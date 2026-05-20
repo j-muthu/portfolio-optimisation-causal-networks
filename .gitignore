@@ -1,0 +1,21 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+
+# OS
+.DS_Store
+
+# Claude local settings
+.claude/settings.local.json
+
+# Reference PDFs — papers kept locally, not version-controlled
+*.pdf
+
+# Data cache (downloaded prices / Wikipedia tables — regenerable)
+cache/
+
+# Experiment artefacts: pickled results are large; CSVs/PNGs/logs are tracked
+results/**/*.pkl

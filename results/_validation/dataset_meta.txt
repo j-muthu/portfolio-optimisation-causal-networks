@@ -1,0 +1,4 @@
+Dataset(n=2766, d=24, approach='fixed', range=2014-01-01..2024-12-31)
+n=2766 d=24
+meta={'approach': 'fixed', 'start': '2014-01-01', 'end': '2024-12-31', 'universe_size': 25, 'standardised': True, 'adf_alpha': 0.01, 'max_missing': 0.05}
+dropped={'missing_data': ['ABNB'], 'non_stationary': []}

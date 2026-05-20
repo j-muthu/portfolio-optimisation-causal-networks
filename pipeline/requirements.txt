@@ -1,0 +1,31 @@
+# Runtime dependencies for the S&P 500 causal-discovery pipeline.
+# Install into a Python 3.13 venv:
+#
+#     python3.13 -m venv .venv
+#     .venv/bin/pip install -r pipeline/requirements.txt
+#
+# NOTE: causalnex and lingam are NOT installed from PyPI -- the pipeline uses
+# the vendored source trees in thesis/causalnex and thesis/lingam directly
+# (see pipeline/_vendored.py).  These are only their runtime dependencies.
+
+# Core numerics / data
+numpy==2.4.6
+pandas==3.0.3
+scipy==1.17.1
+pyarrow==24.0.0          # parquet caching
+
+# Causal discovery dependencies
+networkx==3.6.1          # causalnex StructureModel
+scikit-learn==1.8.0      # causalnex transformers, lingam regressions
+statsmodels==0.14.6      # lingam VAR estimation
+graphviz==0.21           # imported transitively by lingam.utils
+semopy==2.3.11           # imported transitively by lingam.utils
+
+# Data download
+yfinance==1.3.0
+lxml==6.1.1              # pandas.read_html (Wikipedia tables)
+requests==2.34.2
+
+# Analysis / parallelism
+joblib==1.5.3            # rolling-window parallelism
+matplotlib==3.10.9       # graph_analysis plots
