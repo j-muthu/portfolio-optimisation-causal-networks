@@ -1,3 +1,5 @@
+## Old notes & plans
+
 Split asset return into systematic risk and idiosyncratic risk.
 - To minimise systematic risk, you use the factor model, which specifies explicit external variables or factors. Each asset has a vector of betas, which are sensitivity to each factor.
 - For idiosyncratic risk, you reduce risk by diversification. Give it a covariance matrix of asset returns. It gives weights that minimise portfolio variance for a given expected return.
@@ -123,3 +125,38 @@ tests whether statistical & causal info are complementary.
 
 symmetrisation in v1 & v3 means you lose causal directionality
 but clustering isn't directional - assets are either in the same cluster or not
+
+questions:
+1. is my pipeline fully reproducible?
+2. what date does my pipeline's data fetching go up to?
+3. can you make the log output more frequent?
+4. should I run it on google colab so it has gpu/tpu access? would that be faster than my local machine, even at the free tier? or should I buy a paid tier?
+5. what's the current window size? is it 2 years - do you think that's a good choice? can it be changed easily?
+
+## Change of plans following call w/ Ce 21/05
+
+we need some error propagation! portfolio backtesting results need to somehow act as a signal to affect the clustering
+
+could it improve the identification of factors of HSP?
+factors should be lagged
+for actual factor selection, should just use a simple greedy dynotears algorithm
+
+FFNN maps driver vectors to asset returns
+
+1. either work on clustering or allocation, not both (doing both is too much) 
+2. options:
+3. if you do causal asset allocation, need to redesign HRP/HSP algorithm to take advantage of causal info (can't just symmetrise)
+4. if you do causal discovery for factors, need to take advantage of portfolio performance 
+feed distance matrix back into HRP
+
+Hyperparams:
+K (number of selected drivers), W (selection window), α (causal/historical mix), γ (utility EMA decay), the linkage method, and the lag horizon for the DYNOTEARS fit.
+
+**future work**:
+- expand candidate driver universe
+- test on other, larger stock market indicies
+- instead of HSP's FFNN & AAD stack, switch it out for NTS-NOTEARS
+	- which is like DYNOTEARS (score-based, temporal, acyclic) but also allows for nonlinear modelling of dependence of child vars on their parents (by using 1D CNNs)
+- also use VARLINGAM as another linear temporal causal discovery algorithm, and is theoretically better for financial returns because it requires non-gaussian residuals 
+- make the whole pipeline feedback-loop-able -- differentiable end to end (full bilevel optimisation, gradient (or evolutionary-strategy proxy gradient) of validation Sharpe with respect to discovery hyperparameters and clustering parameters jointly)
+- account for transaction costs
