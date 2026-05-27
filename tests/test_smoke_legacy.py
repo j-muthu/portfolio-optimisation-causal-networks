@@ -23,15 +23,15 @@ import networkx as nx
 import numpy as np
 
 from pipeline.data import build_dataset
-from pipeline.graph_analysis import (
+from pipeline.discovery.diagnostics import (
     analyse_rolling,
     causal_order_drift,
     compare_rolling,
     detect_regime_changes,
 )
 from pipeline.portfolio import compare_hrp
-from pipeline.rolling_dynotears import run_dynotears_window, run_rolling_dynotears
-from pipeline.rolling_varlingam import run_rolling_varlingam, run_varlingam_window
+from pipeline.discovery.dynotears import run_dynotears_window, run_rolling_dynotears
+from pipeline.discovery.varlingam import run_rolling_varlingam, run_varlingam_window
 
 # 20 large-cap, long-history names across several GICS sectors.
 SMOKE_TICKERS = [

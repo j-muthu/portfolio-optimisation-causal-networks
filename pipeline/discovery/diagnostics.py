@@ -305,3 +305,51 @@ def plot_metrics(
     plt.close(fig)
     logger.info("Saved metrics plot to %s", output_path)
     return output_path
+
+
+# ============================================================================
+# VARLiNGAM HSIC residual-independence diagnostics
+# ============================================================================
+def summarise_error_independence(window) -> dict:
+    """Boil a ``JointVarLingamWindow``'s HSIC p-value matrix down to scalars.
+
+    Returns ``{"rejection_rate", "min_pvalue", "median_pvalue", "n_pairs"}``
+    where ``rejection_rate`` is the fraction of off-diagonal p-values < 0.05
+    (LiNGAM null hypothesis = "residuals are pairwise independent").
+
+    Interpretation:
+    * ``rejection_rate ≈ 0.05`` (the false-positive level) ⇒ LiNGAM
+      assumption holds for this window.
+    * ``rejection_rate ≫ 0.05`` ⇒ LiNGAM is misspecified; the recovered
+      causal order should not be trusted for downstream interpretation.
+
+    Returns an empty dict if the window has no ``error_indep_pvalues``
+    (e.g. spot-check skipped this rebalance).
+    """
+    pvalues = getattr(window, "error_indep_pvalues", None)
+    if pvalues is None:
+        return {}
+    pvalues = np.asarray(pvalues)
+    triu = np.triu_indices_from(pvalues, k=1)
+    off_diag = pvalues[triu]
+    return {
+        "rejection_rate": float((off_diag < 0.05).mean()),
+        "min_pvalue": float(off_diag.min()),
+        "median_pvalue": float(np.median(off_diag)),
+        "n_pairs": int(len(off_diag)),
+    }
+
+
+def summarise_error_independence_panel(result) -> pd.DataFrame:
+    """Aggregate :func:`summarise_error_independence` across a rolling result.
+
+    Returns one row per window that has HSIC p-values populated (skipped
+    windows are omitted). Useful for plotting the misspecification time-series.
+    """
+    rows = []
+    for w in result.windows:
+        s = summarise_error_independence(w)
+        if not s:
+            continue
+        rows.append({"end_date": w.end_date, **s})
+    return pd.DataFrame(rows).set_index("end_date") if rows else pd.DataFrame()

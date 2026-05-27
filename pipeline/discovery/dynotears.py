@@ -27,12 +27,14 @@ from __future__ import annotations
 import logging
 import warnings
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Iterator, Sequence
 
 import networkx as nx
 import numpy as np
 import pandas as pd
 
+from pipeline._parallel import execute_windows
 from pipeline._vendored import from_pandas_dynamic
 from pipeline.data import Dataset
 
@@ -195,6 +197,7 @@ def run_dynotears_window(
     w_threshold: float = 0.01,
     max_iter: int = 100,
     enforce_acyclic: bool = True,
+    tabu_edges: list[tuple[int, str, str]] | None = None,
 ) -> tuple[np.ndarray, list[np.ndarray], bool, int]:
     """Fit DYNOTEARS on one window.
 
@@ -208,6 +211,13 @@ def run_dynotears_window(
         the contemporaneous graph is a genuine DAG.  The lagged matrices ``A``
         are inter-slice and may legitimately contain cycles, so they are left
         untouched.
+    tabu_edges:
+        Optional list of ``(lag, from_col_name, to_col_name)`` tuples to
+        forbid. ``lag == 0`` is an intra-slice (W) constraint; ``lag >= 1`` is
+        an inter-slice (A[lag-1]) constraint. ``causalnex.from_pandas_dynamic``
+        translates these into ``(0, 0)`` L-BFGS-B bounds on the corresponding
+        cells, giving an exact hard constraint with no optimiser surgery
+        (see :mod:`pipeline.discovery.dynotears_joint`).
 
     Returns
     -------
@@ -228,6 +238,7 @@ def run_dynotears_window(
             lambda_a=lambda_a,
             max_iter=max_iter,
             w_threshold=w_threshold,
+            tabu_edges=tabu_edges,
         )
     converged = not any("converge" in str(w.message).lower() for w in caught)
     W, A = structure_model_to_matrices(sm, columns, p)
@@ -375,6 +386,7 @@ def run_rolling_dynotears(
     lambda_grid: Sequence[float] | None = None,
     cv_val_frac: float = 0.2,
     n_jobs: int = 1,
+    checkpoint_dir: str | Path | None = None,
 ) -> RollingDynotearsResult:
     """Slide DYNOTEARS across a :class:`Dataset` (the plan's Step 1).
 
@@ -391,6 +403,10 @@ def run_rolling_dynotears(
         :func:`select_lambdas` instead of using the fixed values.
     n_jobs:
         Process-level parallelism (``joblib``).  Each window is independent.
+    checkpoint_dir:
+        If set, each completed window is pickled there and an interrupted run
+        resumes from the checkpoints instead of recomputing.  Keyed by window
+        index only -- use a fresh directory when parameters change.
 
     Returns
     -------
@@ -414,14 +430,9 @@ def run_rolling_dynotears(
             w_threshold, max_iter, lambda_grid, cv_val_frac,
         )
 
-    if n_jobs == 1:
-        windows = [_call(job) for job in jobs]
-    else:
-        from joblib import Parallel, delayed
-
-        windows = Parallel(n_jobs=n_jobs)(delayed(_call)(job) for job in jobs)
-
-    windows.sort(key=lambda w: w.index)
+    windows = execute_windows(
+        jobs, _call, n_jobs, "dynotears", checkpoint_dir=checkpoint_dir
+    )
     return RollingDynotearsResult(
         windows=windows,
         columns=list(returns.columns),
@@ -434,5 +445,313 @@ def run_rolling_dynotears(
             "max_iter": max_iter,
             "cross_validated": lambda_grid is not None,
             **dataset.meta,
+        },
+    )
+
+
+# ============================================================================
+# Stage 1 joint-matrix path: drivers + assets with asset→driver tabu_edges
+# ============================================================================
+def make_tabu_edges_asset_to_driver(
+    driver_columns: Sequence[str],
+    asset_columns: Sequence[str],
+    p: int,
+) -> list[tuple[int, str, str]]:
+    """Enumerate the (lag, from, to) tuples forbidding asset → driver edges.
+
+    Encodes the directional hypothesis that within the analysis timescale
+    drivers cause assets, not vice versa. Returns ~|assets| × |drivers| × (p+1)
+    entries (e.g. 100 × 50 × 2 ≈ 10 k for the primary backtest configuration);
+    the cost is paid once per window and the optimiser only sees ``(0, 0)``
+    bounds on the masked cells.
+    """
+    out: list[tuple[int, str, str]] = []
+    for lag in range(p + 1):
+        for asset in asset_columns:
+            for driver in driver_columns:
+                out.append((lag, asset, driver))
+    return out
+
+
+@dataclass
+class JointDynotearsWindow:
+    """DYNOTEARS output for one window of the joint ``[D | A]`` panel.
+
+    Stage 1's per-window output, persisted to Parquet downstream. The matrix
+    convention matches :class:`DynotearsWindow` (``W[i, j]`` is ``i -> j``),
+    but here columns include drivers and assets; ``driver_idx`` /
+    ``asset_idx`` carry the block layout.
+    """
+
+    index: int
+    start_row: int
+    end_row: int
+    start_date: pd.Timestamp
+    end_date: pd.Timestamp
+    columns: list[str]
+    driver_columns: list[str]
+    asset_columns: list[str]
+    driver_idx: np.ndarray
+    asset_idx: np.ndarray
+    W: np.ndarray
+    A: list[np.ndarray]
+    p: int
+    lambda_w: float
+    lambda_a: float
+    converged: bool
+    acyclic_edges_removed: int
+    zscore_mean: np.ndarray
+    zscore_std: np.ndarray
+    fit_loss: float
+    tabu_enforced: bool
+
+    @property
+    def n_drivers(self) -> int:
+        return len(self.driver_columns)
+
+    @property
+    def n_assets(self) -> int:
+        return len(self.asset_columns)
+
+    def driver_to_asset_block(self, lag: int) -> np.ndarray:
+        """``M[d, a]`` for ``M ∈ {W, A[lag-1]}`` — the block that should be non-trivial."""
+        mat = self.W if lag == 0 else self.A[lag - 1]
+        return mat[np.ix_(self.driver_idx, self.asset_idx)]
+
+    def asset_to_driver_block(self, lag: int) -> np.ndarray:
+        """``M[a, d]`` — the block masked to zero by the tabu_edges constraint."""
+        mat = self.W if lag == 0 else self.A[lag - 1]
+        return mat[np.ix_(self.asset_idx, self.driver_idx)]
+
+    def n_intra_edges_driver_to_asset(self) -> int:
+        return int(np.count_nonzero(self.driver_to_asset_block(0)))
+
+
+@dataclass
+class RollingJointDynotearsResult:
+    """Per-window sequence of :class:`JointDynotearsWindow` plus meta."""
+
+    windows: list[JointDynotearsWindow]
+    columns: list[str]
+    driver_columns: list[str]
+    asset_columns: list[str]
+    meta: dict = field(default_factory=dict)
+
+    def __len__(self) -> int:
+        return len(self.windows)
+
+    @property
+    def dates(self) -> pd.DatetimeIndex:
+        return pd.DatetimeIndex([w.end_date for w in self.windows])
+
+    def to_frame(self) -> pd.DataFrame:
+        rows = []
+        for w in self.windows:
+            d2a = w.driver_to_asset_block(0)
+            a2d = w.asset_to_driver_block(0)
+            rows.append(
+                {
+                    "start_date": w.start_date,
+                    "end_date": w.end_date,
+                    "intra_edges_total": int(np.count_nonzero(w.W)),
+                    "intra_edges_driver_to_asset": int(np.count_nonzero(d2a)),
+                    "intra_edges_asset_to_driver": int(np.count_nonzero(a2d)),
+                    "lambda_w": w.lambda_w,
+                    "lambda_a": w.lambda_a,
+                    "converged": w.converged,
+                    "fit_loss": w.fit_loss,
+                    "tabu_enforced": w.tabu_enforced,
+                }
+            )
+        return pd.DataFrame(rows)
+
+
+def run_dynotears_joint_window(
+    joint_window: pd.DataFrame,
+    driver_columns: Sequence[str],
+    asset_columns: Sequence[str],
+    p: int = 1,
+    lambda_w: float = 0.05,
+    lambda_a: float = 0.05,
+    w_threshold: float = 0.01,
+    max_iter: int = 100,
+    enforce_acyclic: bool = True,
+    enforce_tabu: bool = True,
+) -> JointDynotearsWindow:
+    """Fit DYNOTEARS on one window of the joint ``[D | A]`` panel.
+
+    Steps:
+
+    1. Per-window z-score normalisation (mean and std stored on the output).
+    2. Build the asset → driver tabu mask if ``enforce_tabu`` is set.
+    3. Call :func:`run_dynotears_window` with the mask.
+    4. Compute the residual fit loss (Frobenius of the DYNOTEARS objective on
+       the normalised window) for diagnostics.
+
+    ``index`` / ``start_row`` / ``end_row`` / dates are filled with placeholder
+    values; the rolling driver overwrites them.
+    """
+    columns = list(joint_window.columns)
+    driver_columns = list(driver_columns)
+    asset_columns = list(asset_columns)
+    if set(columns) != set(driver_columns) | set(asset_columns):
+        raise ValueError(
+            "joint_window columns must equal the union of driver_columns and "
+            "asset_columns"
+        )
+
+    # 1. Per-window z-score.
+    mean = joint_window.mean(axis=0)
+    std = joint_window.std(axis=0, ddof=0).where(lambda s: s > 1e-12, 1e-12)
+    normalised = (joint_window - mean) / std
+
+    # 2. Tabu mask.
+    tabu = (
+        make_tabu_edges_asset_to_driver(driver_columns, asset_columns, p)
+        if enforce_tabu
+        else None
+    )
+
+    # 3. Fit.
+    W, A, converged, removed = run_dynotears_window(
+        normalised,
+        p=p,
+        lambda_w=lambda_w,
+        lambda_a=lambda_a,
+        w_threshold=w_threshold,
+        max_iter=max_iter,
+        enforce_acyclic=enforce_acyclic,
+        tabu_edges=tabu,
+    )
+
+    # 4. Fit loss (Frobenius residual on the normalised window).
+    fit_loss = reconstruction_error(normalised.to_numpy(), p, W, A)
+
+    driver_idx = np.array([columns.index(c) for c in driver_columns], dtype=int)
+    asset_idx = np.array([columns.index(c) for c in asset_columns], dtype=int)
+
+    return JointDynotearsWindow(
+        index=-1,
+        start_row=-1,
+        end_row=-1,
+        start_date=pd.Timestamp(joint_window.index.min()),
+        end_date=pd.Timestamp(joint_window.index.max()),
+        columns=columns,
+        driver_columns=driver_columns,
+        asset_columns=asset_columns,
+        driver_idx=driver_idx,
+        asset_idx=asset_idx,
+        W=W,
+        A=A,
+        p=p,
+        lambda_w=lambda_w,
+        lambda_a=lambda_a,
+        converged=converged,
+        acyclic_edges_removed=removed,
+        zscore_mean=mean.to_numpy(),
+        zscore_std=std.to_numpy(),
+        fit_loss=fit_loss,
+        tabu_enforced=enforce_tabu,
+    )
+
+
+def run_rolling_dynotears_joint(
+    joint,  # JointMatrix from pipeline.data.alignment (avoid import cycle)
+    window: int = 504,
+    step: int = 21,
+    p: int = 1,
+    lambda_w: float = 0.05,
+    lambda_a: float = 0.05,
+    w_threshold: float = 0.01,
+    max_iter: int = 100,
+    enforce_tabu: bool = True,
+    n_jobs: int = 1,
+    checkpoint_dir: str | Path | None = None,
+) -> RollingJointDynotearsResult:
+    """Slide DYNOTEARS over the joint ``[D | A]`` matrix.
+
+    Parameters
+    ----------
+    joint:
+        A ``JointMatrix`` (from :func:`pipeline.data.alignment.build_joint_matrix`)
+        carrying the column-role indices and the trading-day panel.
+    window, step:
+        Window length and stride in trading days. Defaults match the discovery
+        plan: 504 (≈ 2y) and 21 (1 month).
+    enforce_tabu:
+        If ``True`` (default), forbid asset → driver edges. Set ``False`` for
+        the prior-knowledge verification step (refit without the constraint
+        and compare the driver → asset block).
+
+    Returns
+    -------
+    RollingJointDynotearsResult
+    """
+    frame = joint.frame
+    if frame.shape[0] < window:
+        raise ValueError(
+            f"window={window} exceeds joint-matrix rows ({frame.shape[0]})"
+        )
+
+    dates = pd.DatetimeIndex(frame.index)
+    driver_columns = list(joint.driver_columns)
+    asset_columns = list(joint.asset_columns)
+    jobs = [(i, s, e) for i, (s, e) in enumerate(rolling_windows(frame.shape[0], window, step))]
+    logger.info(
+        "Rolling DYNOTEARS (joint): %d windows of %d rows (step %d), "
+        "drivers=%d, assets=%d, p=%d, tabu=%s",
+        len(jobs), window, step, len(driver_columns), len(asset_columns), p, enforce_tabu,
+    )
+
+    def _call(job: tuple[int, int, int]) -> JointDynotearsWindow:
+        idx, start, end = job
+        sub = frame.iloc[start:end]
+        win = run_dynotears_joint_window(
+            sub,
+            driver_columns=driver_columns,
+            asset_columns=asset_columns,
+            p=p,
+            lambda_w=lambda_w,
+            lambda_a=lambda_a,
+            w_threshold=w_threshold,
+            max_iter=max_iter,
+            enforce_tabu=enforce_tabu,
+        )
+        win.index = idx
+        win.start_row = start
+        win.end_row = end
+        win.start_date = dates[start]
+        win.end_date = dates[end - 1]
+        logger.info(
+            "joint window %d (%s..%s): %d intra edges, %d d->a, %d a->d (should=0), "
+            "fit_loss=%.4f%s",
+            idx, win.start_date.date(), win.end_date.date(),
+            int(np.count_nonzero(win.W)),
+            win.n_intra_edges_driver_to_asset(),
+            int(np.count_nonzero(win.asset_to_driver_block(0))),
+            win.fit_loss,
+            "" if win.converged else " [NOT CONVERGED]",
+        )
+        return win
+
+    windows = execute_windows(
+        jobs, _call, n_jobs, "dynotears-joint", checkpoint_dir=checkpoint_dir
+    )
+    return RollingJointDynotearsResult(
+        windows=windows,
+        columns=list(frame.columns),
+        driver_columns=driver_columns,
+        asset_columns=asset_columns,
+        meta={
+            "method": "dynotears-joint",
+            "window": window,
+            "step": step,
+            "p": p,
+            "w_threshold": w_threshold,
+            "max_iter": max_iter,
+            "tabu_enforced": enforce_tabu,
+            "lambda_w": lambda_w,
+            "lambda_a": lambda_a,
+            **(joint.meta or {}),
         },
     )

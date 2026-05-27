@@ -12,8 +12,17 @@ never lost:
 * ``head_to_head.csv``       -- DYNOTEARS-vs-VARLiNGAM comparison (if both run).
 * ``causal_order_drift.csv`` -- VARLiNGAM causal-order stability (if VARLiNGAM).
 * ``run.log``                -- full log of the run.
+* ``dataset.pkl``            -- the exact returns matrix used (for reproducibility).
+* ``checkpoints/``           -- per-window pickles written as each window finishes.
 
 Results land in ``thesis/results/<tag>/``.
+
+Checkpoint/resume: every completed window is pickled under ``checkpoints/`` as it
+finishes, so an interrupted run can be resumed simply by re-running the same
+command -- already-computed windows are loaded instead of recomputed. Checkpoints
+are keyed by ``--tag`` and window index only: when changing windowing or
+algorithm parameters, use a new ``--tag`` (or delete ``checkpoints/``) so stale
+windows are not reused.
 
 Examples
 --------
@@ -41,15 +50,15 @@ from pathlib import Path
 
 from pipeline._vendored import THESIS_ROOT
 from pipeline.data import build_dataset
-from pipeline.graph_analysis import (
+from pipeline.discovery.diagnostics import (
     analyse_rolling,
     causal_order_drift,
     compare_rolling,
     detect_regime_changes,
     plot_metrics,
 )
-from pipeline.rolling_dynotears import run_rolling_dynotears
-from pipeline.rolling_varlingam import run_rolling_varlingam
+from pipeline.discovery.dynotears import run_rolling_dynotears
+from pipeline.discovery.varlingam import run_rolling_varlingam
 
 logger = logging.getLogger("pipeline.run_experiment")
 
@@ -104,7 +113,10 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         "--n-jobs", type=int, default=1,
         help="parallel windows (-1 = all cores)",
     )
-    p.add_argument("--tag", default="run", help="results subdirectory name")
+    p.add_argument(
+        "--tag", default="run",
+        help="results subdirectory name; re-running the same tag resumes from checkpoints",
+    )
     p.add_argument("--no-cache", action="store_true", help="ignore cached data")
     return p.parse_args(argv)
 
@@ -168,7 +180,12 @@ def main(argv: list[str] | None = None) -> None:
         f"meta={dataset.meta}\n"
         f"dropped={dataset.dropped}\n"
     )
+    # Snapshot the exact dataset so results stay reproducible even if yfinance
+    # later revises historical prices.
+    with open(output_dir / "dataset.pkl", "wb") as fh:
+        pickle.dump(dataset, fh)
 
+    checkpoint_dir = output_dir / "checkpoints"
     run_dyn = args.methods in ("dynotears", "both")
     run_var = args.methods in ("varlingam", "both")
     dyn = var = None
@@ -186,6 +203,7 @@ def main(argv: list[str] | None = None) -> None:
             lambda_a=args.lambda_a,
             w_threshold=args.w_threshold,
             n_jobs=args.n_jobs,
+            checkpoint_dir=checkpoint_dir,
         )
         _save_rolling(dyn, "dynotears", output_dir)
         logger.info("DYNOTEARS done in %.1f min", (time.time() - t0) / 60)
@@ -203,6 +221,7 @@ def main(argv: list[str] | None = None) -> None:
             var_method=args.var_method,
             n_bootstrap=args.n_bootstrap,
             n_jobs=args.n_jobs,
+            checkpoint_dir=checkpoint_dir,
         )
         _save_rolling(var, "varlingam", output_dir)
         drift = causal_order_drift(var)
