@@ -1,9 +1,0 @@
-2026-05-20 16:06:11,151 INFO pipeline.run_experiment: Experiment '_validation' -> /Users/joshmuthu/thesis/results/_validation
-2026-05-20 16:06:11,151 INFO pipeline.run_experiment: Config: {'start': '2014-01-01', 'end': '2024-12-31', 'approach': 'fixed', 'max_assets': 25, 'window': 504, 'step': 21, 'methods': 'both', 'p': 1, 'lambda_w': 0.05, 'lambda_a': 0.05, 'w_threshold': 0.01, 'lags': 1, 'criterion': 'bic', 'var_method': 'builtin', 'n_bootstrap': 0, 'n_jobs': -1, 'tag': '_validation', 'no_cache': False}
-2026-05-20 16:06:11,245 INFO pipeline.data: Capping universe at 25 of 503 tickers
-2026-05-20 16:06:11,400 INFO pipeline.data: Downloading 25 tickers 2014-01-01..2024-12-31
-2026-05-20 16:06:12,508 INFO pipeline.data: Dropped 1 assets with >5% missing days
-2026-05-20 16:06:13,067 INFO pipeline.data: Built Dataset(n=2766, d=24, approach='fixed', range=2014-01-01..2024-12-31)
-2026-05-20 16:06:13,067 INFO pipeline.run_experiment: Dataset: Dataset(n=2766, d=24, approach='fixed', range=2014-01-01..2024-12-31)
-2026-05-20 16:06:13,068 INFO pipeline.run_experiment: === Running rolling DYNOTEARS ===
-2026-05-20 16:06:13,068 INFO pipeline.rolling_dynotears: Rolling DYNOTEARS: 108 windows of 504 rows (step 21), d=24, p=1
