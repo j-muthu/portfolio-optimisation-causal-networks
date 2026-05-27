@@ -41,7 +41,15 @@ from pipeline.discovery.dynotears import (
     JointDynotearsWindow,
     run_dynotears_joint_window,
 )
+from pipeline.discovery.varlingam import (
+    JointVarLingamWindow,
+    run_varlingam_joint_window,
+)
 from pipeline.factor_selection import SelectionResult, select_drivers
+from pipeline.factor_selection.correlation_selector import (
+    CorrelationSelectionResult,
+    select_top_k_corr,
+)
 from pipeline.sensitivities import SensitivityWindow, fit_sensitivities_window
 
 logger = logging.getLogger(__name__)
@@ -54,11 +62,17 @@ RESULTS_ROOT = THESIS_ROOT / "results"
 # ============================================================================
 @dataclass
 class Stage1Rebalance:
-    """Stage 1 output for one rebalance date — the §Interface contract."""
+    """Stage 1 output for one rebalance date — the §Interface contract.
+
+    ``discovery`` is ``None`` on the V0 path (cum-corr selection skips the
+    causal-graph fitting step entirely). ``selection`` is either a
+    ``SelectionResult`` (causal-greedy) or a ``CorrelationSelectionResult``
+    (V0); both expose ``.selected`` and ``.K``.
+    """
 
     rebalance_date: pd.Timestamp
-    discovery: JointDynotearsWindow
-    selection: SelectionResult
+    discovery: JointDynotearsWindow | JointVarLingamWindow | None
+    selection: SelectionResult | CorrelationSelectionResult
     sensitivities: SensitivityWindow
 
 
@@ -118,6 +132,9 @@ def fit_stage1_rebalance(
     selector_kwargs: dict,
     sensitivities_kwargs: dict,
     utility_lookup,
+    selection_method: str = "causal_greedy",
+    discovery_method: str | None = "dynotears",
+    correlation_kwargs: dict | None = None,
 ) -> Stage1Rebalance:
     """Run discovery → selection → sensitivities on a single window.
 
@@ -125,6 +142,20 @@ def fit_stage1_rebalance(
     :func:`run_stage1` (batch over all rebalances) and
     :func:`pipeline.closed_loop.run_closed_loop` (just-in-time, per rebalance,
     inside the V2 closed loop).
+
+    Parameters
+    ----------
+    selection_method:
+        ``"causal_greedy"`` (default; V1/V2 path — Stage A + Stage B + utility
+        blend per :func:`select_drivers`) or ``"correlation"`` (V0 path —
+        cumulative-correlation top-K per :func:`select_top_k_corr`). The
+        latter skips discovery entirely.
+    discovery_method:
+        ``"dynotears"`` (default) or ``"varlingam"``. Ignored (with a debug
+        log) when ``selection_method == "correlation"``.
+    correlation_kwargs:
+        Forwarded to ``select_top_k_corr`` (e.g. ``{"lags": (0, 1)}``).
+        Ignored on the causal-greedy path.
     """
     # Per-window z-score for both discovery (already done internally by
     # run_dynotears_joint_window) and the selection / sensitivity steps.
@@ -132,26 +163,63 @@ def fit_stage1_rebalance(
     dw = zs[driver_columns]
     aw = zs[asset_columns]
 
-    # 1. Discovery on the *raw* window (the discovery function z-scores again
-    #    internally, so we pass the joint_window untransformed).
-    disc = run_dynotears_joint_window(
-        joint_window, driver_columns=driver_columns, asset_columns=asset_columns,
-        **discovery_kwargs,
-    )
+    if selection_method not in ("causal_greedy", "correlation"):
+        raise ValueError(
+            f"selection_method must be 'causal_greedy' or 'correlation', "
+            f"got {selection_method!r}"
+        )
 
-    # 2. Selection (Stage A + Stage B + optional α blend with U[t-1]).
-    sel = select_drivers(
-        rebalance_date=rebalance_date,
-        discovery_window=disc,
-        driver_window=dw,
-        asset_window=aw,
-        K=K,
-        utility_lookup=utility_lookup,
-        rebalance_index=rebalance_idx,
-        **selector_kwargs,
-    )
+    disc = None
+    sel: SelectionResult | CorrelationSelectionResult
 
-    # 3. Sensitivities on the selected drivers.
+    if selection_method == "correlation":
+        # V0 path: skip discovery entirely; just rank drivers by cum-corr
+        # with the asset block and take the top K.
+        if discovery_method is not None:
+            logger.debug(
+                "selection_method='correlation': ignoring discovery_method=%r "
+                "(V0 doesn't use a causal graph)", discovery_method,
+            )
+        corr_kw = dict(correlation_kwargs or {})
+        sel = select_top_k_corr(
+            driver_window=dw, asset_window=aw, K=K,
+            rebalance_date=rebalance_date, **corr_kw,
+        )
+    else:
+        # V1/V2 path: discovery → Stage A + Stage B + utility blend.
+        if discovery_method == "varlingam":
+            disc = run_varlingam_joint_window(
+                joint_window, driver_columns=driver_columns,
+                asset_columns=asset_columns, **discovery_kwargs,
+            )
+        elif discovery_method == "dynotears":
+            disc = run_dynotears_joint_window(
+                joint_window, driver_columns=driver_columns,
+                asset_columns=asset_columns, **discovery_kwargs,
+            )
+        else:
+            raise ValueError(
+                f"discovery_method must be 'dynotears' or 'varlingam' for "
+                f"selection_method='causal_greedy', got {discovery_method!r}"
+            )
+
+        # Thread the method choice through so Stage A applies the right
+        # stability mask (DYNOTEARS magnitude threshold vs VARLiNGAM
+        # bootstrap probabilities, when available).
+        sel_kw = dict(selector_kwargs)
+        sel_kw.setdefault("method", discovery_method)
+        sel = select_drivers(
+            rebalance_date=rebalance_date,
+            discovery_window=disc,
+            driver_window=dw,
+            asset_window=aw,
+            K=K,
+            utility_lookup=utility_lookup,
+            rebalance_index=rebalance_idx,
+            **sel_kw,
+        )
+
+    # Sensitivities on the selected drivers (shared across V0/V1/V2).
     if not sel.selected:
         # No drivers selected (e.g. ε early-stop or empty pool); return an
         # empty placeholder so the loop can carry on.
@@ -191,9 +259,12 @@ def run_stage1(
     window_size: int = 504,
     K: int = 10,
     tag: str = "stage1",
+    selection_method: str = "causal_greedy",
+    discovery_method: str | None = "dynotears",
     discovery_kwargs: dict | None = None,
     selector_kwargs: dict | None = None,
     sensitivities_kwargs: dict | None = None,
+    correlation_kwargs: dict | None = None,
     utility_lookup: Callable | None = None,
     output_dir: Path | None = None,
     progress_log_every: int = 6,
@@ -239,9 +310,16 @@ def run_stage1(
     discovery_kwargs = dict(discovery_kwargs or {})
     selector_kwargs = dict(selector_kwargs or {})
     sensitivities_kwargs = dict(sensitivities_kwargs or {})
+    correlation_kwargs = dict(correlation_kwargs or {})
 
+    # Embed the method choices in the output dir so V0 / V1-DYNO / V1-VAR
+    # runs with the same tag don't clobber each other.
+    method_suffix = (
+        "v0_corr" if selection_method == "correlation"
+        else f"causal_{discovery_method}"
+    )
     if output_dir is None:
-        output_dir = RESULTS_ROOT / tag / "stage1"
+        output_dir = RESULTS_ROOT / tag / f"stage1__{method_suffix}"
     output_dir = Path(output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
 
@@ -269,6 +347,9 @@ def run_stage1(
                 selector_kwargs=selector_kwargs,
                 sensitivities_kwargs=sensitivities_kwargs,
                 utility_lookup=utility_lookup,
+                selection_method=selection_method,
+                discovery_method=discovery_method,
+                correlation_kwargs=correlation_kwargs,
             )
         except Exception as exc:
             logger.exception("Rebalance %s failed: %s", t.date(), exc)
@@ -286,9 +367,12 @@ def run_stage1(
         rebalances=rebs, tag=tag,
         config={
             "window_size": window_size, "K": K,
+            "selection_method": selection_method,
+            "discovery_method": discovery_method,
             "discovery_kwargs": discovery_kwargs,
             "selector_kwargs": selector_kwargs,
             "sensitivities_kwargs": sensitivities_kwargs,
+            "correlation_kwargs": correlation_kwargs,
             "n_rebalances": len(rebs),
         },
     )

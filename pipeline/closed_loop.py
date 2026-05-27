@@ -105,9 +105,12 @@ def run_closed_loop(
     holding_days: int = 21,
     transaction_cost_bps: float = 5.0,
     gamma_ema: float = 0.3,
+    selection_method: str = "causal_greedy",
+    discovery_method: str | None = "dynotears",
     discovery_kwargs: dict | None = None,
     selector_kwargs: dict | None = None,
     sensitivities_kwargs: dict | None = None,
+    correlation_kwargs: dict | None = None,
     utility_store: UtilityStore | None = None,
     utility_lookup: Callable[
         [pd.Timestamp], tuple[pd.Series, pd.Timestamp | None]
@@ -169,6 +172,7 @@ def run_closed_loop(
     discovery_kwargs = dict(discovery_kwargs or {})
     selector_kwargs = dict(selector_kwargs or {})
     sensitivities_kwargs = dict(sensitivities_kwargs or {})
+    correlation_kwargs = dict(correlation_kwargs or {})
 
     if output_dir is None:
         output_dir = RESULTS_ROOT / tag
@@ -230,6 +234,9 @@ def run_closed_loop(
             selector_kwargs=selector_kwargs,
             sensitivities_kwargs=sens_kwargs_this_call,
             utility_lookup=utility_lookup,
+            selection_method=selection_method,
+            discovery_method=discovery_method,
+            correlation_kwargs=correlation_kwargs,
         )
         stage1_cache[pd.Timestamp(t)] = s1
 
@@ -319,9 +326,12 @@ def run_closed_loop(
         "holding_days": holding_days,
         "transaction_cost_bps": transaction_cost_bps,
         "gamma_ema": gamma_ema,
+        "selection_method": selection_method,
+        "discovery_method": discovery_method,
         "discovery_kwargs": discovery_kwargs,
         "selector_kwargs": selector_kwargs,
         "sensitivities_kwargs": sensitivities_kwargs,
+        "correlation_kwargs": correlation_kwargs,
         "n_rebalances": len(rebalance_dates),
     }
     # Cheap pickle for downstream analysis.

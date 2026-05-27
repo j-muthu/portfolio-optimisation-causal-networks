@@ -140,8 +140,11 @@ def run_shakedown(
     alpha: float = 0.6,
     burn_in_rebalances: int = 3,
     linkage_method: str = "single",
+    selection_method: str = "causal_greedy",
+    discovery_method: str | None = "dynotears",
     discovery_kwargs: dict | None = None,
     sensitivities_kwargs: dict | None = None,
+    correlation_kwargs: dict | None = None,
     driver_specs: list | None = None,
     tag: str = "shakedown_2020",
     output_dir: Path | None = None,
@@ -174,8 +177,19 @@ def run_shakedown(
         gamma_ema=gamma_ema, alpha=alpha,
         burn_in_rebalances=burn_in_rebalances,
         linkage_method=linkage_method,
+        selection_method=selection_method,
+        discovery_method=discovery_method,
         tag=tag,
     )
+
+    # V0 (cum-corr selection) skips discovery entirely → skip K calibration too.
+    if selection_method == "correlation" and use_k_calibration:
+        logger.info(
+            "selection_method='correlation' (V0): skipping K calibration "
+            "(no discovery → no Stage A scores to calibrate against)"
+        )
+        use_k_calibration = False
+        config["use_k_calibration"] = False
 
     # ------------------------------------------------------------------
     # 1. Universe
@@ -383,9 +397,12 @@ def run_shakedown(
         holding_days=holding_days,
         transaction_cost_bps=transaction_cost_bps,
         gamma_ema=gamma_ema,
+        selection_method=selection_method,
+        discovery_method=discovery_method,
         discovery_kwargs=discovery_kwargs or {},
         selector_kwargs={"alpha": alpha, "burn_in_rebalances": burn_in_rebalances},
         sensitivities_kwargs=sensitivities_kwargs or {},
+        correlation_kwargs=correlation_kwargs or {},
         asset_eligibility=joint.asset_eligibility,
         tag=tag,
         output_dir=output_dir,
@@ -452,6 +469,20 @@ def _cli(argv: list[str] | None = None) -> int:
     p.add_argument("--k-calibration-B", type=int, default=50)
     p.add_argument("--k-calibration-n-jobs", type=int, default=1)
     p.add_argument("--window-size", type=int, default=252)
+    p.add_argument(
+        "--selection-method",
+        choices=["causal_greedy", "correlation"],
+        default="causal_greedy",
+        help="causal_greedy (V1/V2) or correlation (V0 vanilla HSP per "
+        "Rodriguez-Dominguez); V0 skips discovery + K calibration entirely.",
+    )
+    p.add_argument(
+        "--discovery-method",
+        choices=["dynotears", "varlingam"],
+        default="dynotears",
+        help="Discovery backend for the causal-greedy selection path. "
+        "Ignored when --selection-method=correlation.",
+    )
     p.add_argument("--tag", default="shakedown_2020")
     p.add_argument("--no-cache", action="store_true")
     p.add_argument("-v", "--verbose", action="store_true")
@@ -474,6 +505,8 @@ def _cli(argv: list[str] | None = None) -> int:
         k_calibration_B=args.k_calibration_B,
         k_calibration_n_jobs=args.k_calibration_n_jobs,
         window_size=args.window_size,
+        selection_method=args.selection_method,
+        discovery_method=args.discovery_method,
         tag=args.tag, use_cache=not args.no_cache,
     )
 
