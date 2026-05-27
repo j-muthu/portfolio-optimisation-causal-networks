@@ -17,5 +17,13 @@ venv/
 # Data cache (downloaded prices / Wikipedia tables — regenerable)
 cache/
 
+# Rodriguez-Dominguez HSP reference dataset — published-paper supplements
+# kept locally for tests/test_hsp_reference.py but not redistributed.
+HSP/
+
 # Experiment artefacts: pickled results are large; CSVs/PNGs/logs are tracked
 results/**/*.pkl
+
+# Local secrets (API keys / WRDS credentials) — never commit
+.env
+*.env.local
