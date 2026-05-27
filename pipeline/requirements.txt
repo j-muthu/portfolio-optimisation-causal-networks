@@ -29,3 +29,21 @@ requests==2.34.2
 # Analysis / parallelism
 joblib==1.5.3            # rolling-window parallelism
 matplotlib==3.10.9       # graph_analysis plots
+
+# Stage 1 sensitivities: PyTorch multi-head FFNN + autograd jacobian
+# Auto-uses MPS on Apple Silicon, CUDA on NVIDIA, else CPU. No CUDA toolkit
+# required for the macOS / Apple-Silicon path.
+torch>=2.4
+# Stage 2 benchmarks: convex-optimisation min-var / Markowitz MVO
+cvxpy>=1.5
+# Trading-day calendar for joint matrix alignment (NYSE holidays/half-days).
+pandas-market-calendars>=4.4
+# WRDS (CRSP) primary asset price source. We connect directly to WRDS's
+# PostgreSQL endpoint via SQLAlchemy + psycopg (not the `wrds` Python library,
+# which pins old pandas/numpy and conflicts with this project's pins). Auth
+# is via ~/.pgpass — same libpq convention the wrds library uses internally.
+# See pipeline/data/wrds_backend.py.
+sqlalchemy>=2.0
+psycopg[binary]>=3.1
+# Excel I/O for the Rodriguez-Dominguez HSP reference dataset (Phase E.2).
+openpyxl>=3.1
