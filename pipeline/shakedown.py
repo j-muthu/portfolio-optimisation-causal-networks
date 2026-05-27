@@ -131,6 +131,8 @@ def run_shakedown(
     use_k_calibration: bool = True,
     k_calibration_B: int = 50,
     k_calibration_n_jobs: int = 1,
+    k_calibration_permuted_max_iter: int = 20,
+    k_calibration_fdr_alpha: float = 0.05,
     rebalance_step_days: int = 21,
     window_size: int = 252,
     lookback_days: int = 252,
@@ -316,27 +318,34 @@ def run_shakedown(
             len(burnin_window), k_calibration_B, k_calibration_n_jobs,
         )
 
-        # Build the per-permutation fit-and-score closure.
+        # Build the per-permutation fit-and-score closure. The permuted
+        # fits override max_iter to ``k_calibration_permuted_max_iter`` —
+        # shuffled drivers have no causal structure, so the full
+        # ``max_iter=100`` is wasted on non-converging fits. Score
+        # distribution is unchanged in distribution, just much cheaper.
+        # The real fit (below) keeps the unmodified discovery_kwargs.
         disc_kwargs = dict(discovery_kwargs or {})
-        rng_for_shuffle = np.random.default_rng(0)
+        permuted_disc_kwargs = {**disc_kwargs, "max_iter": k_calibration_permuted_max_iter}
+        driver_cols_local = list(joint.driver_columns)
+        asset_cols_local = list(joint.asset_columns)
 
         def _fit_permuted_scores(seed: int) -> np.ndarray:
             local_rng = np.random.default_rng(seed)
             shuffled = burnin_window.copy()
             n = len(shuffled)
-            for d in joint.driver_columns:
+            for d in driver_cols_local:
                 shuffled[d] = shuffled[d].to_numpy()[local_rng.permutation(n)]
             try:
                 disc = run_dynotears_joint_window(
-                    shuffled, joint.driver_columns, joint.asset_columns,
-                    **disc_kwargs,
+                    shuffled, driver_cols_local, asset_cols_local,
+                    **permuted_disc_kwargs,
                 )
             except Exception as exc:
                 logger.debug("Permutation fit failed (seed=%d): %s", seed, exc)
-                return np.zeros(len(joint.driver_columns))
+                return np.zeros(len(driver_cols_local))
             return stage_a_score(disc).scores.to_numpy()
 
-        # Real-fit needs to happen once for K calibration.
+        # Real-fit needs to happen once for K calibration — full max_iter.
         real_disc = run_dynotears_joint_window(
             burnin_window, joint.driver_columns, joint.asset_columns, **disc_kwargs,
         )
@@ -346,13 +355,17 @@ def run_shakedown(
             method="dynotears",
             n_permutations=k_calibration_B,
             quantile=0.95,
+            fdr_alpha=k_calibration_fdr_alpha,
+            n_jobs=k_calibration_n_jobs,
         )
         K = cal_result.K
         timings["k_calibration_s"] = time.time() - t0
         cal_result.save(output_dir / "k_calibration.json")
         logger.info(
-            "K calibration done in %.1fs: K_elbow=%d, K_perm=%d, chosen K=%d",
-            timings["k_calibration_s"], cal_result.K_elbow, cal_result.K_perm, K,
+            "K calibration done in %.1fs: K_elbow=%d, K_perm(BH)=%d, "
+            "K_perm_legacy=%d, chosen K=%d",
+            timings["k_calibration_s"], cal_result.K_elbow,
+            cal_result.K_perm, cal_result.K_perm_legacy, K,
         )
 
     # ------------------------------------------------------------------
@@ -467,7 +480,15 @@ def _cli(argv: list[str] | None = None) -> int:
     p.add_argument("--K-default", type=int, default=10)
     p.add_argument("--skip-k-calibration", action="store_true")
     p.add_argument("--k-calibration-B", type=int, default=50)
-    p.add_argument("--k-calibration-n-jobs", type=int, default=1)
+    p.add_argument("--k-calibration-n-jobs", type=int, default=1,
+                   help="Joblib parallelism across the B permutations "
+                   "(-1 = all cores). Embarrassingly parallel.")
+    p.add_argument("--k-calibration-permuted-max-iter", type=int, default=20,
+                   help="DYNOTEARS max_iter cap on permuted fits (shuffled "
+                   "drivers don't converge; capping avoids wasted iterations "
+                   "without changing the score distribution).")
+    p.add_argument("--k-calibration-fdr-alpha", type=float, default=0.05,
+                   help="Benjamini-Hochberg target FDR for K_perm.")
     p.add_argument("--window-size", type=int, default=252)
     p.add_argument(
         "--selection-method",
@@ -504,6 +525,8 @@ def _cli(argv: list[str] | None = None) -> int:
         use_k_calibration=not args.skip_k_calibration,
         k_calibration_B=args.k_calibration_B,
         k_calibration_n_jobs=args.k_calibration_n_jobs,
+        k_calibration_permuted_max_iter=args.k_calibration_permuted_max_iter,
+        k_calibration_fdr_alpha=args.k_calibration_fdr_alpha,
         window_size=args.window_size,
         selection_method=args.selection_method,
         discovery_method=args.discovery_method,

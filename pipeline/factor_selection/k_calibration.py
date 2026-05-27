@@ -4,11 +4,26 @@ window.
 Two methods are computed in parallel and the more conservative wins:
 
 1. **Kneedle** -- find the elbow in the sorted-Stage-A-score curve.
-2. **Permutation null** -- shuffle each driver's time index independently
-   (preserves marginal distribution, destroys temporal causal structure),
-   refit discovery, collect ``max_d Stage-A-score`` across B=100 shuffles.
-   The 95th percentile of those null max-scores is the threshold;
-   ``K_perm`` is the count of real candidates with score above it.
+2. **Permutation null with BH-FDR** -- shuffle each driver's time index
+   independently (preserves marginal distribution, destroys temporal causal
+   structure), refit discovery, collect the per-driver Stage-A score
+   distribution under the null across B permutations. For each real driver
+   compute a one-sided p-value, then control false-discovery rate at α=0.05
+   via Benjamini-Hochberg. ``K_perm`` is the count of drivers that survive.
+
+Why BH-FDR rather than the historical "max-across-d" threshold: the
+``max_d`` statistic is structurally biased upward when d is large, so a
+single real driver's score routinely fails to clear it even under signal.
+The G.5 calibration found ``K_perm = 0`` because of exactly this bug. The
+legacy max-of-d statistic is still computed and stored as a
+side-channel ``K_perm_legacy`` for direct comparison in the methodology
+chapter.
+
+Runtime: the permutation loop is embarrassingly parallel across B fits and
+each permuted DYNOTEARS fit can be capped at a low ``max_iter`` since
+shuffled drivers have no causal structure to converge on. ``n_jobs`` and
+the caller's choice of ``permuted_max_iter`` (see ``shakedown.py``) bring
+the calibration into the minute-scale regime at thesis-relevant d.
 
 ``K = max(K_elbow, K_perm)``. The sensitivity sweep range is
 ``{⌈K/2⌉, K, min(2K, |pool|/2)}`` plus two interpolating values.
@@ -72,25 +87,143 @@ def permutation_null_threshold(
     n_permutations: int = 100,
     quantile: float = 0.95,
     rng: np.random.Generator | None = None,
-) -> tuple[float, np.ndarray]:
-    """Permutation null distribution for the *max* Stage-A score.
+    n_jobs: int = 1,
+) -> tuple[float, np.ndarray, np.ndarray]:
+    """Permutation null distribution for Stage-A scores under shuffled drivers.
 
     ``fit_score_fn`` takes a seed integer and returns the Stage A score
     vector under one driver-permuted refit. The seed is meant to set the
     refit's RNG so the permutations are reproducible.
 
-    Returns ``(threshold, null_max_scores)`` where ``threshold`` is the
-    requested quantile of the per-permutation max scores. Drivers whose
-    real Stage A score exceeds the threshold are deemed signal.
+    Returns ``(threshold, null_max_scores, null_per_driver)`` where:
+
+    * ``threshold`` — the requested quantile (default 95th percentile) of
+      the per-permutation max scores. Legacy "max-across-d" threshold;
+      used to compute ``K_perm_legacy`` for the methodology-chapter
+      comparison. Biased upward at large d (multiple-comparisons).
+    * ``null_max_scores`` — shape ``(B,)``; the per-permutation max
+      scores. Kept for reporting / plotting.
+    * ``null_per_driver`` — shape ``(B, d)``; the **full** per-permutation
+      per-driver score matrix. Consumed by
+      :func:`benjamini_hochberg_K_perm` to compute the FDR-controlled K.
+      Memory cost is trivial (B=100, d=35 → 1400 floats).
+
+    ``n_jobs > 1`` parallelises the permutation loop via joblib
+    (embarrassingly parallel — each permutation is an independent fit).
+    All seeds are drawn up-front from ``rng`` so the result is
+    deterministic regardless of n_jobs.
     """
     rng = rng or np.random.default_rng(0)
-    null_max: list[float] = []
-    for b in range(n_permutations):
-        seed = int(rng.integers(0, 2**31 - 1))
-        scores = fit_score_fn(seed)
-        null_max.append(float(np.max(scores)))
-    null_max_arr = np.asarray(null_max)
-    return float(np.quantile(null_max_arr, quantile)), null_max_arr
+    seeds = [int(rng.integers(0, 2**31 - 1)) for _ in range(n_permutations)]
+
+    if n_jobs == 1:
+        all_scores = [fit_score_fn(s) for s in seeds]
+    else:
+        from joblib import Parallel, delayed
+
+        all_scores = Parallel(n_jobs=n_jobs, prefer="processes")(
+            delayed(fit_score_fn)(s) for s in seeds
+        )
+
+    null_per_driver = np.asarray(all_scores, dtype=float)  # (B, d)
+    null_max_arr = null_per_driver.max(axis=1)             # (B,)
+    threshold = float(np.quantile(null_max_arr, quantile))
+    return threshold, null_max_arr, null_per_driver
+
+
+# ============================================================================
+# Benjamini-Hochberg FDR control
+# ============================================================================
+def benjamini_hochberg_K_perm(
+    real_scores: np.ndarray,
+    null_per_driver: np.ndarray,
+    alpha: float = 0.05,
+    method: str = "zscore",
+) -> tuple[int, np.ndarray, np.ndarray]:
+    """Per-driver p-values + BH-FDR → number of significant drivers.
+
+    Two p-value formulations:
+
+    * ``method="zscore"`` (default, recommended): per-driver one-sided
+      p-value via the standardised score
+      ``z_d = (real_d − mean(null_{·,d})) / std(null_{·,d})``,
+      converted via ``1 − Φ(z)``. Assumes the per-driver null is
+      approximately Gaussian — typical for Stage A scores because they
+      aggregate over many lagged-edge magnitudes (CLT regime).
+      Continuous p-values, not limited by the MC discreteness floor.
+    * ``method="mc"`` (non-parametric backup): empirical one-sided
+      p-value ``p_d = (#{b : null[b, d] ≥ real_d} + 1) / (B + 1)``.
+      Conservative but with a hard floor at ``1 / (B + 1)`` — at
+      typical thesis ``(B=100, d=135, α=0.05)`` this floor is far above
+      BH's threshold so nothing can clear FDR. Use only when ``B`` is
+      large enough that the MC floor is well below ``α / d``.
+
+    Then Benjamini-Hochberg at level ``alpha``: sort p-values ascending,
+    find the largest k with ``p_(k) ≤ (k / m) · α``, declare drivers
+    with rank ≤ k as significant.
+
+    Parameters
+    ----------
+    real_scores:
+        Per-driver real Stage-A scores; shape ``(d,)``.
+    null_per_driver:
+        Permutation null matrix from :func:`permutation_null_threshold`;
+        shape ``(B, d)`` matching ``real_scores`` columnwise.
+    alpha:
+        Target FDR level. ``0.05`` is the canonical academic default.
+    method:
+        ``"zscore"`` (parametric, default) or ``"mc"`` (non-parametric).
+
+    Returns
+    -------
+    ``(K_perm, p_values, significant_mask)``:
+
+    * ``K_perm`` -- count of significant drivers (the BH-FDR estimate of
+      the number of true positives).
+    * ``p_values`` -- shape ``(d,)``; raw per-driver p-values.
+    * ``significant_mask`` -- shape ``(d,)``, bool; True for drivers
+      surviving BH at level ``alpha``.
+    """
+    real_scores = np.asarray(real_scores, dtype=float)
+    null_per_driver = np.asarray(null_per_driver, dtype=float)
+    if null_per_driver.ndim != 2 or null_per_driver.shape[1] != real_scores.shape[0]:
+        raise ValueError(
+            f"null_per_driver shape {null_per_driver.shape} must be (B, d) "
+            f"with d == len(real_scores)={real_scores.shape[0]}"
+        )
+
+    B, d = null_per_driver.shape
+
+    if method == "zscore":
+        from scipy.stats import norm
+
+        null_mean = null_per_driver.mean(axis=0)
+        null_std = null_per_driver.std(axis=0, ddof=1)
+        null_std = np.maximum(null_std, 1e-12)  # floor to avoid div-by-zero
+        z = (real_scores - null_mean) / null_std
+        p_values = norm.sf(z)  # one-sided upper tail
+    elif method == "mc":
+        n_extreme = (null_per_driver >= real_scores[None, :]).sum(axis=0)
+        p_values = (n_extreme + 1.0) / (B + 1.0)
+    else:
+        raise ValueError(f"method must be 'zscore' or 'mc', got {method!r}")
+
+    # Benjamini-Hochberg step-up procedure at level alpha.
+    order = np.argsort(p_values, kind="stable")
+    p_sorted = p_values[order]
+    ranks = np.arange(1, d + 1, dtype=float)
+    bh_threshold = ranks * alpha / d
+    below = p_sorted <= bh_threshold
+    if not below.any():
+        k_star = 0
+    else:
+        # Largest rank k with p_(k) <= (k/d)*alpha.
+        k_star = int(np.where(below)[0].max() + 1)
+
+    significant = np.zeros(d, dtype=bool)
+    if k_star > 0:
+        significant[order[:k_star]] = True
+    return int(significant.sum()), p_values, significant
 
 
 # ============================================================================
@@ -98,12 +231,22 @@ def permutation_null_threshold(
 # ============================================================================
 @dataclass
 class KCalibration:
-    """Outcome of the burn-in K-calibration run."""
+    """Outcome of the burn-in K-calibration run.
+
+    ``K_perm`` is the FDR-controlled count (Benjamini-Hochberg). The
+    historical "max-across-d" statistic is preserved in
+    ``K_perm_legacy`` for the methodology-chapter comparison — it's
+    structurally biased low at large d and was the source of G.5's
+    ``K_perm = 0`` finding.
+    """
 
     K: int
     K_elbow: int
     K_perm: int
+    K_perm_legacy: int
     threshold_perm: float
+    p_values: np.ndarray
+    significant_drivers_mask: np.ndarray
     real_scores_desc: np.ndarray
     real_drivers_desc: list[str]
     pool_size: int
@@ -115,11 +258,14 @@ class KCalibration:
             "K": int(self.K),
             "K_elbow": int(self.K_elbow),
             "K_perm": int(self.K_perm),
+            "K_perm_legacy": int(self.K_perm_legacy),
             "threshold_perm": float(self.threshold_perm),
             "pool_size": int(self.pool_size),
             "sensitivity_sweep": [int(x) for x in self.sensitivity_sweep],
             "real_scores_desc": [float(x) for x in self.real_scores_desc],
             "real_drivers_desc": list(self.real_drivers_desc),
+            "p_values": [float(x) for x in self.p_values],
+            "significant_drivers_mask": [bool(x) for x in self.significant_drivers_mask],
             "metadata": self.metadata,
         }
 
@@ -131,9 +277,14 @@ class KCalibration:
         d = json.loads(Path(path).read_text())
         return cls(
             K=d["K"], K_elbow=d["K_elbow"], K_perm=d["K_perm"],
+            K_perm_legacy=d.get("K_perm_legacy", -1),
             threshold_perm=d["threshold_perm"],
             real_scores_desc=np.asarray(d["real_scores_desc"]),
             real_drivers_desc=list(d["real_drivers_desc"]),
+            p_values=np.asarray(d.get("p_values", []), dtype=float),
+            significant_drivers_mask=np.asarray(
+                d.get("significant_drivers_mask", []), dtype=bool
+            ),
             pool_size=d["pool_size"],
             sensitivity_sweep=list(d.get("sensitivity_sweep", [])),
             metadata=d.get("metadata", {}),
@@ -159,8 +310,10 @@ def calibrate_K(
     n_permutations: int = 100,
     quantile: float = 0.95,
     rng_seed: int = 0,
+    fdr_alpha: float = 0.05,
+    n_jobs: int = 1,
 ) -> KCalibration:
-    """Run both Kneedle and permutation-null and pick the conservative K.
+    """Run both Kneedle and permutation-null + BH-FDR and pick the conservative K.
 
     Parameters
     ----------
@@ -175,14 +328,27 @@ def calibrate_K(
         Pass-through to :func:`stage_a_score` on the real window.
     n_permutations, quantile:
         Permutation-null settings; defaults match the plan (B=100, 95 %).
+        ``quantile`` only governs the **legacy** max-of-d threshold; the
+        primary ``K_perm`` is FDR-controlled.
+    fdr_alpha:
+        Benjamini-Hochberg target false-discovery rate for the
+        per-driver p-values (default 0.05 — academic canonical).
+    n_jobs:
+        Parallelism across the B permutations. ``-1`` uses all cores.
+        Embarrassingly parallel; speedup is near-linear up to the number
+        of physical cores.
 
     Returns
     -------
-    :class:`KCalibration`. The final ``K = max(K_elbow, K_perm)`` and a
-    sensitivity sweep range is populated.
+    :class:`KCalibration` with ``K = max(K_elbow, K_perm)`` (clipped to
+    ``[1, pool_size]``), the per-driver p-values + significance mask, and
+    the legacy max-of-d ``K_perm_legacy`` for direct comparison.
     """
     real_result = stage_a_score(real_window, method=method, target_fraction=target_fraction)
-    sorted_desc = real_result.scores.sort_values(ascending=False)
+    # Keep the original (unsorted) order alongside the sorted view so the
+    # null-per-driver column alignment is unambiguous.
+    real_scores_unsorted = real_result.scores
+    sorted_desc = real_scores_unsorted.sort_values(ascending=False)
     pool_size = int((sorted_desc > 0).sum())
     scores_desc = sorted_desc.values
     drivers_desc = sorted_desc.index.tolist()
@@ -190,25 +356,44 @@ def calibrate_K(
     K_elbow = kneedle(scores_desc) if pool_size > 0 else 0
 
     rng = np.random.default_rng(rng_seed)
-    threshold, null_max = permutation_null_threshold(
+    threshold, null_max, null_per_driver = permutation_null_threshold(
         fit_permuted_score_fn,
         n_permutations=n_permutations,
         quantile=quantile,
         rng=rng,
+        n_jobs=n_jobs,
     )
-    K_perm = int(np.sum(scores_desc > threshold))
+
+    # Primary: BH-FDR on per-driver p-values. Uses the unsorted order so
+    # ``null_per_driver`` columns line up with ``real_scores_unsorted``
+    # (the closure returns scores in the unsorted driver-name order).
+    K_perm, p_values, sig_mask = benjamini_hochberg_K_perm(
+        real_scores_unsorted.values, null_per_driver, alpha=fdr_alpha,
+    )
+    # Legacy diagnostic: count of real drivers above the max-of-d threshold.
+    K_perm_legacy = int(np.sum(scores_desc > threshold))
 
     K = max(K_elbow, K_perm)
     K = max(1, min(K, pool_size))  # never exceed available signal
     sweep = _build_sweep(K, pool_size)
 
+    significant_names = [
+        drv for drv, ok in zip(real_scores_unsorted.index.tolist(), sig_mask) if ok
+    ]
     logger.info(
-        "K calibration: K_elbow=%d, K_perm=%d (threshold=%.4f), chosen K=%d, "
-        "pool_size=%d, sweep=%s",
-        K_elbow, K_perm, threshold, K, pool_size, sweep,
+        "K calibration: K_elbow=%d, K_perm(BH)=%d, K_perm_legacy=%d "
+        "(threshold=%.4f), chosen K=%d, pool_size=%d, sweep=%s",
+        K_elbow, K_perm, K_perm_legacy, threshold, K, pool_size, sweep,
+    )
+    logger.info(
+        "K calibration: %d driver(s) significant at FDR=%.2f: %s",
+        len(significant_names), fdr_alpha, significant_names,
     )
     return KCalibration(
-        K=K, K_elbow=K_elbow, K_perm=K_perm, threshold_perm=threshold,
+        K=K, K_elbow=K_elbow, K_perm=K_perm, K_perm_legacy=K_perm_legacy,
+        threshold_perm=threshold,
+        p_values=p_values,
+        significant_drivers_mask=sig_mask,
         real_scores_desc=scores_desc,
         real_drivers_desc=drivers_desc,
         pool_size=pool_size,
@@ -218,7 +403,10 @@ def calibrate_K(
             "n_permutations": n_permutations,
             "quantile": quantile,
             "target_fraction": target_fraction,
+            "fdr_alpha": fdr_alpha,
+            "n_jobs": n_jobs,
             "null_max_scores": [float(x) for x in null_max],
+            "significant_drivers": significant_names,
         },
     )
 
@@ -226,6 +414,7 @@ def calibrate_K(
 __all__ = [
     "kneedle",
     "permutation_null_threshold",
+    "benjamini_hochberg_K_perm",
     "KCalibration",
     "calibrate_K",
 ]
