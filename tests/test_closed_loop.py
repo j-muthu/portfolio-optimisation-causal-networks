@@ -330,3 +330,138 @@ def test_t3_leak_canary_fires(synthetic_fixture):
         "Leak canary fired on %d/%d rebalances; sample leaks: %s",
         n_rows_seen_diff, len(fix["rebalance_dates"]), leak_examples[:3],
     )
+
+
+# ============================================================================
+# F.2 — selection_method / discovery_method switches
+# ============================================================================
+def test_f2_v0_correlation_skips_discovery(synthetic_fixture):
+    """V0 path: ``selection_method='correlation'`` runs end-to-end with
+    ``Stage1Rebalance.discovery is None`` for every rebalance, and recovers
+    the planted-signal drivers."""
+    from pipeline.closed_loop import run_closed_loop
+    from pipeline.factor_selection.correlation_selector import (
+        CorrelationSelectionResult,
+    )
+
+    fix = synthetic_fixture
+    result = run_closed_loop(
+        joint_frame=fix["joint_frame"],
+        asset_returns=fix["asset_returns"],
+        rebalance_dates=fix["rebalance_dates"],
+        universe_at=fix["universe_at"],
+        driver_columns=fix["driver_columns"],
+        asset_columns=fix["asset_columns"],
+        selection_method="correlation",
+        selector_kwargs={},  # cum-corr doesn't take alpha/burn_in
+        gamma_ema=0.3,
+        tag="t_f2_v0",
+        **{k: v for k, v in _common_kwargs(fix["tmp_dir"] / "f2_v0").items()
+           if k != "discovery_kwargs"},
+        discovery_kwargs={},  # ignored on V0 but passed for API stability
+    )
+
+    # Every rebalance: no discovery object, correlation-result type, non-empty selection.
+    for t in fix["rebalance_dates"]:
+        s1 = result.stage1_cache[t]
+        assert s1.discovery is None, f"V0 must skip discovery at {t.date()}"
+        assert isinstance(s1.selection, CorrelationSelectionResult)
+        assert s1.selection.selected, f"V0 must select drivers at {t.date()}"
+        assert s1.sensitivities.S.shape == (
+            len(fix["asset_columns"]), len(s1.selection.selected)
+        )
+
+    # On the planted fixture, the cum-corr score ranks the two planted drivers
+    # at the top of its sorted-desc score series.
+    sel0 = result.stage1_cache[fix["rebalance_dates"][0]].selection
+    top2 = sel0.scores.sort_values(ascending=False).index[:2].tolist()
+    planted = {"d_planted_0", "d_planted_1"}
+    assert set(top2) == planted, (
+        f"V0 cum-corr top-2 should be the planted drivers; got {top2}"
+    )
+
+
+def test_f2_varlingam_discovery_runs(synthetic_fixture):
+    """V1-VARLiNGAM path: ``discovery_method='varlingam'`` returns
+    ``JointVarLingamWindow`` for every rebalance and Stage A's method-aware
+    scoring uses the VARLiNGAM branch (i.e. no exception, non-empty pool)."""
+    from pipeline.closed_loop import run_closed_loop
+    from pipeline.discovery.varlingam import JointVarLingamWindow
+
+    fix = synthetic_fixture
+
+    # VARLiNGAM uses different kwargs than DYNOTEARS.
+    common = {k: v for k, v in _common_kwargs(fix["tmp_dir"] / "f2_var").items()
+              if k != "discovery_kwargs"}
+
+    result = run_closed_loop(
+        joint_frame=fix["joint_frame"],
+        asset_returns=fix["asset_returns"],
+        rebalance_dates=fix["rebalance_dates"],
+        universe_at=fix["universe_at"],
+        driver_columns=fix["driver_columns"],
+        asset_columns=fix["asset_columns"],
+        selection_method="causal_greedy",
+        discovery_method="varlingam",
+        discovery_kwargs={"lags": 1, "criterion": None, "prune": True},
+        selector_kwargs={"alpha": 1.0, "burn_in_rebalances": 0},
+        gamma_ema=0.3,
+        tag="t_f2_var",
+        **common,
+    )
+
+    for t in fix["rebalance_dates"]:
+        s1 = result.stage1_cache[t]
+        assert isinstance(s1.discovery, JointVarLingamWindow), (
+            f"VARLiNGAM path must produce JointVarLingamWindow; got "
+            f"{type(s1.discovery).__name__} at {t.date()}"
+        )
+        # Stage A "varlingam" branch routed; selector populates the method
+        # in its metadata.
+        assert s1.selection.metadata.get("method") == "varlingam"
+
+
+def test_f2_v0_and_v1_select_differently(synthetic_fixture):
+    """On the planted fixture, V0 (cum-corr) and V1 (causal-greedy +
+    DYNOTEARS) should pick at least one different driver across the run.
+
+    This is a sanity check that the two paths are genuinely independent — if
+    they always picked identical sets, the switch would be effectively a
+    no-op and the ablation matrix would be meaningless.
+    """
+    from pipeline.closed_loop import run_closed_loop
+
+    fix = synthetic_fixture
+    common = _common_kwargs(fix["tmp_dir"] / "f2_v0v1")
+
+    r_v0 = run_closed_loop(
+        joint_frame=fix["joint_frame"], asset_returns=fix["asset_returns"],
+        rebalance_dates=fix["rebalance_dates"], universe_at=fix["universe_at"],
+        driver_columns=fix["driver_columns"], asset_columns=fix["asset_columns"],
+        selection_method="correlation",
+        selector_kwargs={},
+        tag="t_f2_v0_b",
+        **{**common, "output_dir": fix["tmp_dir"] / "f2_v0_b"},
+    )
+    r_v1 = run_closed_loop(
+        joint_frame=fix["joint_frame"], asset_returns=fix["asset_returns"],
+        rebalance_dates=fix["rebalance_dates"], universe_at=fix["universe_at"],
+        driver_columns=fix["driver_columns"], asset_columns=fix["asset_columns"],
+        selection_method="causal_greedy", discovery_method="dynotears",
+        selector_kwargs={"alpha": 1.0, "burn_in_rebalances": 0},
+        tag="t_f2_v1_b",
+        **{**common, "output_dir": fix["tmp_dir"] / "f2_v1_b"},
+    )
+
+    differing = 0
+    for t in fix["rebalance_dates"]:
+        v0_sel = set(r_v0.stage1_cache[t].selection.selected)
+        v1_sel = set(r_v1.stage1_cache[t].selection.selected)
+        if v0_sel != v1_sel:
+            differing += 1
+    assert differing >= 1, (
+        "V0 (cum-corr) and V1 (causal-greedy) picked identical drivers at "
+        "every rebalance — the switch is not genuinely changing selection. "
+        "Either the fixture is degenerate or one of the paths is silently "
+        "using the other's selector."
+    )
