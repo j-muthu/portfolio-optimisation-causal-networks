@@ -88,7 +88,7 @@ def _build_universe(
     n_per_snapshot: int,
     use_cache: bool = True,
 ) -> list[str]:
-    """Union of ``top_n_by_mcap_at`` across a handful of snapshot dates.
+    """Union of top-N-by-CRSP-mcap across a handful of snapshot dates.
 
     Holding the universe fixed (rather than re-selecting at each rebalance)
     keeps the joint matrix columns stable — required for DYNOTEARS to fit
@@ -96,24 +96,76 @@ def _build_universe(
     snapshots captures churn (e.g. additions like TSLA / NVDA) at the cost
     of occasionally including a name that wasn't in the top-N on a given
     rebalance.
+
+    Implementation (G.6): bulk-SQL mcap lookup per snapshot via
+    :func:`pipeline.data.wrds_backend.fetch_crsp_mcap_at_snapshot` — one
+    PERMNO-resolution + one ``crsp.dsf`` query per snapshot, vs the
+    previous ~500 round-trip per-ticker fan-out. ~50× faster at S&P 500
+    membership scale. Falls back to the legacy
+    ``fetch_prices + fetch_shares_outstanding + top_n_by_mcap_at`` path
+    if the bulk function is unavailable (e.g. ``wrds`` library not
+    installed; identical behaviour to pre-G.6).
     """
     history = fetch_fja05680(use_cache=use_cache)
+
+    # Try the fast bulk-SQL path first; gracefully fall back if WRDS is
+    # not configured (no env, no .pgpass) — keeps the harness usable on
+    # machines without WRDS access.
+    try:
+        from pipeline.data.wrds_backend import fetch_crsp_mcap_at_snapshot
+        bulk_available = True
+    except ImportError:
+        fetch_crsp_mcap_at_snapshot = None  # type: ignore[assignment]
+        bulk_available = False
+
     union: set[str] = set()
     for ts in snapshot_dates:
         members = sorted(membership_at(ts, history=history, use_cache=use_cache))
-        # We need ALL members' prices to compute the mcap-at-date.
-        # Pull a thin window of prices and current shares.
-        panel = fetch_prices(members, ts - pd.Timedelta(days=10), ts, use_cache=use_cache)
-        if not panel.resolved:
-            logger.warning("No member prices resolved for snapshot %s", ts.date())
-            continue
-        shares = fetch_shares_outstanding(panel.resolved, as_of=ts, use_cache=use_cache)
-        tickers = top_n_by_mcap_at(
-            ts, n=n_per_snapshot,
-            prices=panel.prices, shares_outstanding=shares,
-            history=history, use_cache=use_cache,
-        )
-        logger.info("Top-%d at %s: %s ...", n_per_snapshot, ts.date(), tickers[:5])
+
+        tickers: list[str] = []
+        if bulk_available:
+            try:
+                mcaps = fetch_crsp_mcap_at_snapshot(
+                    members, ts, use_cache=use_cache,
+                )
+                if not mcaps.empty:
+                    tickers = (
+                        mcaps.sort_values(ascending=False)
+                        .head(n_per_snapshot)
+                        .index.tolist()
+                    )
+                    logger.info(
+                        "Top-%d at %s (bulk-SQL): %s ...",
+                        n_per_snapshot, ts.date(), tickers[:5],
+                    )
+            except Exception as exc:
+                logger.warning(
+                    "Bulk WRDS mcap fetch failed at %s (%s); falling back "
+                    "to per-ticker path.", ts.date(), exc,
+                )
+                tickers = []
+
+        # Legacy fallback: per-ticker prices + shares + top_n_by_mcap_at.
+        if not tickers:
+            panel = fetch_prices(
+                members, ts - pd.Timedelta(days=10), ts, use_cache=use_cache,
+            )
+            if not panel.resolved:
+                logger.warning("No member prices resolved for snapshot %s", ts.date())
+                continue
+            shares = fetch_shares_outstanding(
+                panel.resolved, as_of=ts, use_cache=use_cache,
+            )
+            tickers = top_n_by_mcap_at(
+                ts, n=n_per_snapshot,
+                prices=panel.prices, shares_outstanding=shares,
+                history=history, use_cache=use_cache,
+            )
+            logger.info(
+                "Top-%d at %s (per-ticker fallback): %s ...",
+                n_per_snapshot, ts.date(), tickers[:5],
+            )
+
         union.update(tickers)
     return sorted(union)
 

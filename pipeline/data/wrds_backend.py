@@ -235,6 +235,173 @@ def _resolve_permnos(ticker: str, start: pd.Timestamp, end: pd.Timestamp) -> lis
     return permnos
 
 
+def _resolve_permnos_batch(
+    tickers: Sequence[str], start: pd.Timestamp, end: pd.Timestamp,
+) -> dict[str, list[int]]:
+    """Batch ticker → PERMNO mapping in a single SQL query.
+
+    Returns ``{ticker: [permnos that mapped to this ticker in [start, end]]}``
+    for every input ticker. Tickers with no CRSP coverage in the window
+    are absent from the result (caller should treat as missing).
+
+    Used by :func:`fetch_crsp_mcap_at_snapshot` to avoid the per-ticker
+    round-trip storm in the universe-builder hot path.
+    """
+    tickers_up = sorted({t.upper() for t in tickers})
+    if not tickers_up:
+        return {}
+    cache = _cache_key(
+        "permnos_batch",
+        "|".join(tickers_up),
+        start.isoformat(), end.isoformat(),
+    )
+    if cache.exists():
+        df = pd.read_parquet(cache)
+    else:
+        from sqlalchemy import bindparam, text
+
+        query = text(
+            """
+            SELECT DISTINCT ticker, permno
+            FROM crsp.stocknames
+            WHERE ticker IN :tickers
+              AND namedt <= :end
+              AND nameenddt >= :start
+            """
+        ).bindparams(bindparam("tickers", expanding=True))
+        df = _retry_query(
+            query,
+            params={"tickers": tickers_up, "start": start.date(), "end": end.date()},
+        )
+        df.to_parquet(cache)
+
+    out: dict[str, list[int]] = {}
+    for ticker, group in df.groupby("ticker"):
+        out[str(ticker).upper()] = sorted(int(p) for p in group["permno"].tolist())
+    return out
+
+
+# ============================================================================
+# Bulk market cap at a snapshot date (G.6)
+# ============================================================================
+def fetch_crsp_mcap_at_snapshot(
+    tickers: Sequence[str],
+    as_of: pd.Timestamp,
+    lookback_days: int = 5,
+    use_cache: bool = True,
+) -> pd.Series:
+    """Market cap (USD) per ticker at ``as_of`` in one SQL round-trip.
+
+    The bulk replacement for the universe builder's per-ticker
+    ``fetch_prices`` + ``fetch_shares_outstanding`` calls. Steps:
+
+    1. Batch-resolve every input ticker to its PERMNO(s) in
+       a date window around ``as_of`` (one SQL).
+    2. Issue a single ``crsp.dsf`` query for all PERMNOs over a small
+       trailing window ending at ``as_of`` (one SQL).
+    3. Compute split-adjusted market cap per row in pandas:
+       ``mcap = |prc| × shrout × 1000 / cfacshr`` (CRSP ``shrout``
+       is in thousands; dividing by the cumulative share-adjustment
+       factor undoes splits to give shares-on-that-date).
+    4. Per PERMNO take the latest row in the window; then collapse
+       multiple PERMNOs per ticker (rare; usually rename events).
+
+    Result is a ``pd.Series`` indexed by uppercase ticker; tickers with
+    no CRSP coverage in the window are absent from the result.
+
+    Cached at ``cache/wrds/<hash>.parquet`` keyed by ``(tickers, as_of,
+    lookback_days)`` so repeated calls are free.
+
+    Parameters
+    ----------
+    tickers:
+        S&P 500 (or any) member tickers. Order ignored; case-normalised.
+    as_of:
+        Snapshot date. The function returns the latest available mcap
+        for each PERMNO at or before this date within ``lookback_days``.
+    lookback_days:
+        Trailing calendar-day window to find the most-recent observation
+        per PERMNO. Default 5 catches weekend / holiday gaps.
+    """
+    tickers_up = sorted({t.upper() for t in tickers})
+    if not tickers_up:
+        return pd.Series(dtype=float, name="mcap")
+
+    cache = _cache_key(
+        "mcap_snapshot",
+        "|".join(tickers_up),
+        as_of.isoformat(),
+        str(lookback_days),
+    )
+    if use_cache and cache.exists():
+        df = pd.read_parquet(cache)
+        return df.iloc[:, 0]
+
+    start_window = as_of - pd.Timedelta(days=lookback_days)
+    # Resolve PERMNOs over a wide-enough window (1y) to handle ticker
+    # changes / corporate actions near the snapshot date.
+    resolve_start = as_of - pd.Timedelta(days=365)
+    permno_map = _resolve_permnos_batch(tickers_up, resolve_start, as_of)
+    if not permno_map:
+        empty = pd.Series(dtype=float, name="mcap")
+        empty.to_frame().to_parquet(cache)
+        return empty
+
+    # Flatten + dedupe the PERMNO universe; track reverse mapping.
+    permno_to_ticker: dict[int, str] = {}
+    all_permnos: set[int] = set()
+    for ticker, permnos in permno_map.items():
+        for p in permnos:
+            permno_to_ticker[p] = ticker
+            all_permnos.add(p)
+
+    from sqlalchemy import bindparam, text
+
+    query = text(
+        """
+        SELECT permno, date,
+               ABS(prc) * shrout * 1000.0 / NULLIF(cfacshr, 0) AS mcap
+        FROM crsp.dsf
+        WHERE permno IN :permnos
+          AND date BETWEEN :start AND :end
+          AND prc IS NOT NULL
+          AND shrout IS NOT NULL
+        """
+    ).bindparams(bindparam("permnos", expanding=True))
+    df = _retry_query(
+        query,
+        params={
+            "permnos": sorted(all_permnos),
+            "start": start_window.date(),
+            "end": as_of.date(),
+        },
+    )
+    if df.empty:
+        empty = pd.Series(dtype=float, name="mcap")
+        empty.to_frame().to_parquet(cache)
+        return empty
+
+    df["date"] = pd.to_datetime(df["date"])
+    df["ticker"] = df["permno"].map(permno_to_ticker)
+    # Per PERMNO, take the latest row in the lookback window.
+    latest_per_permno = (
+        df.sort_values(["permno", "date"])
+        .drop_duplicates("permno", keep="last")
+    )
+    # Per ticker, sum mcaps across PERMNOs (rare multi-PERMNO case).
+    mcap_per_ticker = (
+        latest_per_permno.groupby("ticker")["mcap"].sum().astype(float)
+    )
+    mcap_per_ticker.name = "mcap"
+    mcap_per_ticker = mcap_per_ticker.sort_index()
+    mcap_per_ticker.to_frame().to_parquet(cache)
+    logger.info(
+        "WRDS mcap snapshot @ %s: %d/%d tickers resolved (lookback=%dd)",
+        as_of.date(), len(mcap_per_ticker), len(tickers_up), lookback_days,
+    )
+    return mcap_per_ticker
+
+
 # ============================================================================
 # Prices
 # ============================================================================
@@ -358,5 +525,6 @@ def fetch_crsp_shares_outstanding(
 __all__ = [
     "fetch_crsp_prices",
     "fetch_crsp_shares_outstanding",
+    "fetch_crsp_mcap_at_snapshot",
     "verify_connection",
 ]
