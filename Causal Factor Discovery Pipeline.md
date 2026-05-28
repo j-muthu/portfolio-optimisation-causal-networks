@@ -90,6 +90,18 @@ VIX is a borderline case (derived from S&P 500 options, so semi-endogenous). Inc
 - Align all series to NYSE trading calendar
 - Normalize per window (z-score on the fit window) — matches Howard et al. and DYNOTEARS convention
 
+### Per-asset eligibility masking (G.5.b)
+
+Implemented in `pipeline/data/alignment.py::build_joint_matrix(drop_na='drivers_only')`. The plan's original `drop_na='any'` mode dropped any row where *any* column had NaN — which meant a single late-inception asset (e.g. LIN, formed by the Linde + Praxair merger in 2018-10) could cost 200+ rows for the other 99 survivors. The fix:
+
+1. Keep every row where all *drivers* are populated (driver NaNs still cause row-drops; discovery can't tolerate them).
+2. For *assets*, zero-fill any NaN cells and record a per-(row, asset) boolean `asset_eligibility` mask on the returned `JointMatrix`.
+3. Downstream consumers honour the mask:
+   - **FFNN** (`pipeline/sensitivities/ffnn.py::fit_sensitivities_window`) accepts the mask and per-asset-masks its training loss so pre-inception zero-fills don't bias the Jacobian toward zero.
+   - **Closed-loop strategy** (`pipeline/closed_loop.py::run_closed_loop`'s `universe_at(t)` callable) consults `joint.assets_eligible_in_window(t - lookback, t)` and excludes assets whose full lookback isn't observed.
+
+This is what makes the GFC-period backtest viable — many current S&P 500 names didn't exist or had different tickers in 2007-2010 (Meta as Facebook FB→META rename; Berkshire BRK.B; Alphabet GOOG vs GOOGL; etc.). The mask handles each cleanly.
+
 ### Stationarity diagnostics
 
 ADF + KPSS on each driver after preprocessing, per window. Drivers failing both tests are flagged (not dropped) — the flag is logged with discovery output for downstream filtering.
@@ -113,6 +125,8 @@ All operate on the joint variable matrix `X = [D | A]` where D is the driver blo
   Verification: a refit without the tabu mask is run periodically; the magnitude of the difference on the driver → asset block is logged with the discovery output (small delta ⇒ the data already respects the directional hypothesis; large delta ⇒ the constraint is doing real work).
 
 - **Output per window**: `(W, A_1, ..., A_p, Σ_e, fit_loss)`
+
+- **Empirical runtime scaling (G.7 measurement)**: at d=134 (99 assets + 35 drivers), one DYNOTEARS fit with `max_iter=100` on a 252-day window takes ~3-4 min wall (Apple Silicon, single-threaded L-BFGS-B inside `scipy.optimize.minimize`). Vs ~17s at d=65 in Phase H, the scaling is ≈26× — closer to **O(d³·⁵) than O(d²)**, suggesting L-BFGS-B's per-iteration cost dominates at thesis scale. Bears on full-backtest compute budgets (see §Runtime budget at end).
 
 ### VARLiNGAM — robustness comparison
 
@@ -177,11 +191,22 @@ K is set data-adaptively rather than picked a priori. Procedure:
 3. Sort scores descending.
 4. Apply two K-suggestion methods in parallel:
    - **Kneedle algorithm** on the sorted-score curve → `K_elbow`
-   - **Permutation null**: shuffle each candidate's time series independently (preserves marginal distribution, destroys temporal causal structure); refit discovery; collect max null scores across B=100 shuffles. Threshold = 95th percentile of null max-scores. `K_perm` = count of real candidates with score above threshold.
-5. Set primary K = `max(K_elbow, K_perm)` (more conservative — admits more drivers).
+   - **Permutation null with Benjamini-Hochberg FDR**: shuffle each candidate's time series independently (preserves marginal distribution, destroys temporal causal structure); refit discovery; collect the **full (B, d) per-driver score matrix** across B=50 shuffles. For each real driver, compute a one-sided p-value via the parametric z-score `z_d = (real_d − mean(null_{·,d})) / std(null_{·,d})`, converted via `1 − Φ(z)`. Apply Benjamini-Hochberg at α=0.05 to control the false-discovery rate across the d hypotheses. `K_perm` = count of drivers surviving BH-FDR.
+5. Set primary K = `max(K_elbow, K_perm)` clipped to `[1, pool_size]` (more conservative — admits more drivers).
 6. Set sensitivity sweep range: `{⌈K/2⌉, K, min(2K, |pool|/2)}` plus two interpolating values. Ceiling at `|pool|/2` enforces that selection remains meaningful (selecting more than half the pool isn't selection).
 
 This produces a per-thesis K rather than a copied-from-HSP K, and lets the diagnostic plots in the verification step (distance concentration, half-window ARI, effective dimensionality) feed into validating the choice rather than just hyperparameter sweeping.
+
+**Implementation notes (Phase H)**: lives in `pipeline/factor_selection/k_calibration.py`. Two runtime fixes were essential to make this practical at thesis scale:
+
+- **`permuted_max_iter` cap on permuted DYNOTEARS fits** (default 20 vs the unmodified `max_iter=100` for the *real* fit). Shuffled drivers have no causal structure to converge on; capping reduces per-fit cost by ~5× without changing the resulting score distribution (verified empirically by KS-test, see `tests/test_k_calibration.py::test_h2_permuted_max_iter_cap_preserves_distribution`).
+- **`n_jobs` joblib parallelisation** across the B permutation fits — embarrassingly parallel. Seeds drawn up-front from the RNG so result is deterministic regardless of n_jobs (`test_h3_n_jobs_determinism`).
+
+Combined, these give a ~24× speedup at d=65 (162 min → 7 min). At d=134, K calibration took **187 min (~3h)** in Phase G.7 — the bulk of full-backtest setup cost lives here.
+
+**`K_perm_legacy` diagnostic preserved**. The pre-Phase-H definition (real_d vs the 95th percentile of `max_d (null_scores)`) is structurally biased upward at large d (multiple-comparisons "max-of-d" tail statistic). It's kept alongside the BH-FDR `K_perm` as a side-channel diagnostic for the methodology chapter, because the comparison cleanly demonstrates the bias.
+
+**Empirical reality (G.5 / Phase H / G.7)**: on the actual S&P-100 universe at both d=65 and d=134, BH-FDR reports **`K_perm = 0` at α=0.05** — no individual driver achieves FDR-controlled significance. The same windows have `K_elbow = 9` (d=65) and `K_elbow = 14` (d=134), so the operational K selector is **always Kneedle** in practice. The interpretation: Stage A causal scores rank drivers informatively (Kneedle finds a real elbow that scales with N) but no individual driver's score is high enough to clear a strict FDR threshold at the dimensionalities tested. The thesis claim is about the *combination* of causally-selected drivers in the FFNN + HSP pipeline, not the individual-driver significance — so K_perm = 0 is reported honestly in the methodology chapter as a finite-sample-causal-discovery caveat, not hidden.
 
 ### Output
 
@@ -263,6 +288,34 @@ thesis/pipeline/
    - **Effective dimensionality**: PCA on the per-window sensitivity matrix S ∈ ℝ^(N×K). Effective dim = smallest q such that top-q PCs explain 95% variance. If effective dim ≪ K, K is too high and most coordinates are redundant.
    - Concordance check: the three diagnostics should agree on a "good K" range. If they disagree, investigate (e.g., effective dim small but ARI high → real but low-rank structure, possibly fine; concentration ratio dropping but ARI rising → contradictory, investigate).
 9. **Reproducibility**: fixed random seeds at every stochastic step (FFNN initialisation, bootstrap, train/val split, permutation nulls); full pipeline replays bit-for-bit from seed.
+
+### Verification status (as of 2026-05-28)
+
+Empirical findings from the build-out + four shakedown runs (G.3, G.5.b, F.2, Phase H, G.7):
+
+| Check | Status | Notes |
+|---|---|---|
+| 1. Data sanity | ✅ | 100 tickers + 35 drivers resolve cleanly via WRDS+FRED+Yahoo. |
+| 2. Discovery smoke test | ✅ | DYNOTEARS produces acyclic W; asset→driver block exactly zero (tabu_edges verified). |
+| 3. Prior-knowledge verification | ⚠️ Pending | Refit-without-mask comparison not yet run; do during Phase I or after. |
+| 4. Selection sanity (economic priors) | ✅ | Driver rotation matches macro regime: rates pre-COVID → dual-crude + credit at April 2020 crash → safe-haven mid-crisis → vol + rates during recovery (G.5.b + G.7). |
+| 5. Selection stability (Jaccard) | ⚠️ Mixed | Median Jaccard between consecutive rebalances ≈ 0.6 in V1; V0 (cum-corr) is near 1.0 (tautology). |
+| 6. Cross-method (DYNOTEARS ∩ VARLiNGAM) | ❌ Not yet | VARLiNGAM at thesis scale hasn't been run; Phase I deliberately defers it. |
+| 7. Sensitivity stability | ⚠️ Pending | Bootstrap of training window not yet executed. |
+| 8. K-appropriateness diagnostics | Partial | Kneedle elbow scales with N (9 at d=65 → 14 at d=134); concentration ratio + ARI not yet plotted. |
+| 9. Reproducibility | ✅ | Fixed seeds everywhere; `n_jobs` parallelisation is deterministic (`test_h3_n_jobs_determinism`). |
+
+### Runtime budget (empirical, from G.7 at d=134, N=99)
+
+| Step | Wall time | Notes |
+|---|---|---|
+| Asset prices (100 tickers, 2005-2024) | ~5-10 min | WRDS-cached; first run is longer. |
+| Driver pool (35 series, 2005-2024) | ~10 sec | FRED + Yahoo, mostly cached. |
+| Joint matrix + eligibility mask | < 1 sec | |
+| **K calibration** (B=50, n_jobs=-1, permuted_max_iter=20) | **~3 hours** | One-off on burn-in; dominant fixed cost. |
+| **Per-rebalance Stage 1** (DYNOTEARS + Stage B + FFNN) | **~3.8 min** | × 216 rebalances = ~14 hours per variant. |
+| **Per-variant total** | **~17 hours wall** | K-cal once + 216 rebalances. |
+| **Three variants (V0 + V1 + V2)** | **~40 hours total wall** | V0 + V2 share V1's calibrated K; only V1 pays the K-cal cost. Two overnight runs. |
 
 ---
 

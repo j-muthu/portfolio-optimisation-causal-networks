@@ -90,6 +90,13 @@ DYNOTEARS and VARLiNGAM are both run for V1 and V2 → 4 method combinations on 
 
 NTS-NOTEARS, if Stage 1 succeeds with it, replaces both DYNOTEARS discovery and FFNN sensitivities in a unified stack — adds 1-2 more variants for the ablation if time permits.
 
+### Empirical observations from the small-universe shakedowns (F.2 + G.7)
+
+Two findings on the COVID-2020 11-month sample (informative but not statistically powered) that should be reported in the methodology chapter:
+
+* **V0's cum-corr selector has a structural tautology pathology that intensifies with scale.** At d=65 V0 picked 5 international-equity ETFs + 2 rate variables every rebalance; at d=134 it picks 5 ETFs + 4 rate-curve points + HYG/LQD — same 10 drivers every single rebalance, no rotation. The cum-corr ranking ends up dominated by drivers that *trivially co-move with US equity* (other equity indices, the rates curve that prices equity-relevant macro) rather than what *drives* asset returns. This is exactly the bias that causal discovery is designed to bypass. **The qualitative claim the thesis can make is robust**: V1's causal-greedy selector rotates across 26 unique drivers over 11 rebalances on the same data, tracking macro regimes that V0 structurally cannot.
+* **V2 closed-loop hurts on single-regime data and that's expected.** On the COVID-2020 sample V2 < V1 by 96 bps (gross NAV). The closed-loop hypothesis is specifically about *robustness across regime changes* — the utility update is supposed to encode "which drivers worked in past regimes" so the next regime transition is handled better. On an 11-month sample dominated by one regime transition (crash + recovery) at roughly the rebalance frequency, V2's utility goes stale across the regime break and the α-blend tilts selection *against* the new regime's relevant drivers. **The full multi-year multi-regime backtest is the only legitimate test of V2's value**; G.7's single-regime sample is hostile to V2 by construction and should not be read as falsifying the hypothesis.
+
 ---
 
 ## Feedback loop mechanics
@@ -141,6 +148,8 @@ where `z(·)` is a z-score normalisation across the candidate pool (so causal an
 `α ∈ [0,1]` mixes pure causal evidence (α=1, equivalent to V1 open-loop) with pure historical utility (α=0, "what worked before, do again"). Primary value α = 0.6 (lean toward causal evidence, let history correct).
 
 Sensitivity sweep over {0.4, 0.6, 0.8, 1.0}. The α=1 case recovers V1 exactly.
+
+**K is data-adaptive, not fixed.** Stage 1's K calibration (see `Causal Factor Discovery Pipeline.md` §Initial K Calibration) runs once on the burn-in window and produces K = max(K_elbow, K_perm). Empirically K_perm has been 0 at both d=65 and d=134, so the operational K is K_elbow — which scales with universe size (9 at d=65 → 14 at d=134). V2's α-blend operates within whatever K Stage 1 chose; it doesn't change K.
 
 ### Burn-in handling
 
@@ -255,6 +264,39 @@ thesis/pipeline/
 9. **Bootstrap CIs**: random shuffles of returns produce CIs that include zero (null behaves correctly).
 10. **VARLiNGAM misspecification spot-check** (HSIC residual independence): across the annually-sampled VARLiNGAM windows (`error_independence_every_n_windows=12`), the median rejection rate at α=0.05 should be ~5%. Materially higher periods (e.g. a window flagged "LIKELY MISSPECIFIED" with rejection rate > 0.20) are reported in the methodology chapter as VARLiNGAM-misspecification caveats — V1/V2 results using the VARLiNGAM backend in those regimes should be interpreted with caution.
 11. **End-to-end**: full backtest, all variants, all benchmarks, with and without transaction costs, primary and sensitivity-check hyperparameters. Save results to `thesis/results/` as Parquet for downstream plotting.
+
+### Verification status (as of 2026-05-28)
+
+The Phases F.2 (V0/V1/V2 wiring), G.5.b (per-asset eligibility), H (K-cal runtime fix + BH-FDR), and G.7 (first thesis-scale run) collectively cover the bulk of these checks:
+
+| Check | Status | Notes |
+|---|---|---|
+| 1. HRP unit test | ⚠️ Pending | Lopez-de-Prado textbook reproduction not yet verified to 4 d.p. |
+| 2. HSP unit test | ⚠️ Pending | Rodriguez-Dominguez published-figure reproduction (Excel data in `HSP/`). |
+| 3. Smoke test | ✅ | `tests/test_closed_loop.py` (6 passing tests) + `tests/test_k_calibration.py` (3 passing). |
+| 4. Sanity — variants differ | ✅ | F.2 confirmed V0 ≠ V1 (mean Jaccard 0.091 at d=65). |
+| 5. Sanity — V2 with α=1 ≡ V1 | ✅ | `tests/test_closed_loop.py::test_t2_alpha_one_matches_v1_openloop`. |
+| 6. Sanity — leak canary | ✅ | `tests/test_closed_loop.py::test_t3_leak_canary_fires` confirms a deliberately-future-peeking lookup produces visibly different (inflated) selection. |
+| 7. Sanity — feedback direction | ⚠️ Partial | Verified end-to-end on synthetic in unit tests; G.7's single-regime sample is not a fair test of the feedback direction (regime breaks at rebalance frequency). |
+| 8. PSD safeguard | ✅ | `nearest_psd` handles negative eigenvalues; downstream HRP runs cleanly throughout G.5.b / F.2 / G.7. |
+| 9. Bootstrap CIs | ⚠️ Pending | Per-rebalance sample at G.7 (11 rebalances) is too small; Phase I's 216 rebalances gives the first usable CI. |
+| 10. VARLiNGAM HSIC spot-check | ⚠️ Pending | VARLiNGAM at thesis scale not yet run; deferred to post-Phase I. |
+| 11. End-to-end | 🔄 In progress | **Phase I (the full 2007-2024 backtest) is the deliverable.** Waiting on WRDS PAM recovery before launching. |
+
+### Runtime budget (Phase I empirical estimates from G.7's d=134 measurements)
+
+| Step | Wall time | Notes |
+|---|---|---|
+| Asset prices (100 tickers, 2005-2024) | ~5-10 min | Mostly WRDS-cached after first run. |
+| Driver pool (35 series, 2005-2024) | ~10 sec | FRED + Yahoo cached. |
+| K calibration (B=50, n_jobs=-1, permuted_max_iter=20) | ~3 hours | One-off on the 2005-2006 burn-in. |
+| Per-rebalance Stage 1 + backtest | ~3.8 min | × 216 monthly rebalances 2007-2024 = ~14 hours per variant. |
+| **V1 (calibrates K)** | **~17 hours** | K-cal + Stage 1 backtest. |
+| **V0** (reuses V1's K, skips K-cal) | **~14 hours** | FFNN-only per rebalance — actually faster since no DYNOTEARS. Estimate could shrink to ~5 hours. |
+| **V2** (reuses V1's K, same Stage 1 cost) | **~14 hours** | Same as V1 backtest cost. |
+| **Three-variant total** | **~40 hours** (two-overnight job) | Launch V1 first; once K-cal lands (~3h in), launch V0 + V2 sharing V1's calibrated K. |
+
+Above the size where interactive iteration is reasonable, but well within overnight × 2 nights. Phase F.3 (`pipeline/experiment.py` orchestrator) is deferred until Phase I's first headline result reveals which hyperparameters justify a systematic sweep.
 
 ---
 
