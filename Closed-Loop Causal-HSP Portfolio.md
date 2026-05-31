@@ -97,6 +97,29 @@ Two findings on the COVID-2020 11-month sample (informative but not statisticall
 * **V0's cum-corr selector has a structural tautology pathology that intensifies with scale.** At d=65 V0 picked 5 international-equity ETFs + 2 rate variables every rebalance; at d=134 it picks 5 ETFs + 4 rate-curve points + HYG/LQD — same 10 drivers every single rebalance, no rotation. The cum-corr ranking ends up dominated by drivers that *trivially co-move with US equity* (other equity indices, the rates curve that prices equity-relevant macro) rather than what *drives* asset returns. This is exactly the bias that causal discovery is designed to bypass. **The qualitative claim the thesis can make is robust**: V1's causal-greedy selector rotates across 26 unique drivers over 11 rebalances on the same data, tracking macro regimes that V0 structurally cannot.
 * **V2 closed-loop hurts on single-regime data and that's expected.** On the COVID-2020 sample V2 < V1 by 96 bps (gross NAV). The closed-loop hypothesis is specifically about *robustness across regime changes* — the utility update is supposed to encode "which drivers worked in past regimes" so the next regime transition is handled better. On an 11-month sample dominated by one regime transition (crash + recovery) at roughly the rebalance frequency, V2's utility goes stale across the regime break and the α-blend tilts selection *against* the new regime's relevant drivers. **The full multi-year multi-regime backtest is the only legitimate test of V2's value**; G.7's single-regime sample is hostile to V2 by construction and should not be read as falsifying the hypothesis.
 
+### ★ Phase I — full 2007-2024 multi-regime result (the headline experiment)
+
+Ran V0/V1/V2 over the full sample (99 assets, 33 drivers, K=17 calibrated, 215 monthly rebalances 2007-01→2024-11), at **two lookback windows** (252 and 504 days) as a robustness check. Net-of-cost (5 bps) headline:
+
+| | window 252 | window 504 |
+|---|---|---|
+| V0 cum-corr | CAGR 4.87%, Sharpe 0.371 | CAGR 4.93%, Sharpe 0.370 |
+| V1 causal DYNOTEARS | CAGR 5.07%, Sharpe 0.382 | CAGR 5.14%, Sharpe 0.382 |
+| V2 causal + closed-loop | CAGR 5.07%, Sharpe 0.382 | CAGR 4.97%, Sharpe 0.373 |
+| **V1−V0 ΔSharpe** | +0.011, p=0.19 | +0.012, p=0.23 |
+| **V2−V1 ΔSharpe** | +0.000, p=0.97 | **−0.009, p=0.031** |
+| 2018Q4 regime-break (V2−V1) | +0.120 | −0.111 |
+
+(Significance: Politis-Romano stationary block bootstrap, 2000 resamples.)
+
+**The two-part finding — this supersedes the single-regime read above:**
+
+1. **Causal selection (V1 > V0) is robustly positive but modest.** Same sign and ~0.011-0.012 Sharpe magnitude at both windows; doesn't reach conventional significance over 18 years, but it is the consistent, replicable primary result. The thesis's core claim — causal-discovery driver selection beats cumulative-correlation selection — is supported.
+
+2. **Closed-loop feedback (V2 vs V1) is NOT robust.** At window 252 it's roughly neutral with an *apparent* 2018Q4 regime-break edge (+0.120); at window 504 it is **significantly worse** than open-loop V1 (p=0.031) and the 2018Q4 edge **flips sign** (−0.111). The regime-break benefit seen at the shorter window was a window artifact, not a robust mechanism. Plausible reason: at 504 days the 2-year discovery window already produces stable causal graphs, so the utility blend adds little and can inject stale-regime noise; the noisier 252-day window happened to benefit from the feedback's smoothing in 2018Q4, non-robustly.
+
+**Methodological takeaway:** report the robust positive (causal selection) and the honest negative (closed-loop not robust to window choice). The two-window robustness check is what caught V2's fragility — a w252-only analysis would have overstated the closed-loop contribution. This is a stronger, more defensible result than a fragile "V2 wins".
+
 ---
 
 ## Feedback loop mechanics
@@ -279,9 +302,9 @@ The Phases F.2 (V0/V1/V2 wiring), G.5.b (per-asset eligibility), H (K-cal runtim
 | 6. Sanity — leak canary | ✅ | `tests/test_closed_loop.py::test_t3_leak_canary_fires` confirms a deliberately-future-peeking lookup produces visibly different (inflated) selection. |
 | 7. Sanity — feedback direction | ⚠️ Partial | Verified end-to-end on synthetic in unit tests; G.7's single-regime sample is not a fair test of the feedback direction (regime breaks at rebalance frequency). |
 | 8. PSD safeguard | ✅ | `nearest_psd` handles negative eigenvalues; downstream HRP runs cleanly throughout G.5.b / F.2 / G.7. |
-| 9. Bootstrap CIs | ⚠️ Pending | Per-rebalance sample at G.7 (11 rebalances) is too small; Phase I's 216 rebalances gives the first usable CI. |
-| 10. VARLiNGAM HSIC spot-check | ⚠️ Pending | VARLiNGAM at thesis scale not yet run; deferred to post-Phase I. |
-| 11. End-to-end | 🔄 In progress | **Phase I (the full 2007-2024 backtest) is the deliverable.** Waiting on WRDS PAM recovery before launching. |
+| 9. Bootstrap CIs | ✅ | Politis-Romano on Phase I (215 rebalances): V1−V0 p=0.19/0.23, V2−V1 p=0.97 (w252) / 0.031 (w504). |
+| 10. VARLiNGAM HSIC spot-check | ⚠️ Pending | VARLiNGAM at thesis scale not yet run; deferred to post-Phase I (DYNOTEARS-only so far). |
+| 11. End-to-end | ✅ **DONE** | **Phase I complete (2026-05-31): V0/V1/V2 × {window 252, 504} over full 2007-2024, 215 rebalances each. Result: V1>V0 robust+modest; V2 not robust (see §Phase I above).** |
 
 ### Runtime budget (Phase I empirical estimates from G.7's d=134 measurements)
 
