@@ -47,6 +47,7 @@ from pipeline.portfolio import (
     BacktestResult,
     equal_weight,
     run_backtest,
+    v0prime_asset_only_causal_hrp,
     v2_causal_hsp_closed_loop,
 )
 from pipeline.stage1_pipeline import Stage1Rebalance, fit_stage1_rebalance
@@ -239,6 +240,26 @@ def run_closed_loop(
             correlation_kwargs=correlation_kwargs,
         )
         stage1_cache[pd.Timestamp(t)] = s1
+
+        # 3a. V0′ asset-only Causal-HRP: cluster on the asset–asset causal
+        #     block (no drivers, no sensitivities). Tests whether exogenous
+        #     drivers add value over asset–asset causal structure alone.
+        if selection_method == "asset_only":
+            disc_cols = list(s1.discovery.asset_columns)
+            common = [a for a in asset_names if a in disc_cols]
+            if len(common) < 2:
+                return equal_weight(asset_names)
+            pos = [disc_cols.index(a) for a in common]
+            W_aa = s1.discovery.asset_to_asset_block(0)[np.ix_(pos, pos)]
+            end_pos_ret = asset_returns.index.searchsorted(t, side="right")
+            start_pos_ret = max(0, end_pos_ret - lookback_days)
+            ret_window = asset_returns.iloc[start_pos_ret:end_pos_ret][common]
+            w = v0prime_asset_only_causal_hrp(
+                W_aa, common, ret_window, linkage_method=linkage_method
+            )
+            padded = w.reindex(asset_names).fillna(0.0)
+            total = padded.sum()
+            return padded / total if total > 1e-12 else equal_weight(asset_names)
 
         # 3. Build the V2 portfolio. If selection or sensitivities are
         #    empty (selector early-stop, etc.), fall back to equal-weight.

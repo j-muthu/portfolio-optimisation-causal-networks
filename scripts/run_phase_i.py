@@ -50,8 +50,14 @@ DATA_END = "2024-12-31"
 
 def main(argv: list[str] | None = None) -> None:
     p = argparse.ArgumentParser(description="Phase I full-sample backtest launcher.")
-    p.add_argument("--variant", required=True, choices=["V0", "V1", "V2"])
+    p.add_argument("--variant", required=True, choices=["V0", "V0prime", "V1", "V2"])
     p.add_argument("--window", type=int, default=252, help="lookback window (252 or 504)")
+    p.add_argument(
+        "--discovery-method", choices=["dynotears", "varlingam"], default="dynotears",
+        help="causal-discovery backend for V1/V2 (ignored for V0 cum-corr). "
+             "VARLiNGAM runs calibrate their own K (bootstrap-prob Stage A scores "
+             "differ from DYNOTEARS edge magnitudes, so K does not transfer).",
+    )
     p.add_argument(
         "--k", type=int, default=None,
         help="reuse a pre-calibrated K (V0/V2). Omit for V1 to run K calibration.",
@@ -78,19 +84,36 @@ def main(argv: list[str] | None = None) -> None:
 
     # Variant → (selection_method, discovery_method, K-calibration on?)
     if args.variant == "V0":
+        # V0 (cum-corr) never uses discovery or K calibration.
         selection_method, discovery_method = "correlation", "dynotears"
-        use_kcal = False  # V0 (cum-corr) never uses K calibration
-    elif args.variant == "V1":
-        selection_method, discovery_method = "causal_greedy", "dynotears"
+        use_kcal = False
+    elif args.variant == "V0prime":
+        # V0′ asset-only Causal-HRP: DYNOTEARS discovery, asset–asset block →
+        # HRP. No drivers selected, no FFNN, no K calibration.
+        selection_method, discovery_method = "asset_only", "dynotears"
+        use_kcal = False
+    else:  # V1 / V2 — causal greedy on the chosen discovery backend
+        selection_method, discovery_method = "causal_greedy", args.discovery_method
         use_kcal = args.k is None  # calibrate unless a K was supplied
-    else:  # V2
-        selection_method, discovery_method = "causal_greedy", "dynotears"
-        use_kcal = args.k is None
 
     if args.k is not None:
         log.info("Reusing pre-calibrated K=%d (skipping K calibration)", args.k)
 
-    tag = f"phase_i_{args.variant.lower()}_w{args.window}"
+    # VARLiNGAM at d=132 must disable lingam's adaptive-lasso pruning: its
+    # _pruning step regresses each variable on its causal-order predecessors
+    # via LassoLarsIC, which fails when a late-order variable has more
+    # predecessors than the ~251 window samples (n_samples < n_features). We
+    # don't need lingam's pruning anyway — the asset→driver mask is enforced
+    # by post-fit projection and Stage A thresholds edges itself.
+    discovery_kwargs = {"prune": False} if discovery_method == "varlingam" else None
+
+    # Method-aware tag: suffix non-default discovery so VARLiNGAM runs don't
+    # clobber the committed DYNOTEARS Phase I bundles. DYNOTEARS keeps the
+    # original unsuffixed tag for back-compat.
+    if args.variant != "V0" and discovery_method != "dynotears":
+        tag = f"phase_i_{args.variant.lower()}_{discovery_method}_w{args.window}"
+    else:
+        tag = f"phase_i_{args.variant.lower()}_w{args.window}"
 
     res = run_shakedown(
         start=DATA_START,
@@ -112,6 +135,7 @@ def main(argv: list[str] | None = None) -> None:
         gamma_ema=args.gamma,
         selection_method=selection_method,
         discovery_method=discovery_method,
+        discovery_kwargs=discovery_kwargs,
         tag=tag,
         use_cache=True,
     )

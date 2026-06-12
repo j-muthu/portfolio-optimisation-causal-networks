@@ -523,6 +523,11 @@ class JointDynotearsWindow:
         mat = self.W if lag == 0 else self.A[lag - 1]
         return mat[np.ix_(self.asset_idx, self.driver_idx)]
 
+    def asset_to_asset_block(self, lag: int) -> np.ndarray:
+        """``M[a, a]`` — the asset-only causal block (used by V0′ Causal-HRP)."""
+        mat = self.W if lag == 0 else self.A[lag - 1]
+        return mat[np.ix_(self.asset_idx, self.asset_idx)]
+
     def n_intra_edges_driver_to_asset(self) -> int:
         return int(np.count_nonzero(self.driver_to_asset_block(0)))
 

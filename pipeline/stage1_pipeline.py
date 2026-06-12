@@ -163,16 +163,31 @@ def fit_stage1_rebalance(
     dw = zs[driver_columns]
     aw = zs[asset_columns]
 
-    if selection_method not in ("causal_greedy", "correlation"):
+    if selection_method not in ("causal_greedy", "correlation", "asset_only"):
         raise ValueError(
-            f"selection_method must be 'causal_greedy' or 'correlation', "
-            f"got {selection_method!r}"
+            f"selection_method must be 'causal_greedy', 'correlation' or "
+            f"'asset_only', got {selection_method!r}"
         )
 
     disc = None
     sel: SelectionResult | CorrelationSelectionResult
 
-    if selection_method == "correlation":
+    if selection_method == "asset_only":
+        # V0′ path: run the SAME joint discovery V1 uses (drivers present,
+        # asset→driver edges masked), but use only the asset–asset block of W
+        # downstream — no driver selection, no FFNN. Return an empty selection
+        # so the shared "no selected drivers" branch yields an empty
+        # SensitivityWindow; the closed-loop strategy reads
+        # ``discovery.asset_to_asset_block`` instead.
+        disc = run_dynotears_joint_window(
+            joint_window, driver_columns=driver_columns,
+            asset_columns=asset_columns, **discovery_kwargs,
+        )
+        sel = CorrelationSelectionResult(
+            rebalance_date=pd.Timestamp(rebalance_date),
+            selected=[], scores=pd.Series(dtype=float), K=0, lags=(),
+        )
+    elif selection_method == "correlation":
         # V0 path: skip discovery entirely; just rank drivers by cum-corr
         # with the asset block and take the top K.
         if discovery_method is not None:
