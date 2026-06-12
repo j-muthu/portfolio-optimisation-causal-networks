@@ -2,7 +2,7 @@
 
 ## Context
 
-This supersedes `Causal-HRP Portfolio Construction Framework.md` following the shift in research direction. Key changes:
+This supersedes `old_notes/Causal-HRP Portfolio Construction Framework.md` following the shift in research direction. Key changes:
 
 | | Old plan | New plan |
 |---|---|---|

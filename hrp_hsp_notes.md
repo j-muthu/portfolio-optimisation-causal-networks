@@ -160,3 +160,33 @@ K (number of selected drivers), W (selection window), α (causal/historical mix)
 - also use VARLINGAM as another linear temporal causal discovery algorithm, and is theoretically better for financial returns because it requires non-gaussian residuals 
 - make the whole pipeline feedback-loop-able -- differentiable end to end (full bilevel optimisation, gradient (or evolutionary-strategy proxy gradient) of validation Sharpe with respect to discovery hyperparameters and clustering parameters jointly)
 - account for transaction costs
+
+
+Dimensions / counts
+    - d — total number of columns (variables) in the joint matrix the causal-discovery algorithm sees. It's drivers + assets
+    together: d = (#drivers) + (#assets). E.g. d=65 = 30 assets + 35 drivers; d=134 = 99 assets + 35 drivers; Phase I ran
+    d=132 (99 assets + 33 drivers, after dropping hyg_lqd + vvix).
+    - N (or n for assets) — number of assets. Used N=15/30/99/100 across runs.
+    - n (in K-calibration / windows) — number of time observations (trading days) in a window, e.g. n=252.
+    - K — number of drivers selected each rebalance (the target subset, e.g. K=17 in Phase I). Distinct from the ~35
+    candidate drivers in the pool.
+    - B — number of permutation shuffles in the K-calibration null (B=50).
+    - p — DYNOTEARS lag order (how many lagged time-slices the causal graph includes).
+
+    Matrices
+    - D — the driver block of the joint matrix X = [D | A]; also used for the distance matrix D_ij between assets in
+    sensitivity space.
+    - A — the asset block of [D | A]; also DYNOTEARS's lagged adjacency matrices A_p.
+    - W — DYNOTEARS's contemporaneous (intra-slice) weighted adjacency matrix; the causal graph.
+    - B0, B_lags — VARLiNGAM's equivalents of W and A_p.
+    - S — the per-asset sensitivity matrix (the FFNN Jacobian, drivers→returns), shape N×K.
+    - U — driver-utility state in the closed-loop feedback (V2), updated by EMA.
+
+    Hyperparameters
+    - α (alpha) — the V2 blend weight: score = α·causal + (1−α)·utility. α=1 recovers open-loop V1; Phase I used α=0.6.
+    - γ (gamma) — EMA decay on the utility update (γ=0.3).
+    - λ_w, λ_a — DYNOTEARS L1 regularisation penalties on W and A.
+
+    Score/selection
+    - K_elbow — K suggested by the Kneedle elbow on the sorted driver-score curve.
+    - K_perm — K suggested by the permutation-null significance test (BH-FDR); came out 0 at every scale.

@@ -2,7 +2,7 @@
 
 ## Context
 
-This supersedes `Causal Discovery Pipelines for S&P 500.md` following a shift in research direction. The shift, prompted by supervisor input, is from asset-to-asset causal discovery → driver-to-asset causal discovery, framed within Rodriguez-Dominguez's HSP (Hierarchical Sensitivity Parity) paradigm rather than HRP.
+This supersedes `old_notes/Causal Discovery Pipelines for S&P 500.md` following a shift in research direction. The shift, prompted by supervisor input, is from asset-to-asset causal discovery → driver-to-asset causal discovery, framed within Rodriguez-Dominguez's HSP (Hierarchical Sensitivity Parity) paradigm rather than HRP.
 
 Key changes vs the superseded plan:
 
