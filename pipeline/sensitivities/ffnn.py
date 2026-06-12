@@ -27,6 +27,7 @@ from __future__ import annotations
 
 import hashlib
 import logging
+import os
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Sequence
@@ -360,19 +361,27 @@ def fit_sensitivities_window(
 
     cache_path = CACHE_DIR / f"{cache_key}.pt"
     if use_cache and cache_path.exists():
-        bundle = torch.load(cache_path, weights_only=False)
-        logger.debug("FFNN cache hit: %s", cache_path.name)
-        return SensitivityWindow(
-            rebalance_date=rebalance_date,
-            selected_drivers=list(selected_drivers),
-            asset_names=asset_names,
-            S=bundle["S"],
-            arch=bundle["arch"],
-            val_rmse=bundle["val_rmse"],
-            n_train=int(X_tr.shape[0]),
-            n_val=int(X_va.shape[0]),
-            metadata={"cache_hit": True, "lags": lags, "device": device, "cache_key": cache_key},
-        )
+        # Tolerant read: a torn/corrupt cache file (e.g. two concurrent runs
+        # writing the same key) must not crash the backtest — fall through to
+        # recompute instead. Atomic writes below make torn files unlikely, but
+        # this is the safety net.
+        try:
+            bundle = torch.load(cache_path, weights_only=False)
+            logger.debug("FFNN cache hit: %s", cache_path.name)
+            return SensitivityWindow(
+                rebalance_date=rebalance_date,
+                selected_drivers=list(selected_drivers),
+                asset_names=asset_names,
+                S=bundle["S"],
+                arch=bundle["arch"],
+                val_rmse=bundle["val_rmse"],
+                n_train=int(X_tr.shape[0]),
+                n_val=int(X_va.shape[0]),
+                metadata={"cache_hit": True, "lags": lags, "device": device, "cache_key": cache_key},
+            )
+        except Exception as exc:
+            logger.warning("FFNN cache read failed (%s: %s) — recomputing",
+                           cache_path.name, exc)
 
     # Architecture search.
     best_model = None
@@ -395,11 +404,17 @@ def fit_sensitivities_window(
     assert best_model is not None
     S = _compute_sensitivities(best_model, X_tr, N, lags, K, device)
     if use_cache:
+        # Atomic write: serialise to a unique temp file, then os.replace into
+        # place. os.replace is atomic on POSIX, so a concurrent reader sees
+        # either the old file or the complete new one — never a torn write
+        # (the race that crashed two parallel runs sharing a cache key).
+        tmp_path = cache_path.with_suffix(f".{os.getpid()}.tmp")
         torch.save(
             {"S": S, "arch": best_arch, "val_rmse": best_val,
              "state_dict": best_model.state_dict()},
-            cache_path,
+            tmp_path,
         )
+        os.replace(tmp_path, cache_path)
 
     logger.info(
         "FFNN window %s: K=%d, N=%d, n_train=%d, arch=%s, val_rmse=%.4f",
