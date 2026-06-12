@@ -23,7 +23,18 @@ HSP/
 
 # Experiment artefacts: pickled results are large; CSVs/PNGs/logs are tracked
 results/**/*.pkl
+# Per-run feedback state — regenerable, and the exploratory runs are noise.
+results/**/utility.parquet
 
 # Local secrets (API keys / WRDS credentials) — never commit
 .env
 *.env.local
+
+old_notes/
+interim_report/interim_report.*
+!interim_report/interim_report.tex
+
+interim_report/interim_report_template.*
+!interim_report/interim_report_template.tex
+
+varlingam_docs/
