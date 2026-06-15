@@ -211,6 +211,44 @@ Source: `scripts/collate_j4.py` → `results/j4a_k_sensitivity.csv`,
 
 ---
 
+## 1c. J5 — non-linear-discovery probe (NTS-NOTEARS)
+
+A full NTS-NOTEARS backtest is compute-prohibitive, so J5 is a **reduced-scope
+probe**: fit NTS-NOTEARS (per-variable 1D-CNN structure learning) and DYNOTEARS
+on a handful of regime windows at a reduced universe (25 assets + 33 drivers,
+d=58, 504-day windows) and compare the discovered driver→asset structure.
+Wrapper `pipeline/discovery/nts_notears.py` (edge strength = L2-norm of each
+CNN kernel → a `(W, A)` pair slotting into the DYNOTEARS interface); probe
+`scripts/probe_nts_notears.py` → `results/j5_nts_probe.csv`.
+
+| window | top-10 Jaccard (NTS vs DYNO) | Spearman (Stage-A scores) | NTS asset→driver max | NTS fit | DYNO fit |
+|---|---|---|---|---|---|
+| 2008-10 GFC | 0.25 | +0.52 | 0.0 | 217 s | 17 s |
+| 2014-06 calm | 0.25 | −0.07 | 0.0 | 206 s | 29 s |
+| 2020-03 COVID | 0.25 | +0.49 | 0.0 | 216 s | 20 s |
+| 2022-06 hike | 0.67 | −0.06 | 0.0 | 217 s | 22 s |
+
+**Findings.**
+1. **The directional prior transfers to NTS-NOTEARS** — its native
+   `prior_knowledge` bound-dicts drive the asset→driver block to exactly 0 in
+   every window (the non-linear analogue of DYNOTEARS `tabu_edges`; validates
+   the interim report's claim that NTS supports the prior).
+2. **Non-linear discovery agrees only modestly with the linear graph** — mean
+   top-10 driver Jaccard 0.35 (coincidentally close to the DYNOTEARS-vs-VARLiNGAM
+   0.34), mean Stage-A Spearman 0.22, *higher in stress windows* (GFC/COVID
+   ρ≈0.5) than calm/hike (≈0). So NTS-NOTEARS is a genuinely different lens, not
+   a re-derivation of DYNOTEARS — a non-linear backtest could plausibly differ,
+   which is precisely why it's worth flagging as future work.
+3. **Compute confirms infeasibility at scale** — NTS is ~10× DYNOTEARS even at
+   d=58 (~214 s vs ~22 s/window); extrapolating, a full 215-rebalance backtest
+   is ~13 h/variant *at this reduced d*, and several× that at the thesis d≈130
+   (~50-90 h+/variant). **Full NTS-NOTEARS backtest integration is future work**;
+   the probe establishes feasibility + the cross-method agreement signal.
+
+(Requires `igraph`, a vendored-NTS dependency, added to `pipeline/requirements.txt`.)
+
+---
+
 ## 2. Regime-conditional findings (the differentiator)
 
 From `scripts/regime_analysis.py` → `results/regime_analysis/` (zero re-compute;
@@ -491,7 +529,9 @@ verification quantifies how much the prior was doing.
   artefacts: w504 V1−V0 +0.012→+0.001, and "V2 sig worse at w504" → V2≡V1.
   **VARLiNGAM re-run in progress**; refresh §2 regime tables + the VARLiNGAM §1
   rows when it completes.
-- **NTS-NOTEARS** — feasibility-bounded to a reduced sub-analysis or future work.
+- **NTS-NOTEARS (J5) — DONE as a reduced-scope probe** (see §1c): integrates +
+  enforces the prior, agrees modestly with DYNOTEARS (Jaccard 0.35), ~10× the
+  cost → full backtest remains future work.
 - **Network-density regimes** — need a discovery-only re-run to persist
   per-window graph density.
 - **Commonality-principle compatibility** of causally-selected drivers — open
