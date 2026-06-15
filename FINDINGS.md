@@ -4,12 +4,27 @@
 results from the full 2007–2024 backtests (`results/`), the design decisions and
 their justifications (the two repo plan docs + the session plan), the research
 notes in this repo, and the methodological findings/bugs discovered during
-implementation. Last updated 2026-06-11.*
+implementation. Last updated 2026-06-15.*
 
 > **One-line thesis.** Replace HSP's *correlation-based* driver selection with
 > *causal-discovery-based* selection (and optionally close a performance→selection
 > feedback loop), and test whether this yields more robust S&P-100 portfolios,
 > especially around regime changes.
+
+### Figures (final report) — `scripts/plot_thesis_figures.py` → `results/figures/`
+
+All regenerated from the frozen-EEM bundles + result CSVs (reproducible; match
+the tables here). The submitted `interim_report/figures/` are left as-is.
+
+| figure | supports |
+|---|---|
+| `nav_curves.png` | §1 — cumulative net NAV, V0/V0′/V1-DYNO/V1-VAR, both windows |
+| `sharpe_matrix.png` | §1 — net Sharpe by variant × window (w252 edge, w504 convergence) |
+| `k_sensitivity.png` | §1b J4a — V1>V0 edge is K-fragile |
+| `feedback_grid.png` | §1b J4b — closed loop inert (V2≡V1 across the α/γ grid) |
+| `regime_excess.png` | §2 — causal beats V0 in every regime (V0′ most) |
+| `directional_prior.png` | §3 J1 — the asset→driver prior is consequential |
+| `nts_probe.png` | §1c J5 — NTS-NOTEARS vs DYNOTEARS agreement + cost |
 
 ---
 
