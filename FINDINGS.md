@@ -23,27 +23,28 @@ Politis–Romano stationary block bootstrap (2000 resamples).
 
 ### The full matrix (annualised net Sharpe)
 
-**Numbers below are the deterministic (frozen-EEM) re-run** (2026-06-15) — the
-canonical bundles after the EEM-determinism fix (§1b, §7). The DYNOTEARS rows
-changed materially vs the original jittery-EEM commit; VARLiNGAM rows are being
-regenerated under frozen EEM (pending) — values shown are the old jittery ones,
-flagged ‡.
+**All numbers are the deterministic (frozen-EEM) re-run** (2026-06-15) — the
+canonical bundles after the EEM-determinism fix (§1b, §7).
 
 | method | window | V0 | V1 | V2 | V1−V0 (p) | V2−V1 (p) |
 |---|---|---|---|---|---|---|
 | DYNOTEARS | 252 | 0.371 | 0.381 | 0.381 | +0.010 (0.27) | +0.000 (1.00) |
 | DYNOTEARS | 504 | 0.370 | 0.372 | 0.372 | **+0.001 (0.92)** | +0.000 (1.00) |
-| VARLiNGAM‡ | 252 | 0.371 | 0.398 | 0.398 | +0.027 (0.007) | −0.000 (0.06) |
-| VARLiNGAM‡ | 504 | 0.370 | 0.357 | 0.357 | −0.013 (0.15) | −0.000 (1.0) |
+| VARLiNGAM | 252 | 0.371 | **0.399** | 0.399 | **+0.028 (0.004)** | +0.000 (1.00) |
+| VARLiNGAM | 504 | 0.370 | 0.357 | 0.357 | −0.014 (0.14) | +0.000 (1.00) |
 
-**Two corrections vs the original commit** (both EEM artefacts, see §1b): (a) the
-DYNOTEARS **w504 V1−V0 edge collapsed +0.012 → +0.001** — the "robust across
-*both* windows" claim is really **w252-only**; (b) the headline "V2 *significantly
-worse* at DYNOTEARS-w504 (p=0.031)" **disappears** — under frozen EEM **V2 ≡ V1
-exactly at both windows** (the closed loop is inert, not harmful, consistent with
-J4b). ‡ VARLiNGAM rows pending frozen re-run.
+**Corrections vs the original (jittery-EEM) commit** — all consequences of the
+determinism fix (§1b): (a) DYNOTEARS **w504 V1−V0 collapsed +0.012 → +0.001**, so
+"robust across *both* windows" is really **w252-only**; (b) the headline "V2
+*significantly worse* at DYNOTEARS-w504 (p=0.031)" **disappears** — **V2 ≡ V1
+exactly at every cell** (the closed loop is inert, not harmful — J4b); (c)
+**VARLiNGAM is robust to the fix** — its w252 result is essentially unchanged
+(+0.028, p=0.004, still the strongest causal result) and still reverses at w504
+(−0.014, ns). So VARLiNGAM's ICA-on-residuals discovery is far less sensitive to
+the EEM micro-jitter than DYNOTEARS's non-convex L-BFGS — itself a robustness
+observation worth a line in the methods chapter.
 
-CAGR (net): V0 4.87–4.93%, V1-DYNOTEARS 5.07–5.14%, V1-VARLiNGAM 5.33% (w252, ‡).
+CAGR (net): V0 4.87–4.93%, V1-DYNOTEARS 5.07–5.14%, V1-VARLiNGAM 5.33% (w252).
 All variants absorb the full ≈−51% GFC drawdown (long-only equity HRP/HSP — the
 thesis is about *relative* driver-selection quality, not drawdown avoidance).
 
@@ -85,9 +86,9 @@ survive the determinism fix (w504 V1−V0 is +0.001); the honest claim is a
    (asset-only), not V1.
 
 2. **VARLiNGAM strengthens the result at 252 days (significantly) but is
-   window-fragile** *(‡ numbers below are pre-determinism-fix; a frozen-EEM
-   VARLiNGAM re-run is in progress and may shift them — see §1 matrix)*.
-   V1-VARLiNGAM beats V0 by +0.027, **p=0.007** at 252 days
+   window-fragile** *(confirmed robust to the frozen-EEM re-run: +0.028, p=0.004
+   at w252; −0.014, ns at w504 — essentially unchanged, unlike DYNOTEARS-w504)*.
+   V1-VARLiNGAM beats V0 by +0.028, **p=0.004** at 252 days
    — the strongest causal result in the study — but *reverses* to −0.013 (ns)
    at 504 days. Proposed mechanism (good methodological point): VARLiNGAM's
    identifiability rests on **non-Gaussian residuals**; a 504-day window spans
@@ -203,8 +204,10 @@ edge (+0.010) is solid; the w504 edge is not.**
 windows) were regenerated under frozen EEM (~8 min, warm cache) and §1 now
 reflects them. This also corrected a *second* artefact: the committed "V2
 significantly worse at DYNOTEARS-w504 (p=0.031)" disappears — V2 ≡ V1 exactly at
-both windows under frozen EEM. The VARLiNGAM rows are being regenerated likewise
-(in progress); §2 regime tables will be refreshed when that lands.
+both windows under frozen EEM. The VARLiNGAM rows were regenerated likewise and
+are **robust to the fix** (w252 +0.028 p=0.004 unchanged; w504 still reverses) —
+VARLiNGAM's ICA discovery is far less sensitive to the EEM micro-jitter than
+DYNOTEARS's L-BFGS. §2 regime tables refreshed from the all-frozen bundles.
 
 Source: `scripts/collate_j4.py` → `results/j4a_k_sensitivity.csv`,
 `results/j4b_alpha_gamma.csv`.
@@ -258,26 +261,28 @@ for 4/5 windows, COVID differing only by date-range definition).
 
 ### Regime Sharpe (net), window 252
 
+(Frozen-EEM re-run, 2026-06-15; V2 ≡ V1 in every cell — omitted.)
+
 | variant | all | NBER recession | NBER expansion | high-vol (VIX top quintile) | low-vol (VIX bottom) |
 |---|---|---|---|---|---|
-| V0 | 0.371 | −0.640 | 0.731 | −1.351 | 5.628 |
-| V1-DYNOTEARS | 0.382 | −0.623 | 0.744 | −1.354 | 5.679 |
-| **V1-VARLiNGAM** | **0.398** | **−0.604** | **0.758** | **−1.325** | **5.710** |
+| V0 | 0.371 | −0.638 | 0.731 | −1.351 | 5.630 |
+| **V0′ (asset-only)** | **0.403** | **−0.575** | **0.759** | **−1.317** | **5.744** |
+| V1-DYNOTEARS | 0.381 | −0.616 | 0.740 | −1.342 | 5.642 |
+| V1-VARLiNGAM | 0.399 | −0.604 | 0.759 | −1.325 | 5.710 |
 
-**Key finding: the causal variants beat V0 in *every* regime slice at w252** —
+**Key finding: every causal variant beats V0 in *every* regime slice at w252** —
 *less-bad* in stress (recession, high-vol) and *better* in benign (expansion,
-low-vol), with V1-VARLiNGAM best across the board. This is the cleanest
-substantiation of the core hypothesis that causal selection differentiates,
-especially in stress.
+low-vol). **V0′ (asset-only) is the standout**: best `all`-Sharpe and the
+**least-bad recession Sharpe (−0.575 vs V0 −0.638)** — the cleanest
+substantiation that causal structure differentiates, especially in stress.
 
-- **Max drawdown, NBER recession**: V1-VARLiNGAM −0.511 vs V0 −0.523 — causal
-  selection modestly cushions the GFC-recession drawdown.
-- **Turnover** (one-way annualised, w252): V0 1.44, V1-DYNOTEARS 1.43,
-  V1-VARLiNGAM 1.53. VARLiNGAM trades slightly more; turnover rises in
-  recession/high-vol regimes for all variants (~1.6–1.75). (`turnover.csv`.)
-- **Window 504 reconfirms VARLiNGAM fragility**: V1-VARLiNGAM regime Sharpes
-  fall *below* V0 in every slice, while DYNOTEARS-V1 stays above V0 — consistent
-  with the matrix-level finding.
+- **Max drawdown, NBER recession**: V0′ −0.506, V1-VARLiNGAM −0.511 vs V0 −0.523
+  — causal structure modestly cushions the GFC-recession drawdown (V0′ most).
+- **Turnover** (one-way annualised, w252): broadly comparable across variants;
+  rises in recession/high-vol regimes for all. (`turnover.csv`.)
+- **Window 504 reconfirms the fragility**: V1-VARLiNGAM regime Sharpes fall
+  *below* V0 in every slice, and at w504 DYNOTEARS-V1 ≈ V0′ ≈ V0 (all ≈0.372) —
+  the regime edge is a **w252 phenomenon**, consistent with the matrix.
 
 **Caveat / deferred**: network-density regimes (per Howard et al.'s market-timing
 construction) need per-window discovery W matrices, which were not persisted in
@@ -524,11 +529,12 @@ verification quantifies how much the prior was doing.
 - **α/γ feedback sweep (J4b) — DONE** (see §1b): V2 ≡ V1 *exactly* across all 9
   (α,γ) combos — the closed loop is inert (utility re-ranks only within the
   causal-selected set). Strongest form of the closed-loop negative.
-- **Headline re-run under frozen EEM — DONE** (2026-06-15) for DYNOTEARS
-  (canonical V0/V1/V2/V0′ × both windows); §1 updated. Corrected two EEM
-  artefacts: w504 V1−V0 +0.012→+0.001, and "V2 sig worse at w504" → V2≡V1.
-  **VARLiNGAM re-run in progress**; refresh §2 regime tables + the VARLiNGAM §1
-  rows when it completes.
+- **Headline re-run under frozen EEM — DONE** (2026-06-15) for the *full* matrix
+  (DYNOTEARS + VARLiNGAM, V0/V1/V2/V0′ × both windows) + §2 regime tables; §1/§2
+  updated. Corrected two DYNOTEARS EEM artefacts (w504 V1−V0 +0.012→+0.001;
+  "V2 sig worse at w504" → V2≡V1). VARLiNGAM proved **robust to the fix**
+  (w252 +0.028 p=0.004 unchanged). The whole §1/§2 is now internally consistent
+  and reproducible.
 - **NTS-NOTEARS (J5) — DONE as a reduced-scope probe** (see §1c): integrates +
   enforces the prior, agrees modestly with DYNOTEARS (Jaccard 0.35), ~10× the
   cost → full backtest remains future work.
