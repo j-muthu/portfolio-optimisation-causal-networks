@@ -42,7 +42,9 @@ Entry points
 from __future__ import annotations
 
 import io
+import json
 import logging
+import os
 import shutil
 import subprocess
 import time
@@ -270,10 +272,30 @@ def fetch_yahoo_series(
     """Download a Yahoo series. Returns adjusted close as a ``Series``."""
     safe_name = ticker.replace("^", "caret_").replace("=", "_")
     cache = CACHE_DIR / f"yahoo_{safe_name}.parquet"
+    meta_path = cache.with_suffix(".parquet.meta")
     if use_cache and cache.exists():
         df = pd.read_parquet(cache)
         series = df.iloc[:, 0]
-        if series.index.min() <= start and series.index.max() >= end:
+        # Reuse the cache when it covers the request. Two acceptance routes:
+        #  (1) data-coverage: cached data spans [start, end] outright;
+        #  (2) request-coverage: a previous fetch already asked Yahoo for a span
+        #      that contains [start, end] (recorded in the sidecar .meta). This
+        #      route is essential for late-inception series (e.g. EEM, listed
+        #      2003-04) requested with an earlier padded start: their data
+        #      simply doesn't reach `start`, so route (1) never passes and the
+        #      old code re-fetched live on *every* call — yielding a
+        #      nondeterministic auto-adjusted series (run-to-run jitter ~1e-7
+        #      that poisons any content hash and perturbs DYNOTEARS).
+        cov_ok = series.index.min() <= start and series.index.max() >= end
+        req_ok = False
+        if meta_path.exists():
+            try:
+                m = json.loads(meta_path.read_text())
+                req_ok = (pd.Timestamp(m["req_start"]) <= start
+                          and pd.Timestamp(m["req_end"]) >= end)
+            except Exception:
+                req_ok = False
+        if cov_ok or req_ok:
             series.name = ticker
             return series.loc[start:end]
 
@@ -303,7 +325,17 @@ def fetch_yahoo_series(
     close = close.dropna().astype(float)
     close.name = ticker
     close.index = pd.to_datetime(close.index)
-    close.to_frame().to_parquet(cache)
+    # Atomic writes (unique temp + os.replace) so concurrent first-fetches by
+    # parallel runs can't tear the parquet/meta. Record the requested span so a
+    # later call within that span reuses the cache (route (2) above) even when
+    # the data itself starts after `start` (instrument inception).
+    tmp = cache.with_suffix(f".parquet.{os.getpid()}.tmp")
+    close.to_frame().to_parquet(tmp)
+    os.replace(tmp, cache)
+    meta_tmp = meta_path.with_suffix(f".meta.{os.getpid()}.tmp")
+    meta_tmp.write_text(json.dumps({"req_start": str(pd.Timestamp(start).date()),
+                                    "req_end": str(pd.Timestamp(end).date())}))
+    os.replace(meta_tmp, meta_path)
     return close.loc[start:end]
 
 
