@@ -47,3 +47,6 @@ sqlalchemy>=2.0
 psycopg[binary]>=3.1
 # Excel I/O for the Rodriguez-Dominguez HSP reference dataset (Phase E.2).
 openpyxl>=3.1
+# NTS-NOTEARS (J5 non-linear-discovery probe): the vendored nts-notears/ tree
+# imports igraph in its utils. See pipeline/discovery/nts_notears.py.
+igraph>=0.11
