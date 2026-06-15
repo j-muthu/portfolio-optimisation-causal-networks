@@ -23,14 +23,27 @@ Politis–Romano stationary block bootstrap (2000 resamples).
 
 ### The full matrix (annualised net Sharpe)
 
+**Numbers below are the deterministic (frozen-EEM) re-run** (2026-06-15) — the
+canonical bundles after the EEM-determinism fix (§1b, §7). The DYNOTEARS rows
+changed materially vs the original jittery-EEM commit; VARLiNGAM rows are being
+regenerated under frozen EEM (pending) — values shown are the old jittery ones,
+flagged ‡.
+
 | method | window | V0 | V1 | V2 | V1−V0 (p) | V2−V1 (p) |
 |---|---|---|---|---|---|---|
-| DYNOTEARS | 252 | 0.371 | 0.382 | 0.382 | +0.011 (0.19) | +0.000 (0.97) |
-| DYNOTEARS | 504 | 0.370 | 0.382 | 0.373 | +0.012 (0.23) | **−0.009 (0.031)** |
-| VARLiNGAM | 252 | 0.371 | **0.398** | 0.398 | **+0.027 (0.007)** | −0.000 (0.06) |
-| VARLiNGAM | 504 | 0.370 | 0.357 | 0.357 | −0.013 (0.15) | −0.000 (1.0) |
+| DYNOTEARS | 252 | 0.371 | 0.381 | 0.381 | +0.010 (0.27) | +0.000 (1.00) |
+| DYNOTEARS | 504 | 0.370 | 0.372 | 0.372 | **+0.001 (0.92)** | +0.000 (1.00) |
+| VARLiNGAM‡ | 252 | 0.371 | 0.398 | 0.398 | +0.027 (0.007) | −0.000 (0.06) |
+| VARLiNGAM‡ | 504 | 0.370 | 0.357 | 0.357 | −0.013 (0.15) | −0.000 (1.0) |
 
-CAGR (net): V0 4.87–4.93%, V1-DYNOTEARS 5.07–5.14%, V1-VARLiNGAM 5.33% (w252).
+**Two corrections vs the original commit** (both EEM artefacts, see §1b): (a) the
+DYNOTEARS **w504 V1−V0 edge collapsed +0.012 → +0.001** — the "robust across
+*both* windows" claim is really **w252-only**; (b) the headline "V2 *significantly
+worse* at DYNOTEARS-w504 (p=0.031)" **disappears** — under frozen EEM **V2 ≡ V1
+exactly at both windows** (the closed loop is inert, not harmful, consistent with
+J4b). ‡ VARLiNGAM rows pending frozen re-run.
+
+CAGR (net): V0 4.87–4.93%, V1-DYNOTEARS 5.07–5.14%, V1-VARLiNGAM 5.33% (w252, ‡).
 All variants absorb the full ≈−51% GFC drawdown (long-only equity HRP/HSP — the
 thesis is about *relative* driver-selection quality, not drawdown avoidance).
 
@@ -43,32 +56,38 @@ graph → HRP).
 
 | window | V0 (cum-corr) | **V0′ (asset-only causal)** | V1 (DYNOTEARS) | V0′−V0 (p) | V1−V0′ (p) |
 |---|---|---|---|---|---|
-| 252 | 0.371 | **0.400** | 0.382 | **+0.029 (0.000)** | −0.018 (0.042) |
-| 504 | 0.370 | 0.374 | 0.382 | +0.004 (0.69) | +0.008 (0.44) |
+| 252 | 0.371 | **0.403** | 0.381 | **+0.032 (0.00)** | **−0.022 (0.01)** |
+| 504 | 0.370 | 0.372 | 0.372 | +0.002 (0.84) | −0.001 (0.94) |
 
-At **window 252 the asset-only causal graph (V0′) is the single best DYNOTEARS
-variant** — Sharpe 0.400, *significantly* beating both V0 (p<0.001) and the
-driver-based V1 (p=0.042), with the smallest drawdown (−50.8%) and the
-least-negative recession Sharpe (−0.595). So the ablation question "do
-exogenous drivers add value over asset-asset causal structure alone?" gets a
-provocative w252 answer: **no — at the short window, asset-asset causal
-structure alone beats adding the driver/sensitivity machinery.** But V0′ is
-**window-fragile** (0.400 → 0.374), reverting to ≈V0 at 504 days where V1
-reclaims the top. **The only variant robust across *both* windows is
-DYNOTEARS-V1 (0.382/0.382).** Net thesis-level reading: causal structure
-helps, but the *form* that helps most is window-dependent — V0′ and
-VARLiNGAM-V1 both peak at w252 and fade at w504; only the open-loop
-causal-driver-selection (DYNOTEARS-V1) carries a consistent edge across both.
+(Frozen-EEM re-run, 2026-06-15.) At **window 252 the asset-only causal graph
+(V0′) is the single best variant** — Sharpe 0.403, *significantly* beating both
+V0 (+0.032, p<0.001) and the driver-based V1 (V0′ over V1 by 0.022, **p=0.01**),
+with the smallest drawdown (−50.5%). So the ablation question "do exogenous
+drivers add value over asset-asset causal structure alone?" gets a provocative
+w252 answer: **no — at the short window, asset-asset causal structure alone
+beats adding the driver/sensitivity machinery.** But the edge is
+**window-specific**: at 504 days V0′, V1 and V0 all converge to ≈0.372 (every
+DYNOTEARS edge vanishes). Net thesis-level reading: **causal structure helps at
+the 1-year window — most via V0′ — and essentially not at the 2-year window.**
+The earlier "DYNOTEARS-V1 robust across both windows" reading does **not**
+survive the determinism fix (w504 V1−V0 is +0.001); the honest claim is a
+**w252 effect**, strongest for V0′.
 
 ### The three-part conclusion (the spine of the results chapter)
 
-1. **Causal selection beats correlation selection — robust under DYNOTEARS,
-   modest, not significant.** V1-DYNOTEARS > V0 by ΔSharpe +0.011/+0.012 at
-   *both* windows (same sign and magnitude; p≈0.19–0.23). This is the
-   replicable primary result. CAGR edge ~+0.2 pp/yr.
+1. **Causal selection beats correlation selection — at the 1-year window only,
+   and not robust to K** *(revised under the frozen-EEM re-run)*. V1-DYNOTEARS >
+   V0 by +0.010 at w252 (p=0.27) but only **+0.001 at w504** (p=0.92) — the
+   originally-claimed w504 edge (+0.012) was an EEM artefact. The J4a K-sweep
+   further shows the w252 edge is **K-fragile** (positive at the Kneedle K=17,
+   sign-flipping at other K; §1b). Honest primary claim: a modest, window- and
+   K-specific w252 effect — and the strongest w252 effect is actually **V0′**
+   (asset-only), not V1.
 
 2. **VARLiNGAM strengthens the result at 252 days (significantly) but is
-   window-fragile.** V1-VARLiNGAM beats V0 by +0.027, **p=0.007** at 252 days
+   window-fragile** *(‡ numbers below are pre-determinism-fix; a frozen-EEM
+   VARLiNGAM re-run is in progress and may shift them — see §1 matrix)*.
+   V1-VARLiNGAM beats V0 by +0.027, **p=0.007** at 252 days
    — the strongest causal result in the study — but *reverses* to −0.013 (ns)
    at 504 days. Proposed mechanism (good methodological point): VARLiNGAM's
    identifiability rests on **non-Gaussian residuals**; a 504-day window spans
@@ -77,20 +96,27 @@ causal-driver-selection (DYNOTEARS-V1) carries a consistent edge across both.
    distributional assumption) has no such window sensitivity. **Quote the
    252-day VARLiNGAM number only with the 504-day caveat.**
 
-3. **The closed-loop feedback (V2) does not robustly help — a characterised
-   negative.** V2 ≈ V1 at the short window under both methods; significantly
-   *worse* than open-loop at DYNOTEARS-w504 (p=0.031); under VARLiNGAM V2 ≡ V1
-   to 3 d.p. at both windows (feedback does essentially nothing). The apparent
-   2018Q4 regime-break edge at w252 (+0.120) flips sign at w504 (−0.111) — a
-   window artefact. Plausible reason: at 504 days the 2-year discovery window
-   already yields stable causal graphs, so the utility blend adds stale-regime
-   noise rather than signal.
+3. **The closed-loop feedback (V2) is inert — a clean characterised negative**
+   *(revised)*. Under frozen EEM, **V2 ≡ V1 to 4 d.p. at both windows**
+   (DYNOTEARS); the originally-headline "significantly *worse* at w504 (p=0.031)"
+   was itself an EEM artefact. The J4b α/γ sweep confirms inertness across the
+   *entire* feedback grid (§1b): the utility blend only re-ranks *within* the
+   causal-selected set, so it never changes the selected drivers. **The loop
+   does nothing, rather than hurting** — a cleaner negative than the original.
+   (The earlier 2018Q4 regime-break sign-flip story was a jittery-EEM,
+   w252-vs-w504 artefact and is superseded; regime tables in §2 will be
+   refreshed once the VARLiNGAM re-run lands.)
 
-**Framing takeaway.** A robust positive primary result + a well-characterised
-negative on the secondary extension is a *stronger, more defensible* thesis
-outcome than a fragile "the full method wins." The two-window × two-method
-design is what repeatedly exposed the fragility (VARLiNGAM-w504, V2-w504); the
-robustness checking is itself a methodological contribution.
+**Framing takeaway** *(revised after the frozen-EEM re-run + J4)*. The honest
+outcome: causal structure delivers a modest, **w252-localised** improvement over
+correlation selection — strongest via the asset-only **V0′** — with **no robust
+2-year-window edge**, **K-sensitivity** at the short window, and an **inert**
+closed loop. The robustness/reproducibility machinery (two windows × two methods,
+the J4a K-sweep, and the EEM-determinism fix) is precisely what exposed each of
+these — and is itself the methodological contribution. A well-characterised,
+*reproducible* set of modest/null results is more defensible than the original
+"robust across both windows" reading, which the determinism fix showed rested
+partly on a single non-deterministic driver (EEM).
 
 > **⚠️ Qualified by the J4 sweeps + the EEM-determinism fix (§1b).** The w252
 > V1>V0 edge reproduces at the operating K=17 but is **not robust to K**; and a
@@ -171,9 +197,14 @@ V1 w252 reproduce to ≤0.0006, but **V1 w504 shifts 0.382 → 0.372** (V0 w504
 unchanged at 0.370). So the committed **w504 V1−V0 edge of +0.012 becomes
 ≈+0.001** under the deterministic pipeline — the w504 leg of the "robust across
 both windows" claim was substantially an EEM-realisation artefact. **The w252
-edge (+0.010) is solid; the w504 edge is not.** *Recommendation:* re-run the
-committed headline (V0/V1/V2 × both windows) under frozen EEM for one consistent
-set before the final report — now cheap (~minutes) with the warm discovery cache.
+edge (+0.010) is solid; the w504 edge is not.**
+
+**Done (2026-06-15):** the canonical DYNOTEARS bundles (V0/V1/V2/V0′ × both
+windows) were regenerated under frozen EEM (~8 min, warm cache) and §1 now
+reflects them. This also corrected a *second* artefact: the committed "V2
+significantly worse at DYNOTEARS-w504 (p=0.031)" disappears — V2 ≡ V1 exactly at
+both windows under frozen EEM. The VARLiNGAM rows are being regenerated likewise
+(in progress); §2 regime tables will be refreshed when that lands.
 
 Source: `scripts/collate_j4.py` → `results/j4a_k_sensitivity.csv`,
 `results/j4b_alpha_gamma.csv`.
@@ -455,10 +486,11 @@ verification quantifies how much the prior was doing.
 - **α/γ feedback sweep (J4b) — DONE** (see §1b): V2 ≡ V1 *exactly* across all 9
   (α,γ) combos — the closed loop is inert (utility re-ranks only within the
   causal-selected set). Strongest form of the closed-loop negative.
-- **Re-run the committed headline under frozen EEM** (recommended, now cheap with
-  the warm discovery cache): the w504 V1 edge fell from +0.012 to ≈+0.001 under
-  the determinism fix, so §1's matrix and the "robust across both windows" framing
-  should be regenerated for one internally-consistent, reproducible set.
+- **Headline re-run under frozen EEM — DONE** (2026-06-15) for DYNOTEARS
+  (canonical V0/V1/V2/V0′ × both windows); §1 updated. Corrected two EEM
+  artefacts: w504 V1−V0 +0.012→+0.001, and "V2 sig worse at w504" → V2≡V1.
+  **VARLiNGAM re-run in progress**; refresh §2 regime tables + the VARLiNGAM §1
+  rows when it completes.
 - **NTS-NOTEARS** — feasibility-bounded to a reduced sub-analysis or future work.
 - **Network-density regimes** — need a discovery-only re-run to persist
   per-window graph density.
