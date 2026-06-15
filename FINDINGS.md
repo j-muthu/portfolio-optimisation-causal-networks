@@ -92,6 +92,92 @@ outcome than a fragile "the full method wins." The two-window × two-method
 design is what repeatedly exposed the fragility (VARLiNGAM-w504, V2-w504); the
 robustness checking is itself a methodological contribution.
 
+> **⚠️ Qualified by the J4 sweeps + the EEM-determinism fix (§1b).** The w252
+> V1>V0 edge reproduces at the operating K=17 but is **not robust to K**; and a
+> discovered data-nondeterminism bug means the **committed w504 V1 edge (+0.012)
+> was partly an artefact** — under the fix it falls to ≈+0.001. Read §1 point 1
+> together with §1b.
+
+---
+
+## 1b. K-sensitivity (J4a), feedback grid (J4b) & the EEM-determinism fix
+
+> **Bottom line:** the w252 headline (V1>V0 ≈ +0.010 at the operating K=17)
+> reproduces, but the K-sweep shows the edge is **not robust to K** (it
+> sign-flips at other K), and a discovered data-nondeterminism bug (EEM) means
+> the **committed w504 V1 edge was substantially an artefact** — under the fix
+> it falls from +0.012 to ≈+0.001. The closed loop is **inert across the whole
+> α/γ grid**. All J4 numbers are fresh, fully deterministic (frozen-EEM) and
+> self-consistent; the committed headline bundles (§1) are untouched.
+
+Enabled by a content-keyed **discovery cache** (`pipeline/discovery/cache.py`):
+the DYNOTEARS/VARLiNGAM graph is K/α/γ-independent, so each window's fit is
+computed once (~15h populate per window) and every sweep config reuses it
+(~80 s each). 418 cached graphs (215 w252 + 203 w504), ≈700× fan-out speedup.
+
+### J4a — K-sensitivity of V1 vs V0 (net Sharpe, both windows)
+
+| window | K | V0 | V1 | V1−V0 (p) |
+|---|---|---|---|---|
+| 252 | 10 | 0.391 | 0.376 | −0.015 (0.13) |
+| 252 | 14 | 0.387 | 0.389 | +0.003 (0.77) |
+| 252 | **17** | 0.371 | 0.381 | **+0.010 (0.27)** |
+| 252 | 20 | 0.400 | 0.384 | −0.016 (0.10) |
+| 252 | 25 | 0.393 | 0.383 | −0.010 (0.24) |
+| 504 | 10 | 0.370 | 0.370 | −0.001 (0.92) |
+| 504 | 14 | 0.371 | 0.372 | +0.000 (1.00) |
+| 504 | **17** | 0.370 | 0.372 | +0.001 (0.92) |
+| 504 | 20 | 0.365 | 0.372 | +0.007 (0.42) |
+| 504 | 25 | 0.383 | 0.372 | −0.012 (0.18) |
+
+**Findings.** (i) At the Kneedle operating point **K=17 the w252 edge is
+positive (+0.010)** and matches the committed headline. (ii) But the edge is
+**K-fragile** — it goes negative at K=10/20/25 (w252), driven mostly by V0's
+cum-corr Sharpe bouncing 0.37–0.40 with K while V1 stays ≈0.38; **none** of the
+ΔSharpes is significant (p 0.10–1.00). (iii) V1 w504 Sharpe is **flat at 0.372
+for K≥14** because Stage-B greedy pool-exhausts at ≈13 drivers under the 2-year
+window, so K≥14 all select the same set. **Honest reading: the causal-vs-
+correlation edge holds at the data-driven K but is not robust to arbitrary K —
+report the full curve, not just K=17.**
+
+### J4b — α/γ feedback grid (V2 vs V1 open-loop, w252, DYNOTEARS)
+
+All nine (α∈{0.4,0.6,0.8} × γ∈{0.1,0.3,0.5}) combos give V2 Sharpe = **0.381,
+identical to V1 to 4 d.p.** (ΔSharpe 0.000, p=1.0 throughout). Verified the
+feedback is genuinely active (utility table populated, 215 non-zero rows) yet
+**every rebalance's weights are identical to V1** (max Δ = 0.0). Mechanism: the
+utility blend can only re-rank *within* the causally-selected set — it cannot
+promote a never-selected driver — so when the causal top-K is stable the
+selected set never changes and V2 collapses to V1 exactly. This is the
+**strongest form of the closed-loop negative**: across the entire
+feedback-strength grid the loop is inert, not merely unhelpful (mirrors the
+committed "V2≡V1 to 3 d.p. under VARLiNGAM").
+
+### The EEM data-nondeterminism bug (found during J4; reproducibility-critical)
+
+The discovery cache initially never reused — each run re-keyed. Root cause:
+`fetch_yahoo_series` re-fetched **EEM** live on *every* call because EEM's
+inception (2003-04-14) falls inside the 2-year pre-`start` padding window, so
+the cache's coverage check `index.min() <= pad_start` never passed.
+`auto_adjust=True` returns values that jitter ≈3e-7 run-to-run, which DYNOTEARS
+(non-convex L-BFGS) amplifies to ‖ΔW‖≈0.14 — i.e. **the pipeline was not
+bit-reproducible**, and each committed run used a one-off EEM realisation. Fixed
+(`pipeline/data/drivers.py`): reuse a Yahoo cache when the previously-requested
+*span* covers the request (sidecar `.meta`) + atomic writes; two independent
+processes now produce byte-identical windows.
+
+**Reproducibility impact (fresh frozen-EEM K=17 vs committed):** V0 w252/w504 and
+V1 w252 reproduce to ≤0.0006, but **V1 w504 shifts 0.382 → 0.372** (V0 w504
+unchanged at 0.370). So the committed **w504 V1−V0 edge of +0.012 becomes
+≈+0.001** under the deterministic pipeline — the w504 leg of the "robust across
+both windows" claim was substantially an EEM-realisation artefact. **The w252
+edge (+0.010) is solid; the w504 edge is not.** *Recommendation:* re-run the
+committed headline (V0/V1/V2 × both windows) under frozen EEM for one consistent
+set before the final report — now cheap (~minutes) with the warm discovery cache.
+
+Source: `scripts/collate_j4.py` → `results/j4a_k_sensitivity.csv`,
+`results/j4b_alpha_gamma.csv`.
+
 ---
 
 ## 2. Regime-conditional findings (the differentiator)
@@ -345,6 +431,13 @@ verification quantifies how much the prior was doing.
 - **FFNN sensitivity cache race** between parallel runs (identical window/K/arch
   → same cache key → torn pickle). Fix: tolerant read (recompute on corrupt) +
   atomic write (temp + `os.replace`).
+- **EEM driver was non-deterministic (reproducibility-critical, found in J4).**
+  `fetch_yahoo_series` re-fetched EEM live on every call (its 2003-04 inception
+  falls inside the 2-yr pre-`start` pad, so the cache coverage check never
+  passed); `auto_adjust=True` jitters ≈3e-7 run-to-run, amplified by DYNOTEARS to
+  ‖ΔW‖≈0.14. Fix: reuse a Yahoo cache when the previously-requested *span* covers
+  the request (sidecar `.meta`) + atomic writes. Impact: shifted the committed
+  **w504 V1** Sharpe 0.382→0.372 (see §1b) — the pipeline is now bit-reproducible.
 - **K-cal closure hardcodes DYNOTEARS** — so a "VARLiNGAM K-cal" actually
   calibrates on DYNOTEARS scores; VARLiNGAM runs reuse K=17 deliberately.
 - **stooq dropped** mid-project (added a paid-API requirement); WRDS/CRSP +
@@ -356,11 +449,16 @@ verification quantifies how much the prior was doing.
 - **V0′ (asset-only Causal-HRP) — DONE** (see §1): at w252 it is the best
   variant (Sharpe 0.400, significantly beating V0 *and* V1) but window-fragile
   (≈V0 at w504). The 4-variant ablation is complete.
-- **K-sensitivity of the V1>V0 result** not yet swept (planned J4a:
-  K∈{10,14,17,20,25}) — would harden the primary claim.
-- **α/γ feedback sweep** (J4b) — expected to confirm the closed loop never beats
-  open-loop; low scientific value given the demonstrated non-robustness, useful
-  only as a defensive negative appendix.
+- **K-sensitivity (J4a) — DONE** (see §1b): V1>V0 holds at the operating K=17
+  (w252) but is **not robust to K** (sign-flips at other K, never significant).
+  Qualifies the primary claim — report the full K curve.
+- **α/γ feedback sweep (J4b) — DONE** (see §1b): V2 ≡ V1 *exactly* across all 9
+  (α,γ) combos — the closed loop is inert (utility re-ranks only within the
+  causal-selected set). Strongest form of the closed-loop negative.
+- **Re-run the committed headline under frozen EEM** (recommended, now cheap with
+  the warm discovery cache): the w504 V1 edge fell from +0.012 to ≈+0.001 under
+  the determinism fix, so §1's matrix and the "robust across both windows" framing
+  should be regenerated for one internally-consistent, reproducible set.
 - **NTS-NOTEARS** — feasibility-bounded to a reduced sub-analysis or future work.
 - **Network-density regimes** — need a discovery-only re-run to persist
   per-window graph density.
