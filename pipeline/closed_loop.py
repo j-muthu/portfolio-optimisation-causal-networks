@@ -119,6 +119,7 @@ def run_closed_loop(
     asset_eligibility: pd.DataFrame | None = None,
     tag: str = "v2_closed_loop",
     output_dir: Path | None = None,
+    discovery_cache: bool = False,
 ) -> ClosedLoopResult:
     """Run V2 closed-loop end-to-end with genuine per-rebalance feedback.
 
@@ -238,6 +239,7 @@ def run_closed_loop(
             selection_method=selection_method,
             discovery_method=discovery_method,
             correlation_kwargs=correlation_kwargs,
+            discovery_cache=discovery_cache,
         )
         stage1_cache[pd.Timestamp(t)] = s1
 

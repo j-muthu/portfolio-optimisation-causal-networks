@@ -66,6 +66,18 @@ def main(argv: list[str] | None = None) -> None:
     p.add_argument("--alpha", type=float, default=0.6, help="V2 causal/utility blend")
     p.add_argument("--gamma", type=float, default=0.3, help="V2 utility EMA decay")
     p.add_argument("--transaction-cost-bps", type=float, default=5.0)
+    p.add_argument(
+        "--tag-suffix", default="",
+        help="appended to the result-dir tag (e.g. '_k10', '_a0.4_g0.1') so "
+             "J4 sweep runs don't clobber the committed Phase I bundles.",
+    )
+    p.add_argument(
+        "--discovery-cache", action="store_true",
+        help="reuse a content-keyed disk cache of the per-window causal-graph "
+             "fit (K/alpha/gamma-independent). First run per (method, window) "
+             "populates it; later sweep configs reuse it. Off by default so "
+             "default reproductions are bit-for-bit unchanged.",
+    )
     args = p.parse_args(argv)
 
     logging.basicConfig(
@@ -114,6 +126,11 @@ def main(argv: list[str] | None = None) -> None:
         tag = f"phase_i_{args.variant.lower()}_{discovery_method}_w{args.window}"
     else:
         tag = f"phase_i_{args.variant.lower()}_w{args.window}"
+    # Optional suffix so hyperparameter-sweep runs (J4: varying K / alpha /
+    # gamma) write to distinct result dirs instead of clobbering the committed
+    # K=17 / alpha=0.6 Phase I bundles.
+    if args.tag_suffix:
+        tag = f"{tag}{args.tag_suffix}"
 
     res = run_shakedown(
         start=DATA_START,
@@ -138,6 +155,7 @@ def main(argv: list[str] | None = None) -> None:
         discovery_kwargs=discovery_kwargs,
         tag=tag,
         use_cache=True,
+        discovery_cache=args.discovery_cache,
     )
 
     print("\n" + "=" * 70)

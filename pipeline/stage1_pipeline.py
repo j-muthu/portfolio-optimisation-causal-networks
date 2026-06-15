@@ -37,6 +37,7 @@ import pandas as pd
 
 from pipeline._vendored import THESIS_ROOT
 from pipeline.data.alignment import build_joint_matrix, trading_calendar, zscore_window
+from pipeline.discovery.cache import load_or_compute_discovery
 from pipeline.discovery.dynotears import (
     JointDynotearsWindow,
     run_dynotears_joint_window,
@@ -135,6 +136,7 @@ def fit_stage1_rebalance(
     selection_method: str = "causal_greedy",
     discovery_method: str | None = "dynotears",
     correlation_kwargs: dict | None = None,
+    discovery_cache: bool = False,
 ) -> Stage1Rebalance:
     """Run discovery → selection → sensitivities on a single window.
 
@@ -179,9 +181,14 @@ def fit_stage1_rebalance(
         # so the shared "no selected drivers" branch yields an empty
         # SensitivityWindow; the closed-loop strategy reads
         # ``discovery.asset_to_asset_block`` instead.
-        disc = run_dynotears_joint_window(
-            joint_window, driver_columns=driver_columns,
-            asset_columns=asset_columns, **discovery_kwargs,
+        disc = load_or_compute_discovery(
+            lambda: run_dynotears_joint_window(
+                joint_window, driver_columns=driver_columns,
+                asset_columns=asset_columns, **discovery_kwargs,
+            ),
+            joint_window=joint_window, driver_columns=driver_columns,
+            asset_columns=asset_columns, method="dynotears",
+            discovery_kwargs=discovery_kwargs, use_cache=discovery_cache,
         )
         sel = CorrelationSelectionResult(
             rebalance_date=pd.Timestamp(rebalance_date),
@@ -203,14 +210,24 @@ def fit_stage1_rebalance(
     else:
         # V1/V2 path: discovery → Stage A + Stage B + utility blend.
         if discovery_method == "varlingam":
-            disc = run_varlingam_joint_window(
-                joint_window, driver_columns=driver_columns,
-                asset_columns=asset_columns, **discovery_kwargs,
+            disc = load_or_compute_discovery(
+                lambda: run_varlingam_joint_window(
+                    joint_window, driver_columns=driver_columns,
+                    asset_columns=asset_columns, **discovery_kwargs,
+                ),
+                joint_window=joint_window, driver_columns=driver_columns,
+                asset_columns=asset_columns, method="varlingam",
+                discovery_kwargs=discovery_kwargs, use_cache=discovery_cache,
             )
         elif discovery_method == "dynotears":
-            disc = run_dynotears_joint_window(
-                joint_window, driver_columns=driver_columns,
-                asset_columns=asset_columns, **discovery_kwargs,
+            disc = load_or_compute_discovery(
+                lambda: run_dynotears_joint_window(
+                    joint_window, driver_columns=driver_columns,
+                    asset_columns=asset_columns, **discovery_kwargs,
+                ),
+                joint_window=joint_window, driver_columns=driver_columns,
+                asset_columns=asset_columns, method="dynotears",
+                discovery_kwargs=discovery_kwargs, use_cache=discovery_cache,
             )
         else:
             raise ValueError(

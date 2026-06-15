@@ -203,6 +203,7 @@ def run_shakedown(
     tag: str = "shakedown_2020",
     output_dir: Path | None = None,
     use_cache: bool = True,
+    discovery_cache: bool = False,
 ) -> ShakedownResult:
     """End-to-end real-data smoke run.
 
@@ -471,6 +472,7 @@ def run_shakedown(
         asset_eligibility=joint.asset_eligibility,
         tag=tag,
         output_dir=output_dir,
+        discovery_cache=discovery_cache,
     )
     timings["closed_loop_s"] = time.time() - t0
     logger.info("Closed loop done in %.1fs (%d rebalances, K=%d)",
