@@ -26,6 +26,11 @@ the tables here). The submitted `interim_report/figures/` are left as-is.
 | `directional_prior.png` | §3 J1 — the asset→driver prior is consequential |
 | `nts_probe.png` | §1c J5 — NTS-NOTEARS vs DYNOTEARS agreement + cost |
 
+Report-ready captions for every figure: `results/figures/CAPTIONS.md`. Corrected
+(frozen-EEM) versions of the two *interim*-report figures, separate from the
+submitted ones: `interim_report/figures_corrected/` (V2 now coincides with V1;
+the old 2018Q4 "V2 edge" is gone) — via `scripts/plot_interim_corrected.py`.
+
 ---
 
 ## 1. Headline empirical results

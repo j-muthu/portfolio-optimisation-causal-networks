@@ -1,0 +1,70 @@
+# Figure captions (final report)
+
+Report-ready captions for the figure set. All figures are regenerated from the
+frozen-EEM bundles + result CSVs by `scripts/plot_thesis_figures.py`
+(`results/figures/`) and `scripts/plot_interim_corrected.py`
+(`interim_report/figures_corrected/`). Numbers match FINDINGS.md.
+
+## Thesis figure set (`results/figures/`)
+
+**nav_curves.png** — *Cumulative net asset value (start = 1.0, net of 5 bps
+one-way transaction costs) over 2007–2024 for V0 (cum-corr), V0′ (asset-only
+causal), V1-DYNOTEARS and V1-VARLiNGAM, at the 252- and 504-day lookback
+windows. The closed-loop V2 is omitted as it is numerically identical to V1.
+All variants absorb the full ≈51% GFC drawdown — the differences are in
+risk-adjusted return, not drawdown avoidance.*
+
+**sharpe_matrix.png** — *Annualised net Sharpe by variant and lookback window
+(deterministic frozen-EEM pipeline). At the 252-day window the asset-only V0′
+(0.403) and VARLiNGAM-V1 (0.399) clearly exceed the correlation baseline V0
+(0.371); at the 504-day window all variants converge to ≈0.37 (VARLiNGAM-V1
+falls below V0 to 0.357). The causal edge is a short-window phenomenon.*
+
+**k_sensitivity.png** — *K-sensitivity of the causal-vs-correlation comparison
+(J4a). V0's cumulative-correlation Sharpe varies erratically with the number of
+selected drivers K (0.37–0.40), while V1's is stable (≈0.38); consequently the
+sign of V1 − V0 flips with K, with V1 ahead only near the Kneedle-calibrated
+K = 17 (dotted line). No ΔSharpe is statistically significant. At 504 days V1 is
+flat for K ≥ 14 because Stage-B greedy selection exhausts the ≈13-driver pool.*
+
+**feedback_grid.png** — *Closed-loop feedback grid (J4b): net Sharpe of V2 over
+the α (causal/utility blend) × γ (utility EMA decay) grid at the 252-day window.
+The surface is uniformly 0.381 — identical to open-loop V1 to four decimals at
+every setting. The utility feedback can only re-rank drivers within the
+causally-selected set, so it never changes that set; the closed loop is inert.*
+
+**regime_excess.png** — *Regime-conditional Sharpe edge over the V0 baseline
+(252-day window) across NBER recession/expansion and VIX high-/low-volatility
+regimes. Every causal variant beats V0 in every regime — less-bad in stress,
+better in benign conditions — with the asset-only V0′ the largest edge
+throughout (e.g. +0.06 Sharpe in recession). Plotted as excess over V0 because
+absolute regime Sharpes span −1.4 to +5.7.*
+
+**directional_prior.png** — *Verification of the asset→driver directional prior
+(J1). Bars: the fraction of total DYNOTEARS edge mass that would fall on
+economically-implausible asset→driver edges if the prior were removed (35–48%
+across regime windows). Line (right axis): top-K driver-set Jaccard with vs
+without the prior. The prior cheaply removes a large block of spurious
+reverse-causation mass and materially changes which drivers are selected,
+especially in the 2008 and 2022 stress regimes.*
+
+**nts_probe.png** — *Non-linear-discovery probe (J5; reduced universe d = 58).
+(a) Agreement between NTS-NOTEARS and DYNOTEARS on driver→asset structure —
+top-10 driver Jaccard and Stage-A score Spearman — modest overall (mean Jaccard
+0.35), higher in stress windows. (b) Per-window fit cost (log scale):
+NTS-NOTEARS is ≈10× DYNOTEARS even at this reduced dimensionality, so a full
+215-rebalance backtest is left as future work.*
+
+## Corrected interim-report figures (`interim_report/figures_corrected/`)
+
+These are the frozen-EEM corrections of the two submitted interim figures (the
+submitted `interim_report/figures/` are left untouched).
+
+**nav_curve.png** — *Cumulative net NAV, V0/V1/V2, 252-day window (frozen-EEM).
+V2 (dashed) coincides with V1: the closed loop is inert.*
+
+**sharpe_and_regime.png** — *(a) Net Sharpe by variant × lookback window; (b)
+named-regime mean monthly excess-Sharpe vs 1/N (252-day window). Corrected vs
+the submitted interim figure: V1 w504 falls 0.382→0.372 and V2 ≡ V1 in every
+regime — the previously-reported 2018Q4 "V2 edge" was a jittery-EEM artefact and
+is gone.*
