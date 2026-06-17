@@ -1,0 +1,101 @@
+\documentclass[12pt, a4paper]{report}
+
+% Custom Computing group formatting
+\usepackage{ccrep}
+
+% Additional packages
+\usepackage{booktabs}
+\usepackage{array}
+\usepackage{enumitem}
+
+% Referencing (Vancouver style, mandated)
+\addbibresource{references.bib}
+
+% Document metadata
+\title{Portfolio Optimisation with Causal Networks}
+\author{Joshua Muthu}
+\cid{06048741}
+\supervisor{Dr.\ Ce Guo and Prof.\ Wayne Luk}
+\secondmarker{Prof.\ Stephen Weston}
+\date{September 2026}
+
+\begin{document}
+
+% --- Front matter (does not count towards the 60-page limit) ---
+\pagenumbering{roman}
+
+\maketitle
+
+\begin{abstract}
+\noindent Portfolio optimisation has long relied on the correlations between
+asset returns. Correlation, however, is undirected, static, and can be spurious:
+a variable that merely co-moves with equities is indistinguishable from one that
+causally drives them. This dissertation asks whether replacing the
+correlation-based driver selection in a recent allocation framework,
+Hierarchical Sensitivity Parity (HSP), with \emph{causal} structure produces
+more robust portfolios. I propose \emph{closed-loop Causal-HSP}: drivers are
+chosen by temporal causal discovery (DYNOTEARS, with VARLiNGAM as a comparator)
+under a directional prior, assets are clustered in the resulting causal
+sensitivity space, and a feedback loop lets realised performance update a
+driver-utility score that shapes the next period's selection.
+
+I evaluate the method on an approximate S\&P~100 (top-99 by market
+capitalisation), 215 monthly rebalances over 2007--2024, net of costs, at
+one- and two-year lookback windows, with significance from a Politis--Romano
+stationary block bootstrap. The findings are deliberately characterised rather
+than overstated. \textbf{(i)} Causal driver selection beats correlation
+selection at the one-year window (Sharpe $0.381$ vs $0.371$ for DYNOTEARS;
+$0.399$, $p=0.004$, for VARLiNGAM) but the edge vanishes at the two-year window
+and is not robust to the number of drivers $K$. \textbf{(ii)} The strongest
+one-year variant is \emph{asset-only} Causal-HRP (no exogenous drivers), at
+Sharpe $0.403$, significantly beating both correlation-HSP ($p<0.001$) and the
+driver-based method ($p=0.01$). \textbf{(iii)} The closed loop is \emph{inert}:
+across an entire $\alpha/\gamma$ grid the feedback never alters the
+causally-selected driver set, so it reproduces the open loop exactly. Two of
+these conclusions corrected an earlier, more optimistic reading after a
+data-determinism bug was found and fixed, making the whole pipeline
+bit-reproducible. The contribution is a complete, reproducible characterisation
+of where causal structure helps portfolio construction (the short window, and
+most via asset-only structure) and where it does not (the long window, and via
+the feedback extension).
+\end{abstract}
+
+\begin{acknowledgements}
+I would like to thank my supervisors, Dr.\ Ce Guo and Prof.\ Wayne Luk, for
+their guidance throughout this project, and Prof.\ Stephen Weston as my second
+marker.
+\end{acknowledgements}
+
+\tableofcontents
+\clearpage
+
+% --- Main content (60-page limit applies from here) ---
+\pagenumbering{arabic}
+
+\input{chapters/01_introduction}
+\input{chapters/02_background}
+\input{chapters/03_discovery}
+\input{chapters/04_sensitivity}
+\input{chapters/05_evaluation}
+\input{chapters/06_conclusion}
+
+% --- Back matter (does not count towards the 60-page limit) ---
+\clearpage
+\printbibliography[heading=bibintoc, title={References}]
+
+\chapter*{Declarations}
+\addcontentsline{toc}{chapter}{Declarations}
+This report is my own work. The research was conducted under the supervision of
+Dr.\ Ce Guo and Prof.\ Wayne Luk. No Imperial ethics approval was required: the
+project uses only publicly available market and macroeconomic data and involves
+no human participants or personal data. Generative AI (Anthropic's Claude) was
+used to assist with drafting and proofreading the prose of this report and as a
+coding assistant during implementation; all technical content, design decisions,
+experiments and results are my own, and all AI-assisted text was reviewed and
+edited by me. All numerical results are reproducible from the committed code and
+cached data.
+
+\appendix
+\input{chapters/A_appendix}
+
+\end{document}

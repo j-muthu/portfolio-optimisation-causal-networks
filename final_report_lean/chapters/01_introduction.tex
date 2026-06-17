@@ -1,0 +1,155 @@
+% ============================================================
+\chapter{Introduction}
+\label{chap:intro}
+% ============================================================
+
+\section{Context and motivation}
+\label{sec:motivation}
+
+Portfolio optimisation divides capital across assets so as to maximise return
+for a given level of risk. Since Markowitz's mean--variance model
+\cite{markowitz1952portfolio}, modern portfolio theory has decomposed an asset's
+risk into a \emph{systematic} part, shared with the broader market and priced
+through factor models such as the Capital Asset Pricing Model
+\cite{sharpe1964capm} and Arbitrage Pricing Theory \cite{ross1976apt}, and an
+\emph{idiosyncratic} part that diversification across assets reduces. These two
+components ordinarily trade off: reducing factor exposure tends to concentrate a
+portfolio, while diversifying across assets reduces variance but tends to
+increase factor exposure.
+
+Almost all of this machinery rests on the covariance, or equivalently the
+correlation, matrix of returns. Correlation has three well-known weaknesses.
+It is \emph{undirected} (it imposes no temporal ordering between assets'
+movements); it is \emph{static} (it does not track how market structure shifts
+during crises); and it can be \emph{spurious} (two variables may co-move with no
+causal relationship \cite{simon1954spurious}). The last point is the most
+damaging for factor investing: a variable that merely co-moves with equities,
+such as an equity index, is statistically indistinguishable from one that
+causally drives them, which manifests as overfitting and false factor
+discoveries \cite{lopezdeprado2023causal}.
+
+Causal discovery learns directed relationships from observational data and so, in
+principle, separates genuine drivers from incidental co-movement. The field has
+recently become tractable at scale: the score-based algorithm NOTEARS
+\cite{zheng2018notears} and its temporal extension DYNOTEARS
+\cite{pamfil2020dynotears} recast structure learning as continuous optimisation,
+and a small but growing literature now applies these methods to equity markets
+\cite{howard2025causal,tang2024trading}.
+
+This project applies causal discovery to a recent allocation framework,
+Hierarchical Sensitivity Parity (HSP) \cite{rodriguez2023hsp}. HSP first selects
+the common \emph{drivers} of a set of assets (government bonds, commodity
+futures, macroeconomic indicators, FX pairs, and so on) and then clusters assets
+by the similarity of their \emph{sensitivities} to those drivers. Its appeal is
+theoretical --- via the commonality principle and the Reichenbach common-cause
+principle \cite{rodriguez2025causal,hitchcock2020reichenbach} it claims to escape
+the systematic/idiosyncratic diversification trade-off --- yet it selects its
+drivers by \emph{cumulative correlation}, the very quantity its causal motivation
+was meant to move beyond. The central question of this dissertation is whether
+replacing that correlation-based selection with genuine causal structure
+produces more robust portfolios, particularly around the regime changes where
+correlation-based methods are most vulnerable. I additionally test a
+\emph{closed feedback loop} in which realised out-of-sample performance updates a
+driver-utility score that shapes the next period's selection. I call HSP with
+causally-selected drivers \emph{Causal-HSP}, and the version with feedback
+\emph{closed-loop Causal-HSP}.
+
+\section{Challenges, novel contributions, and quantified benefits}
+\label{sec:challenges}
+
+The project is framed around three technical challenges, the contributions that
+address them, and the quantified benefits actually measured.
+
+\begin{enumerate}
+  \item \textbf{Key technical challenges.}
+  \begin{enumerate}[label=\textbf{C\arabic*}]
+    \item \emph{Causal driver identification at portfolio scale.} HSP selects
+      drivers by cumulative correlation, conflating co-movement with causation.
+      Identifying genuinely causal drivers requires causal discovery over a large
+      joint panel of drivers and assets, a directional prior (drivers cause
+      assets, not the reverse), and enough computational tractability to repeat
+      the discovery at every rebalance --- non-trivial, as many causal-discovery
+      algorithms are expensive and not readily parallelisable.
+    \item \emph{Using directional causal structure inside a symmetric allocator.}
+      Hierarchical risk-parity methods cluster on a symmetric distance matrix, but
+      causal graphs are directional. Naively symmetrising the causal adjacency
+      would discard the very directional information that motivates the approach.
+    \item \emph{Closed-loop feedback.} I hypothesise that letting realised
+      performance feed back into selection improves robustness across regime
+      changes. Such feedback is not part of HSP, so the framework must be extended
+      and the hypothesis tested rather than assumed.
+  \end{enumerate}
+
+  \item \textbf{Contributions addressing each challenge.}
+  \begin{enumerate}[label=\textbf{A\arabic*}]
+    \item A \emph{causal factor discovery pipeline} (Chapter~\ref{chap:discovery})
+      that runs temporal causal discovery (DYNOTEARS, with VARLiNGAM as a
+      comparator, and a reduced-scope NTS-NOTEARS probe) over the joint panel,
+      enforces the directional prior by forbidding asset-to-driver edges,
+      calibrates the number of drivers from the data, and is made reproducible and
+      tractable by a content-keyed discovery cache.
+    \item \emph{Causal-HSP in sensitivity space} (Chapter~\ref{chap:sensitivity}):
+      each asset's sensitivities to the selected drivers form a Euclidean
+      embedding whose distance matrix is symmetric \emph{by construction}, so
+      directional causal information drives the clustering with no symmetrisation
+      of the graph. This also enables an \emph{asset-only} control (V0$'$) that
+      converts an asset--asset causal graph directly into weights.
+    \item A \emph{closed feedback loop} (Chapter~\ref{chap:evaluation}) that
+      attributes realised performance back to the drivers that shaped the
+      portfolio and blends this utility with causal evidence in the next
+      selection, evaluated across two lookback windows and a hyperparameter grid.
+  \end{enumerate}
+
+  \item \textbf{Quantified benefits actually measured} (full detail in
+    Chapter~\ref{chap:evaluation}; net of 5\,bps costs, 215 monthly rebalances,
+    2007--2024, significance by stationary block bootstrap
+    \cite{politis1994stationary}). The results are reported here as measured,
+    including where the method does \emph{not} help.
+  \begin{itemize}[itemsep=1pt, topsep=3pt]
+    \item At the \textbf{one-year} window causal selection beats the
+      cumulative-correlation baseline (V0, Sharpe $0.371$): DYNOTEARS reaches
+      $0.381$ (a $+0.010$ edge that is \emph{not} statistically significant,
+      $p=0.27$) and VARLiNGAM reaches $0.399$ ($+0.028$, $p=0.004$).
+    \item The single most effective variant is \textbf{asset-only Causal-HRP}
+      (V0$'$, no exogenous drivers): Sharpe $0.403$, significantly above both the
+      correlation baseline ($p<0.001$) \emph{and} the driver-based method
+      ($p=0.01$). On this universe, asset--asset causal structure alone
+      outperforms adding the exogenous-driver machinery.
+    \item These edges are \textbf{not robust}. At the \textbf{two-year} window they
+      vanish (every variant converges to Sharpe $\approx 0.372$, and VARLiNGAM
+      falls below the baseline), and the V1$-$V0 edge changes sign with the number
+      of drivers $K$.
+    \item The \textbf{closed loop is inert}: across the entire $\alpha,\gamma$
+      grid the feedback never changes the selected driver set, so V2 reproduces
+      open-loop V1 exactly. The feedback hypothesis (C3) is answered in the
+      negative.
+    \item Qualitatively, the causal selector rotates across $\approx 26$ distinct
+      drivers that track the macro regime, whereas the correlation selector locks
+      onto the same $\approx 10$--$14$ drivers (international-equity ETFs and the
+      rates curve) at every rebalance --- direct evidence of the cum-corr
+      tautology the project set out to avoid.
+    \item The closest prior work, Howard et al.\ \cite{howard2025causal}, applies
+      DYNOTEARS to the S\&P~500 but never sets portfolio weights from the causal
+      graph; converting causal structure directly into allocation (and the V0$'$
+      result above) is the novel element here.
+  \end{itemize}
+\end{enumerate}
+
+The honest one-line summary is therefore: \emph{causal structure delivers a
+small, window-dependent improvement over correlation for this framework ---
+clearest, and statistically significant, only as asset-only structure at the
+short window --- and the closed-loop extension delivers nothing.} Establishing
+this carefully, and reproducibly, is the contribution.
+
+\section{Report structure}
+\label{sec:structure}
+
+Chapter~\ref{chap:background} reviews portfolio optimisation, causal discovery,
+and their intersection, and positions the work against the literature.
+Chapters~\ref{chap:discovery}--\ref{chap:evaluation} present the three
+achievements: A1, the causal factor discovery pipeline (addressing C1);
+A2, Causal-HSP in sensitivity space (C2); and A3 with the full empirical
+evaluation, the closed loop and all comparative, regime-conditional and
+robustness results (C3). Chapter~\ref{chap:conclusion} draws objective
+conclusions, states the limitations of a causal (and causal-plus-asset) approach
+plainly, and sets out future work.

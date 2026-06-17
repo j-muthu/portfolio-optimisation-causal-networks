@@ -1,0 +1,313 @@
+% ============================================================
+\chapter{A3 and Evaluation: Closed-Loop Feedback and Results}
+\label{chap:evaluation}
+% ============================================================
+
+This chapter presents the closed feedback loop (A3, addressing C3) and the full
+empirical evaluation. Section~\ref{sec:loop} describes the loop;
+Section~\ref{sec:method} the evaluation methodology; Sections~\ref{sec:headline}
+to \ref{sec:regimes} report the results --- the headline comparison, the
+causal-versus-correlation question, the sensitivity to the number of drivers, the
+(non-)value of the closed loop, the asset-only result, and the
+regime-conditional analysis. Section~\ref{sec:believe} then steps back and asks,
+under good epistemic norms, how much of this we should actually believe.
+
+\section{Closing the loop}
+\label{sec:loop}
+
+Achievement A3 extends HSP, which has no feedback. After the weights $w[t]$ are
+held for the month, the realised reward is the excess Sharpe ratio relative to an
+equal-weight portfolio over the same holding period,
+\begin{equation}
+  R[t] = \mathrm{Sharpe}\big(\text{portfolio over } [t, t{+}h]\big)
+       - \mathrm{Sharpe}\big(\tfrac{1}{N} \text{ over } [t, t{+}h]\big).
+\end{equation}
+The excess form controls for market-wide regime effects, so drivers are not
+punished for a crash that hit everything. Reward is attributed to drivers in
+proportion to how strongly each shaped the portfolio,
+\begin{equation}
+  \mathrm{credit}_d[t] = R[t]\,\frac{\mathrm{influence}_d}{\sum_{d'} \mathrm{influence}_{d'}},
+  \qquad
+  \mathrm{influence}_d = \sum_i \big| w_i[t]\, s_{i,d}[t] \big|,
+\end{equation}
+and each selected driver's utility follows an exponential moving average, which the
+next selection blends with causal evidence:
+\begin{equation}
+  U_d[t] = \gamma\, \mathrm{credit}_d[t] + (1-\gamma)\, U_d[t-1],
+  \qquad
+  \mathrm{score}_d[t] = \alpha\, z\big(\mathrm{causal}_d[t]\big) + (1-\alpha)\, z\big(U_d[t-1]\big).
+\end{equation}
+Here $\gamma$ sets the utility's memory and $\alpha$ weights causal evidence
+against history ($\alpha=1$ recovers open-loop V1). Lookahead discipline is
+enforced by keying utility on the holding-period-\emph{end} date and asserting a
+21-day gap on lookup, with a deliberately-leaky ``canary'' variant used in testing
+to confirm the guard fires. The full closed-loop method is V2.
+
+\section{Evaluation methodology}
+\label{sec:method}
+
+All variants are evaluated on the same backtest: the approximate S\&P~100
+universe, monthly rebalancing over 2007--2024 (215 rebalances), $K=17$ calibrated
+once on a 2006 burn-in, at two lookback windows --- 252 trading days (one year)
+and 504 (two years) --- as the primary robustness check. Transaction costs of
+5\,bps per unit of one-way turnover are charged (with sweeps over
+$\{0,5,10,20\}$\,bps); results are net of costs. For each variant I compute
+annualised Sharpe (the headline), CAGR, maximum drawdown, volatility, turnover and
+concentration. The controlled scientific comparison holds the \emph{allocator}
+fixed and varies only the driver-selection mechanism, so the standard-HSP variant
+V0 is the baseline; the equal-weight ($1/N$) portfolio is the absolute reference
+used in the regime analysis. Differences in Sharpe are tested with a
+Politis--Romano stationary block bootstrap \cite{politis1994stationary} (2000
+resamples), which respects the serial dependence of returns. Regimes are defined
+by NBER recession dates, top-versus-bottom VIX quintiles, and named historical
+stress windows.
+
+\section{Headline results}
+\label{sec:headline}
+
+Table~\ref{tab:matrix} gives the full matrix and Table~\ref{tab:sig} the pairwise
+significance; Figure~\ref{fig:nav} plots the net NAV trajectories and
+Figure~\ref{fig:sharpe} the Sharpe-by-variant comparison. All numbers are from the
+deterministic (frozen-EEM) pipeline (Section~\ref{sec:cache}).
+
+\begin{table}[t]
+  \centering
+  \caption{Full results matrix: annualised net Sharpe, 2007--2024, by discovery
+    method, variant and lookback window. V0 (cumulative correlation) is the shared
+    baseline; V0$'$ is asset-only (DYNOTEARS graph only).}
+  \label{tab:matrix}
+  \begin{tabular}{l l c c c c}
+    \toprule
+    Method & Window & V0 & V1 & V2 & V0$'$ \\
+    \midrule
+    DYNOTEARS & 252 & 0.371 & 0.381 & 0.381 & \textbf{0.403} \\
+    DYNOTEARS & 504 & 0.370 & 0.372 & 0.372 & 0.372 \\
+    VARLiNGAM & 252 & 0.371 & \textbf{0.399} & 0.399 & --- \\
+    VARLiNGAM & 504 & 0.370 & 0.357 & 0.357 & --- \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\begin{table}[t]
+  \centering
+  \caption{Pairwise Sharpe differences ($\Delta$Sharpe, $p$-value), Politis--Romano
+    block bootstrap, 2000 resamples. Positive favours the first variant.}
+  \label{tab:sig}
+  \begin{tabular}{l c c}
+    \toprule
+    Comparison & Window 252 & Window 504 \\
+    \midrule
+    V1$-$V0 (DYNOTEARS) & $+0.010$ ($p=0.27$) & $+0.001$ ($p=0.92$) \\
+    V1$-$V0 (VARLiNGAM) & $\mathbf{+0.028}$ ($\mathbf{p=0.004}$) & $-0.014$ ($p=0.14$) \\
+    V0$'-$V0 (asset-only) & $\mathbf{+0.032}$ ($\mathbf{p<0.001}$) & $+0.002$ ($p=0.84$) \\
+    V0$'-$V1 (DYNOTEARS) & $\mathbf{+0.022}$ ($\mathbf{p=0.01}$) & $+0.001$ ($p=0.94$) \\
+    V2$-$V1 (closed loop) & $0.000$ ($p=1.0$) & $0.000$ ($p=1.0$) \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\begin{figure}[tbp]
+  \centering
+  \includegraphics[width=0.97\textwidth]{figures/nav_curves.png}
+  \caption{Cumulative net-of-cost NAV, 2007--2024, for V0, V0$'$, V1-DYNOTEARS and
+    V1-VARLiNGAM at both windows (V2 omitted, being identical to V1). All variants
+    absorb the full $\approx 51\%$ GFC drawdown; differences are in risk-adjusted
+    return, not drawdown avoidance.}
+  \label{fig:nav}
+\end{figure}
+
+\begin{figure}[tbp]
+  \centering
+  \includegraphics[width=0.82\textwidth]{figures/sharpe_matrix.png}
+  \caption{Net Sharpe by variant and lookback window. At one year V0$'$ (0.403)
+    and VARLiNGAM-V1 (0.399) clearly exceed the baseline (0.371); at two years all
+    variants converge to $\approx 0.37$ and VARLiNGAM-V1 falls below it. The causal
+    edge is a short-window phenomenon.}
+  \label{fig:sharpe}
+\end{figure}
+
+The headline reading, stated plainly:
+\begin{itemize}[itemsep=2pt, topsep=3pt]
+  \item At the one-year window, the causal variants beat the correlation baseline,
+        and the best are V0$'$ (0.403) and VARLiNGAM-V1 (0.399), both significant.
+        DYNOTEARS-V1's edge ($+0.010$) is in the right direction but not
+        significant.
+  \item At the two-year window the entire effect disappears: V0, V1 and V0$'$ all
+        sit at $\approx 0.372$ and VARLiNGAM-V1 \emph{underperforms} the baseline.
+  \item The closed loop adds nothing anywhere: V2 equals V1 to four decimal places.
+  \item In absolute terms every variant has a low Sharpe ($\approx 0.37$--$0.40$)
+        and an $\approx 51\%$ drawdown: this is a study of \emph{relative}
+        driver-selection quality within a long-only equity allocator, not of
+        absolute performance or drawdown control.
+\end{itemize}
+
+\section{Does causal selection beat correlation?}
+\label{sec:causal-vs-corr}
+
+The answer is a qualified yes at one year and a clear no at two years. Two
+mechanisms are worth noting. First, the cum-corr baseline is structurally
+tautological: V0 selects essentially the same $\approx 10$--$14$ drivers every
+rebalance --- mostly international-equity ETFs and the rates curve --- because
+these trivially co-move with US equity, whereas the causal selector rotates
+across $\approx 26$ drivers that track the macro regime (rates and credit before
+COVID, crude and credit at the April-2020 crash, safe-haven assets mid-crisis,
+volatility and rates in the recovery). This qualitative difference is robust and
+is the cleanest vindication of the causal approach, \emph{independent} of the
+modest Sharpe gap. Second, the two discovery methods disagree substantially ---
+mean top-$K$ driver Jaccard of only $0.34$ between DYNOTEARS and VARLiNGAM --- yet
+both beat V0 at one year: concordance of conclusion despite divergence of
+selection.
+
+The window-dependence is the central negative finding and admits a plausible
+mechanism for VARLiNGAM. Its identifiability rests on non-Gaussian residuals; a
+two-year window spans more regimes, so by the central limit theorem the residuals
+trend Gaussian, ICA identification weakens, the causal order becomes noisier, and
+selection degrades --- consistent with VARLiNGAM being strongest at one year and
+falling below baseline at two. DYNOTEARS, score-based and distribution-free, lacks
+this specific sensitivity but also lacks the one-year significance. The
+interaction between an algorithm's assumptions and the window length is itself a
+useful methodological observation, and a caution against quoting the strong
+one-year VARLiNGAM number without its two-year companion.
+
+\section{Sensitivity to the number of drivers $K$}
+\label{sec:ksens}
+
+$K$ is calibrated from the data ($K=17$ by Kneedle), but a robustness sweep over
+$K\in\{10,14,17,20,25\}$ (Figure~\ref{fig:ksens}) shows the causal-versus-
+correlation comparison is \emph{not} robust to it. At one year the V1$-$V0 edge is
+positive only near $K=17$; it turns negative at $K=10$, $20$ and $25$, driven
+mostly by the cum-corr baseline's Sharpe bouncing erratically between $0.37$ and
+$0.40$ while V1 stays near $0.38$. None of the per-$K$ differences is significant.
+At two years V1's Sharpe is flat at $\approx 0.372$ for $K\ge 14$ because the
+greedy selector exhausts the $\approx 13$ drivers that clear the Stage-A threshold.
+The honest implication is that the one-year DYNOTEARS edge holds at the
+\emph{data-chosen} $K$ but should not be presented as $K$-robust; this, together
+with the zero FDR-significant drivers found in calibration
+(Section~\ref{sec:selection}), tempers the strength of the driver-based claim.
+
+\begin{figure}[tbp]
+  \centering
+  \includegraphics[width=0.97\textwidth]{figures/k_sensitivity.png}
+  \caption{$K$-sensitivity of V0 versus V1 (DYNOTEARS). The cum-corr baseline
+    (grey) varies erratically with $K$ while causal V1 (blue) is stable, so the
+    sign of $V1-V0$ flips with $K$; V1 leads only near the Kneedle-calibrated
+    $K=17$ (dotted). No difference is significant. At two years V1 is flat for
+    $K\ge 14$ (pool exhaustion).}
+  \label{fig:ksens}
+\end{figure}
+
+\section{Is the closed loop useful?}
+\label{sec:loop-eval}
+
+No. Sweeping the feedback strength over the full grid
+$\alpha\in\{0.4,0.6,0.8\}\times\gamma\in\{0.1,0.3,0.5\}$ at the one-year window
+gives a Sharpe of $0.381$ at \emph{every} setting, identical to open-loop V1 to
+four decimals (Figure~\ref{fig:grid}). The feedback machinery genuinely runs (the
+utility table is populated at all 215 rebalances), yet the per-rebalance weights
+are identical to V1 throughout. The mechanism is now understood: the utility blend
+can only \emph{re-rank drivers within} the causally-selected set --- it cannot
+promote a driver the causal selector never shortlisted --- so when the causal
+top-$K$ is stable, the selected set never changes and V2 collapses to V1 exactly.
+This is the strongest possible form of the negative result: the closed loop is not
+merely unhelpful on average, it is \emph{inert} across the entire feedback grid.
+C3's hypothesis --- that feedback improves robustness --- is rejected for this
+design.
+
+\begin{figure}[tbp]
+  \centering
+  \includegraphics[width=0.7\textwidth]{figures/feedback_grid.png}
+  \caption{Closed-loop feedback grid: V2 net Sharpe over the $\alpha$ (causal/
+    utility blend) $\times\ \gamma$ (utility memory) grid at one year. The surface
+    is uniformly $0.381$, identical to open-loop V1: the feedback never changes the
+    selected driver set, so the loop is inert.}
+  \label{fig:grid}
+\end{figure}
+
+\section{Do exogenous drivers help at all? The asset-only result}
+\label{sec:v0prime-eval}
+
+The most striking result is that removing the exogenous drivers \emph{improves}
+performance at the short window. Asset-only Causal-HRP (V0$'$) reaches Sharpe
+$0.403$ at one year, significantly above both the correlation baseline
+($+0.032$, $p<0.001$) and the driver-based Causal-HSP V1 ($+0.022$, $p=0.01$),
+with the smallest drawdown ($-50.5\%$). On this universe and window, the
+asset--asset causal graph alone is a better basis for clustering than the entire
+driver-selection-and-sensitivity apparatus. A plausible reading is that the
+exogenous-driver path adds estimation noise (driver selection, then a neural
+sensitivity fit) that the direct asset-graph route avoids, while still capturing
+the cross-asset structure that matters for clustering. This is an uncomfortable
+result for a project framed around \emph{driver} selection, and it is reported as
+the headline it deserves to be. The necessary caveat is that V0$'$ is also
+window-dependent: at two years it falls back to $\approx 0.372$, level with
+everything else.
+
+\section{Regime-conditional analysis}
+\label{sec:regimes}
+
+Because the hypothesised advantage of causal methods is robustness around regime
+changes, I condition performance on market regime (Figure~\ref{fig:regime},
+full tables in Appendix~\ref{app:tables}). At one year, every causal variant
+beats the correlation baseline in \emph{every} regime slice --- NBER recession and
+expansion, and high- and low-volatility --- and V0$'$ is the largest edge
+throughout, including the least-bad recession Sharpe ($-0.575$ versus V0's
+$-0.638$) and the smallest recession drawdown. This is the cleanest support for
+the core hypothesis: where causal structure helps, it helps most in stress. The
+caveat, again, is the window: at two years the regime edges collapse with the
+aggregate ones.
+
+\begin{figure}[tbp]
+  \centering
+  \includegraphics[width=0.9\textwidth]{figures/regime_excess.png}
+  \caption{Regime-conditional Sharpe edge over the V0 baseline (one-year window),
+    across NBER recession/expansion and VIX high-/low-volatility regimes. Every
+    causal variant beats V0 in every regime; asset-only V0$'$ is the largest edge
+    throughout. Plotted as excess over V0 because absolute regime Sharpes span
+    $-1.4$ to $+5.7$.}
+  \label{fig:regime}
+\end{figure}
+
+\section{How much should we believe this?}
+\label{sec:believe}
+
+Good practice demands that the results be read against their own threats to
+validity, stated explicitly rather than buried.
+
+\paragraph{Effect sizes are small and mostly not significant.} The headline
+DYNOTEARS edge is $\approx 0.01$ Sharpe and not significant; only the asset-only
+V0$'$ and the one-year VARLiNGAM results clear conventional significance, and only
+at one window. Over $\approx 215$ monthly observations a $\Delta$Sharpe of
+$0.01$--$0.03$ is near the detection floor, so the study is plausibly
+\emph{underpowered} for effects of this size, and absence of significance is not
+evidence of absence of a (small) effect.
+
+\paragraph{Multiple comparisons.} The study reports many comparisons --- four
+variants, two methods, two windows, five values of $K$, a nine-point feedback
+grid. Testing this many configurations inflates the probability of finding
+\emph{some} significant result by chance, so the significant cells (V0$'$ at one
+year, $p<0.001$; VARLiNGAM at one year, $p=0.004$) should be read with a
+multiple-testing discount in mind. They are reported as exploratory findings, not
+as pre-registered confirmatory tests, and the consistent direction across regimes
+(Section~\ref{sec:regimes}) is offered as corroborating, not confirmatory,
+evidence.
+
+\paragraph{In-window-significant is not robust.} Every positive result here is
+single-window: nothing that is significant at one year survives at two years. The
+two-window design was deliberately adopted to expose exactly this kind of
+fragility, and it did.
+
+\paragraph{A result that needed a reproducibility fix.} As recorded in
+Section~\ref{sec:cache}, two earlier conclusions (a two-year causal edge; a
+``significantly worse'' closed loop) were artefacts of one non-deterministic
+driver and vanished once the pipeline was made reproducible. This is a concrete
+reminder of how fragile small financial-backtest effects are, and why the
+corrected numbers above should be treated as the only ones that count.
+
+\paragraph{What the evidence does and does not support.} It supports: (i) that
+correlation-based selection is tautological and causal selection is qualitatively
+more regime-adaptive; (ii) that, on this universe at the one-year window,
+asset-only causal structure modestly but significantly improves risk-adjusted
+return over correlation-HSP. It does \emph{not} support: a robust, large, or
+reliably significant advantage of causal \emph{driver} selection; any benefit from
+the closed-loop extension; or any of these effects at the two-year window. That
+asymmetry --- a genuine but narrow positive, surrounded by clearly characterised
+negatives --- is the scientific result.

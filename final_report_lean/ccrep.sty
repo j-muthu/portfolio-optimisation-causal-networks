@@ -1,0 +1,77 @@
+\NeedsTeXFormat{LaTeX2e}
+\ProvidesPackage{ccrep}[2026/02/24 v1.0 Minimal Project Style for Custom Computing Group]
+
+\renewcommand*{\rmdefault}{bch}
+\renewcommand*{\ttdefault}{cmtt}
+
+% --- Essential Packages ---
+\RequirePackage[utf8]{inputenc}
+\RequirePackage[T1]{fontenc}
+\RequirePackage[margin=2.6cm]{geometry}
+\RequirePackage{amsmath, amssymb}
+\RequirePackage{graphicx}
+\RequirePackage{setspace}
+\RequirePackage[style=vancouver, backend=biber]{biblatex}
+
+% hyperref should almost always be loaded last to prevent macro conflicts
+\RequirePackage{hyperref} 
+
+% --- Global Configurations ---
+\hypersetup{
+    colorlinks=true,
+    linkcolor=blue,
+    filecolor=magenta,      
+    urlcolor=cyan,
+    citecolor=blue,
+}
+
+\onehalfspacing
+
+% --- Custom Title Page Variables & Fallbacks ---
+% Define the memory allocations before calling them in \maketitle
+\newcommand{\cid}[1]{\def\@cid{#1}}
+\newcommand{\supervisor}[1]{\def\@supervisor{#1}}
+\newcommand{\secondmarker}[1]{\def\@secondmarker{#1}}
+
+
+% Fallbacks to prevent compilation errors if students forget the commands
+\def\@supervisor{\textbf{[MISSING SUPERVISOR]}}
+\def\@secondmarker{\textbf{[MISSING SECOND MARKER]}}
+
+% --- Redefine \maketitle ---
+\renewcommand{\maketitle}{
+    \begin{titlepage}
+        \includegraphics[width=6cm]{imperial.png}
+        
+        \centering
+        \vspace*{3cm}
+        {\huge \bfseries \@title \par}
+        \vspace{2.5cm}
+        {\LARGE \textbf{\@author} \par}
+        {\large \@cid \par}
+        \vspace{2.5cm}
+        {\Large \textbf{Supervisor:} \@supervisor \par}
+        \vspace{0.5cm}
+        {\Large \textbf{Second Marker:} \@secondmarker \par}
+        \vfill
+        {\Large Department of Computing \par}
+        \vspace{0.5cm}
+        {\Large \@date \par}
+    \end{titlepage}
+}
+
+\renewenvironment{abstract}{
+    \chapter*{Abstract}
+    \addcontentsline{toc}{chapter}{Abstract} % Optional: adds it to the TOC
+}{
+    \clearpage
+}
+
+% Create a custom acknowledgements environment
+\newenvironment{acknowledgements}{
+    \chapter*{Acknowledgements}
+}{
+    \clearpage
+}
+
+\endinput

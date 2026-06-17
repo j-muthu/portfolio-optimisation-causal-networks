@@ -1,0 +1,105 @@
+% ============================================================
+\chapter{A2: Causal-HSP in Sensitivity Space}
+\label{chap:sensitivity}
+% ============================================================
+
+This chapter presents the allocation stage (A2), which addresses the second
+challenge (C2): using directional causal structure inside an allocator that
+fundamentally requires a \emph{symmetric} distance matrix. It also introduces the
+four backtest variants and the asset-only control that turns out to be the most
+effective method in the study.
+
+\section{The symmetrisation problem}
+\label{sec:symm}
+
+Hierarchical risk-parity clustering (Section~\ref{sec:hrp}) operates on a
+symmetric, non-negative distance matrix. A causal graph, by contrast, is
+\emph{directional}: the adjacency $W$ is asymmetric by design, and that asymmetry
+is the whole point. The naive fix --- symmetrise $W$, e.g.\ via
+$\tfrac{1}{2}(W + W^\top)$ --- would discard exactly the directional information
+that motivated using causal discovery. Resolving this tension without throwing
+away the causal content is the technical crux of A2.
+
+\section{Resolution via the sensitivity space}
+\label{sec:sensspace}
+
+The resolution reuses HSP's key idea (Section~\ref{sec:hsp}) but feeds it a
+causally-selected driver set. For each asset $i$, a feed-forward neural network
+$f_i$ is trained to map the selected drivers to the asset's return over the
+window, and its sensitivity vector is extracted by automatic differentiation,
+\begin{equation}
+  s_i = \Big( \tfrac{\partial f_i}{\partial d_1}, \ldots,
+               \tfrac{\partial f_i}{\partial d_K} \Big),
+\end{equation}
+averaged over the window's observations. Crucially, the $s_i$ live in a
+\emph{Euclidean} space whose coordinates are the (causally-selected) drivers, so
+the distance matrix
+\begin{equation}
+  D_{ij} = \lVert s_i - s_j \rVert_2
+\end{equation}
+is symmetric \emph{by construction}. No symmetrisation of an asymmetric adjacency
+is ever performed: the directional causal information enters earlier, in
+\emph{which} drivers are selected and how they shape each asset's sensitivities,
+and is preserved through to a symmetric distance. The allocation step --- single-
+linkage clustering, quasi-diagonalisation, and recursive bisection with
+sample-covariance variances --- is then identical to HSP and HRP. This cleanly
+separates the contribution (causal selection $\to$ sensitivity space) from the
+unchanged, well-understood allocator.
+
+\paragraph{Per-asset eligibility.} Late-inception names (e.g.\ tickers created by
+mergers mid-sample) would otherwise force the loss of entire rows. A per-asset
+eligibility mask keeps every row in which all drivers are populated, fills
+pre-inception asset cells, and masks them out of the network's training loss so
+the Jacobian is not biased toward zero. This handles ticker renames and
+late-listed constituents without discarding history for the survivors.
+
+\section{The four variants}
+\label{sec:variants}
+
+To isolate the effect of each design choice, I compare four variants that share
+the same universe, drivers, allocator and costs (Table~\ref{tab:variants}). V0 is
+standard HSP. V1 replaces its correlation selector with causal discovery (A1).
+V2 adds the closed loop (A3, Chapter~\ref{chap:evaluation}). V0$'$ is an
+asset-only control that uses \emph{no} exogenous drivers at all.
+
+\begin{table}[t]
+  \centering
+  \caption{The four backtest variants. All share the universe, allocator,
+    transaction costs and rebalance schedule; they differ only in how the
+    clustering distance is formed and whether feedback is applied.}
+  \label{tab:variants}
+  \begin{tabular}{l l l l}
+    \toprule
+    Variant & Driver selection & Clustered on & Feedback \\
+    \midrule
+    V0 (HSP baseline)     & cumulative correlation & driver sensitivities & no \\
+    V1 (Causal-HSP)       & causal discovery       & driver sensitivities & no \\
+    V2 (closed-loop)      & causal + utility blend & driver sensitivities & yes \\
+    V0$'$ (Causal-HRP)    & none                   & asset--asset causal graph & no \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\section{Asset-only Causal-HRP (V0$'$): weights directly from the graph}
+\label{sec:v0prime}
+
+V0$'$ is the sharpest test of whether exogenous drivers add anything. It discards
+the driver pool and the sensitivity network entirely. From the \emph{same} joint
+DYNOTEARS fit that V1 uses, it reads the asset--asset block of the contemporaneous
+graph, converts it into a symmetric distance (via a causal embedding distance and
+a nearest-positive-semidefinite projection), and clusters and allocates exactly
+as before. It therefore converts an asset-level causal graph \emph{directly} into
+portfolio weights --- precisely the step the closest prior work
+\cite{howard2025causal} stops short of.
+
+V0$'$ matters for two reasons. Methodologically, it is the missing cell of the
+ablation: V0 isolates ``correlation versus causal selection'' only if there is
+also a variant that removes drivers altogether. Empirically --- and this is
+stated plainly because it is the most important and least expected result of the
+project --- V0$'$ is \emph{the single most effective variant at the one-year
+window}, with a Sharpe of $0.403$, significantly beating both the correlation
+baseline V0 ($p<0.001$) and the driver-based Causal-HSP V1 ($p=0.01$). On this
+universe, at the short window, asset--asset causal structure alone outperforms the
+entire exogenous-driver-and-sensitivity apparatus that the project was originally
+built around. The full numbers, significance, and the (important) caveat that this
+edge too is window-dependent are given in Chapter~\ref{chap:evaluation}.

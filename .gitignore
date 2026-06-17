@@ -40,3 +40,18 @@ interim_report/interim_report_template.*
 varlingam_docs/
 
 latex_template/*
+
+final_report/*
+
+# final_report_lean: track LaTeX source + figures + the built PDF, but not the
+# LaTeX build intermediates.
+final_report_lean/main.aux
+final_report_lean/main.bbl
+final_report_lean/main.bcf
+final_report_lean/main.blg
+final_report_lean/main.fdb_latexmk
+final_report_lean/main.fls
+final_report_lean/main.log
+final_report_lean/main.out
+final_report_lean/main.run.xml
+final_report_lean/main.toc

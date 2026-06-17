@@ -1,0 +1,103 @@
+% ============================================================
+\chapter{Conclusions and Future Work}
+\label{chap:conclusion}
+% ============================================================
+
+\section{Summary of findings}
+\label{sec:summary}
+
+This project asked whether replacing the correlation-based driver selection in
+Hierarchical Sensitivity Parity with causal structure produces more robust
+portfolios, and whether closing a performance-feedback loop helps further. It
+built and validated a complete pipeline: causal factor discovery under a
+directional prior (A1, C1), allocation in a causal sensitivity space that
+preserves directional information inside a symmetric allocator (A2, C2), and a
+closed feedback loop (A3, C3), evaluated on an approximate S\&P~100 over
+2007--2024 at two windows, two discovery methods, a range of $K$, and a feedback
+grid, with bootstrap significance throughout.
+
+The results, stated objectively:
+\begin{enumerate}[itemsep=2pt]
+  \item \textbf{Causal driver selection helps modestly, at the short window only,
+        and not robustly.} It beats correlation-HSP at one year (significantly for
+        VARLiNGAM, $p=0.004$; directionally but not significantly for DYNOTEARS),
+        but the edge disappears at two years and flips sign with $K$. The
+        per-driver causal signal is statistically weak (zero FDR-significant
+        drivers at calibration). The robust, window-independent finding is
+        qualitative: causal selection rotates across regime-relevant drivers
+        whereas correlation selection is tautological.
+  \item \textbf{The most effective method is asset-only causal structure.} V0$'$,
+        which uses \emph{no} exogenous drivers and converts an asset--asset causal
+        graph directly into weights, is the best variant at one year (Sharpe
+        $0.403$, significantly above both correlation-HSP and driver-based
+        Causal-HSP). On this universe, the exogenous-driver machinery does not
+        earn its place at the short window --- though, like everything else, this
+        edge is window-dependent.
+  \item \textbf{The closed loop adds nothing.} Across the entire $\alpha,\gamma$
+        grid the feedback is inert, because utility can only re-rank within the
+        causally-selected set. The C3 hypothesis is rejected for this design.
+\end{enumerate}
+
+The blunt overall assessment is that, for this framework and universe, causal
+methods are \emph{mildly and conditionally} effective, not robustly so: the only
+statistically clean, economically modest win is asset-only causal structure at the
+one-year window. This is a more useful scientific outcome than an overstated
+``causal beats correlation'' headline would have been, precisely because the
+robustness checks (two windows, two methods, the $K$-sweep, and the reproducibility
+fix) were built to find fragility --- and found it. The project's contribution is
+therefore a careful, reproducible \emph{characterisation} of where causal structure
+helps portfolio construction and where it does not, together with a novel
+weights-directly-from-graph result (V0$'$) that the closest prior work
+\cite{howard2025causal} did not reach.
+
+\section{Limitations}
+\label{sec:limitations}
+
+The limitations are intrinsic to the claims and are stated without hedging.
+\begin{itemize}[itemsep=2pt]
+  \item \textbf{Small, mostly sub-significant effects.} The headline edges are
+        $0.01$--$0.03$ in Sharpe; only two cells are significant and only at one
+        window, and the study is plausibly underpowered for effects this small
+        (Section~\ref{sec:believe}). Multiple comparisons across the configuration
+        grid further discount the significant cells.
+  \item \textbf{Window- and $K$-fragility.} No positive result survives the move
+        from a one-year to a two-year window, and the driver-based edge is not
+        robust to $K$. Robustness across regime \emph{conditioning} is good;
+        robustness across these \emph{design} choices is not.
+  \item \textbf{Long-only equity, single asset class.} Every variant absorbs the
+        full $\approx 51\%$ GFC drawdown; the work concerns relative
+        driver-selection quality within a long-only equity allocator, not absolute
+        return or drawdown control, and does not test other asset classes where
+        cross-asset causal structure might be richer.
+  \item \textbf{Universe approximation.} The top-by-market-cap reconstruction of
+        the S\&P~100 lacks the official index's sector-balancing discretion, and a
+        fixed snapshot-union universe carries mild residual survivorship effects.
+  \item \textbf{Weak per-driver causal signal.} The calibration finding of zero
+        FDR-significant drivers means the ``causal'' driver scores, at this
+        universe size, are not far above noise --- a caveat for any
+        driver-level interpretation.
+\end{itemize}
+
+\section{Future work}
+\label{sec:future}
+
+Several directions follow directly. \textbf{(1) Full non-linear discovery.} The
+NTS-NOTEARS probe (Section~\ref{sec:nts}) showed the prior transfers and the
+method is a genuinely different lens; a full backtest (now feasible only with more
+compute or a smaller universe) could test whether non-linear causal structure
+changes the picture. \textbf{(2) Foreground the asset-only route.} Given that
+V0$'$ is the strongest variant, the natural follow-up is to develop asset-only
+Causal-HRP in its own right --- richer asset-level graph summaries, alternative
+graph-to-distance maps, and a test of whether its short-window edge generalises to
+other universes. \textbf{(3) Network-density regimes.} Conditioning on the
+discovered graph's density (in the manner of Howard et al.\
+\cite{howard2025causal}) needs only a cheap discovery-only re-run that persists
+per-window density, and would sharpen the regime analysis. \textbf{(4) Larger,
+multi-asset universes}, where the per-driver signal may strengthen and where
+cross-asset causal structure is plausibly more informative, addressing the
+weak-signal limitation. \textbf{(5) Latent-variable and path-dependent
+extensions}, to relax the causal-sufficiency assumption that no unobserved common
+cause sits behind the drivers and assets. Across all of these, the reproducibility
+infrastructure built here (the deterministic pipeline and the discovery cache)
+makes such sweeps cheap to run honestly --- which, as this project found, is a
+prerequisite for trusting the answers.
