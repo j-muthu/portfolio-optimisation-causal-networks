@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(.venv/bin/python -c ' *)",
+      "Bash(curl -s -o /tmp/dgs10.csv -w 'HTTP %{http_code}, %{size_download}B, %{time_total}s\\\\n' --max-time 90 'https://fred.stlouisfed.org/graph/fredgraph.csv?id=DGS10')",
+      "Read(//tmp/**)"
+    ]
+  }
+}

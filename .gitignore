@@ -38,3 +38,5 @@ interim_report/interim_report_template.*
 !interim_report/interim_report_template.tex
 
 varlingam_docs/
+
+latex_template/*
