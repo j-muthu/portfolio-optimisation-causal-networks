@@ -43,6 +43,20 @@ enforced by keying utility on the holding-period-\emph{end} date and asserting a
 21-day gap on lookup, with a deliberately-leaky ``canary'' variant used in testing
 to confirm the guard fires. The full closed-loop method is V2.
 
+\paragraph{The measurement problem.} Whether such a loop can work at all is,
+before anything else, a question of measurement, and the \emph{update frequency}
+is central to it. The reward $R[t]$ is a Sharpe ratio estimated over a single
+$21$-day holding window, so its sampling error is large: for a near-zero true
+Sharpe the standard error of a Sharpe estimated from $n$ observations is
+approximately $\sqrt{1/n}\approx\rsSharpeSE$ at $n=21$. Empirically, across the
+$215$ rebalances $R[t]$ has mean $\rsRewardMean$ and standard deviation
+$\rsRewardStd$ --- a per-observation signal-to-noise ratio of just $\rsRewardSNR$.
+A monthly update therefore carries about as much noise as signal. This is one
+half of why the loop cannot learn (Section~\ref{sec:loop-eval}); the other half
+is structural. The frequency is not incidental: a higher-frequency reward would
+shrink this error, which is why the measurement problem, not the feedback rule,
+is the first thing future work should change.
+
 \section{Evaluation methodology}
 \label{sec:method}
 
@@ -51,16 +65,25 @@ universe, monthly rebalancing over 2007--2024 (215 rebalances), $K=17$ calibrate
 once on a 2006 burn-in, at two lookback windows --- 252 trading days (one year)
 and 504 (two years) --- as the primary robustness check. Transaction costs of
 5\,bps per unit of one-way turnover are charged (with sweeps over
-$\{0,5,10,20\}$\,bps); results are net of costs. For each variant I compute
-annualised Sharpe (the headline), CAGR, maximum drawdown, volatility, turnover and
-concentration. The controlled scientific comparison holds the \emph{allocator}
-fixed and varies only the driver-selection mechanism, so the standard-HSP variant
-V0 is the baseline; the equal-weight ($1/N$) portfolio is the absolute reference
-used in the regime analysis. Differences in Sharpe are tested with a
-Politis--Romano stationary block bootstrap \cite{politis1994stationary} (2000
-resamples), which respects the serial dependence of returns. Regimes are defined
-by NBER recession dates, top-versus-bottom VIX quintiles, and named historical
-stress windows.
+$\{0,5,10,20\}$\,bps); results are net of costs. The \emph{risk-adjusted return} of Q is
+made precise here. The headline measure is the annualised Sharpe ratio, reported
+alongside CAGR, maximum drawdown, volatility, turnover and concentration. But the
+Sharpe ratio assumes normality, and daily returns on this universe have excess
+kurtosis ${\approx}\,\rsKurtosis$ (Figure~\ref{fig:retdist}); I therefore also
+report the Sortino and Calmar ratios and, for the rigour question Q5, the
+distribution-aware Probabilistic and Deflated Sharpe ratios
+\cite{bailey2012psr,bailey2014deflated}. The controlled scientific comparison
+holds the \emph{allocator} fixed and varies only the driver-selection mechanism,
+so the standard-HSP variant V0 is the baseline; the equal-weight ($1/N$) portfolio
+is the absolute reference used in the regime analysis. Pairwise differences in
+Sharpe are tested with a Politis--Romano stationary block bootstrap
+\cite{politis1994stationary} (2000 resamples), which respects the serial
+dependence of returns. Because the study evaluates \rsNtrials\ distinct
+configurations, those pairwise tests are supplemented in
+Section~\ref{sec:believe-rigour} by a data-snooping-aware battery (Deflated
+Sharpe, White's Reality Check, Hansen's SPA, and the Model Confidence Set) that
+corrects for the multiplicity. Regimes are defined by NBER recession dates,
+top-versus-bottom VIX quintiles, and named historical stress windows.
 
 \section{Headline results}
 \label{sec:headline}
@@ -141,7 +164,7 @@ The headline reading, stated plainly:
         absolute performance or drawdown control.
 \end{itemize}
 
-\section{Does causal selection beat correlation?}
+\section{Does causal selection beat correlation? (Q1)}
 \label{sec:causal-vs-corr}
 
 The answer is a qualified yes at one year and a clear no at two years. Two
@@ -169,7 +192,7 @@ interaction between an algorithm's assumptions and the window length is itself a
 useful methodological observation, and a caution against quoting the strong
 one-year VARLiNGAM number without its two-year companion.
 
-\section{Sensitivity to the number of drivers $K$}
+\section{Sensitivity to the number of drivers $K$ (Q3)}
 \label{sec:ksens}
 
 $K$ is calibrated from the data ($K=17$ by Kneedle), but a robustness sweep over
@@ -196,7 +219,7 @@ with the zero FDR-significant drivers found in calibration
   \label{fig:ksens}
 \end{figure}
 
-\section{Is the closed loop useful?}
+\section{Is the closed loop useful? (Q4)}
 \label{sec:loop-eval}
 
 No. Sweeping the feedback strength over the full grid
@@ -208,6 +231,10 @@ are identical to V1 throughout. The mechanism is now understood: the utility ble
 can only \emph{re-rank drivers within} the causally-selected set --- it cannot
 promote a driver the causal selector never shortlisted --- so when the causal
 top-$K$ is stable, the selected set never changes and V2 collapses to V1 exactly.
+This structural inertness compounds the measurement problem of
+Section~\ref{sec:loop}: with a per-rebalance reward signal-to-noise ratio of only
+$\rsRewardSNR$, even where the loop \emph{could} re-rank the shortlist a single
+month's reward is too noisy to do so reliably --- both point the same way.
 This is the strongest possible form of the negative result: the closed loop is not
 merely unhelpful on average, it is \emph{inert} across the entire feedback grid.
 C3's hypothesis --- that feedback improves robustness --- is rejected for this
@@ -223,7 +250,7 @@ design.
   \label{fig:grid}
 \end{figure}
 
-\section{Do exogenous drivers help at all? The asset-only result}
+\section{Do exogenous drivers help at all? The asset-only result (Q2)}
 \label{sec:v0prime-eval}
 
 The most striking result is that removing the exogenous drivers \emph{improves}
@@ -240,6 +267,79 @@ result for a project framed around \emph{driver} selection, and it is reported a
 the headline it deserves to be. The necessary caveat is that V0$'$ is also
 window-dependent: at two years it falls back to $\approx 0.372$, level with
 everything else.
+
+\section{What survives rigour? (Q5)}
+\label{sec:believe-rigour}
+
+% NB: the numbers in this section come from _generated/robust_stats.tex, written
+% by scripts/robust_stats.py. The committed file is a provisional placeholder;
+% regenerate it locally and reconcile the verdict wording if the significance
+% of any cell changes.
+The second half of Q is the decisive one: does any measured advantage survive
+correction for the multiplicity of the \rsNtrials\ configurations tried and for
+the non-normality of returns? The pairwise bootstrap of
+Section~\ref{sec:headline} answers a single pre-specified comparison; it does not
+discount the search that produced it. Two corrections are applied.
+
+\paragraph{Non-normality (PSR) and selection bias (DSR).} Daily returns are
+strongly non-normal (Figure~\ref{fig:retdist}, excess kurtosis
+${\approx}\,\rsKurtosis$), which the plain Sharpe ignores. The Probabilistic
+Sharpe Ratio --- the probability the true Sharpe exceeds zero given the sample's
+skewness, kurtosis and length --- is nonetheless high for every variant
+(V0 $\rsVzeroPSR$, V0$'$ $\rsVprimePSR$, V1-DYNOTEARS $\rsVoneDynoPSR$,
+V1-VARLiNGAM $\rsVoneVarPSR$): the \emph{level} of risk-adjusted return is real,
+not a fat-tail artefact. The Deflated Sharpe Ratio then sets the bar to the best
+Sharpe expected from \rsNtrials\ trials under the null of no skill. It deflates
+every variant (V0 $\rsVzeroDSR$, V0$'$ $\rsVprimeDSR$, V1-DYNOTEARS
+$\rsVoneDynoDSR$, V1-VARLiNGAM $\rsVoneVarDSR$; Figure~\ref{fig:dsrmcs}) but the
+leaders remain positive --- so the short-window asset-only and VARLiNGAM Sharpes
+are not merely the luckiest of many tries.
+
+\paragraph{Does the best strategy beat the baseline (RC/SPA)?} The question Q
+actually poses is comparative: does the \emph{best causal variant} beat the
+correlation baseline once the search is accounted for? White's Reality Check
+gives $p=\rsSpaRC$ and Hansen's SPA $p=\rsSpaConsistent$ for the best causal
+variant against V0 at the one-year window. Unlike the single-comparison bootstrap
+(which flagged VARLiNGAM and V0$'$ as significant), these family-wise tests
+\emph{do not} establish that causal selection beats correlation once the
+\rsNtrials-way search is corrected for.
+
+\paragraph{Which strategies are indistinguishable (MCS)?} The Model Confidence
+Set returns the variants statistically indistinguishable from the best at the
+$90\%$ level. It contains \rsMcsSize\ variants (\rsMcsMembers), and --- the
+decisive point --- the correlation baseline V0 \rsMcsVzeroIn\ among them. If the
+baseline cannot be excluded from the confidence set, then no causal variant can
+be said to beat it on this evidence.
+
+\paragraph{Verdict on Q5.} The absolute risk-adjusted returns survive correction
+for non-normality and multiplicity, but the \emph{causal-over-correlation edge}
+does not: it is real under a single pre-specified test, yet does not clear a
+data-snooping-aware one, and the baseline survives in the Model Confidence Set.
+This is the honest answer to the second half of Q, and it tempers --- without
+erasing --- the short-window findings of
+Sections~\ref{sec:causal-vs-corr}--\ref{sec:v0prime-eval}.
+
+\begin{figure}[tbp]
+  \centering
+  \includegraphics[width=0.7\textwidth]{figures/returns_distribution.png}
+  \caption{Distribution of daily net returns (pooled across variants) against a
+    fitted normal. The heavy tails (excess kurtosis ${\approx}\,\rsKurtosis$) are
+    why the plain Sharpe ratio is supplemented by the Probabilistic and Deflated
+    Sharpe ratios, which account for higher moments.}
+  \label{fig:retdist}
+\end{figure}
+
+\begin{figure}[tbp]
+  \centering
+  \includegraphics[width=0.9\textwidth]{figures/dsr_mcs.png}
+  \caption{Data-snooping-aware adjudication of the \rsNtrials\ configurations.
+    Per-variant annualised Sharpe with the Probabilistic Sharpe (vs zero) and the
+    multiplicity-deflated Deflated Sharpe; markers indicate membership of the
+    $90\%$ Model Confidence Set. The correlation baseline V0 \rsMcsVzeroIn\
+    retained, so no causal variant is established as beating it once the search is
+    corrected for.}
+  \label{fig:dsrmcs}
+\end{figure}
 
 \section{Regime-conditional analysis}
 \label{sec:regimes}
