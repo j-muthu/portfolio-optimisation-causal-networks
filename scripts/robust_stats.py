@@ -140,6 +140,23 @@ def per_period_sharpe(returns: pd.Series) -> float:
     return float(r.mean() / sigma) if sigma > 1e-12 else 0.0
 
 
+def drop_duplicate_configs(returns: pd.DataFrame, names: list[str]) -> list[str]:
+    """Drop names whose daily-return series exactly equals an earlier-kept one.
+
+    The closed loop is inert, so V2 ≡ V1 byte-for-byte; feeding both into SPA/MCS
+    double-counts a single strategy and — worse — gives a zero differential
+    variance that makes the studentised MCS divide by zero and abort. Keeping the
+    first occurrence (V1 precedes V2 in the universe order) yields the set of
+    *distinct* strategies, which is what the data-snooping tests should compare.
+    """
+    kept: list[str] = []
+    for c in names:
+        if not any(np.array_equal(returns[c].to_numpy(), returns[k].to_numpy())
+                   for k in kept):
+            kept.append(c)
+    return kept
+
+
 def psr_dsr_table(returns: pd.DataFrame, baseline: str) -> pd.DataFrame:
     """PSR (vs 0 and vs ``baseline``) and DSR for every column of ``returns``.
 
@@ -284,7 +301,10 @@ def main() -> None:
     table = psr_dsr_table(returns, baseline=baseline)
 
     # --- SPA / Reality Check + MCS over the w252 headline universe vs V0 ---
-    headline252 = [f"{n}_w252" for n in HEADLINE if f"{n}_w252" in returns.columns]
+    # Compare only DISTINCT strategies: V2 ≡ V1 (inert loop), and identical
+    # columns break the studentised MCS, so drop exact duplicates first.
+    headline252 = drop_duplicate_configs(
+        returns, [f"{n}_w252" for n in HEADLINE if f"{n}_w252" in returns.columns])
     causal252 = [c for c in headline252 if not c.startswith("V0_")]
     spa = run_spa(returns, benchmark="V0_w252", candidates=causal252)
     mcs_in, _ = run_mcs(returns, headline252)
