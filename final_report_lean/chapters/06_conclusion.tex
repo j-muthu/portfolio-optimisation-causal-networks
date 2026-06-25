@@ -38,13 +38,18 @@ The results, stated objectively:
         causally-selected set --- and, even where it could, a monthly reward's
         signal-to-noise ratio of $\rsRewardSNR$ is too low to learn from. The C3
         hypothesis is rejected for this design.
-  \item \textbf{The edge does not survive data-snooping correction.} Subjecting
-        the \rsNtrials\ configurations to the Deflated Sharpe ratio, White's
-        Reality Check, Hansen's SPA and the Model Confidence Set, the absolute
-        Sharpe levels survive correction for non-normality and multiplicity, but
-        the causal-over-correlation \emph{edge} does not clear a family-wise test
-        and the correlation baseline \rsMcsVzeroIn\ retained in the $90\%$ Model
-        Confidence Set. The second half of Q is answered in the negative.
+  \item \textbf{Causal \emph{structure} survives data-snooping correction, but
+        causal driver \emph{selection} does not.} Subjecting the \rsNtrials\
+        configurations to the Deflated Sharpe ratio, White's Reality Check,
+        Hansen's SPA and the Model Confidence Set, the absolute Sharpe levels
+        survive correction for non-normality and multiplicity, and at one year the
+        best causal-structure variant beats the baseline even family-wise
+        ($p=\rsSpaRC$). The $90\%$ Model Confidence Set retains only \rsMcsMembers;
+        the correlation baseline V0 \rsMcsVzeroIn\ in it --- but neither is the
+        driver-based DYNOTEARS-V1, which is eliminated alongside V0. So the part of
+        Q that asks whether causal \emph{driver selection} beats correlation is
+        answered in the negative; what survives is asset-only and non-Gaussian
+        structure, and only at the short window.
 \end{enumerate}
 
 Stated as a direct answer to Q: causal driver selection does deliver a higher
@@ -91,11 +96,15 @@ The limitations are intrinsic to the claims and are stated without hedging.
         FDR-significant drivers means the ``causal'' driver scores, at this
         universe size, are not far above noise --- a caveat for any
         driver-level interpretation.
-  \item \textbf{Edge does not clear data-snooping correction.} The single-
-        comparison significance of the short-window asset-only and VARLiNGAM
-        results does not survive the family-wise battery
-        (Section~\ref{sec:believe-rigour}): the baseline is retained in the Model
-        Confidence Set, so the comparative claim in Q is, strictly, unproven.
+  \item \textbf{What survives is structure, not the driver-selection thesis, and
+        only at one window.} The family-wise battery
+        (Section~\ref{sec:believe-rigour}) leaves only the asset-only V0$'$ and
+        VARLiNGAM-V1 in the $90\%$ Model Confidence Set; the project's headline
+        DYNOTEARS driver-selection method is eliminated alongside the baseline,
+        and the surviving edge is confined to the one-year window. The precise
+        claim in Q --- that causal \emph{driver selection} beats correlation ---
+        is therefore not established; the affirmative evidence is for causal
+        \emph{structure} at the short horizon only.
 \end{itemize}
 
 \section{Future work}
