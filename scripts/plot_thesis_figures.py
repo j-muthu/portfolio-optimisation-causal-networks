@@ -15,6 +15,11 @@ Figures
 5. regime_excess.png     regime-conditional Sharpe, excess over V0 (w252)
 6. directional_prior.png J1: how much the asset->driver prior does
 7. nts_probe.png         J5: NTS-NOTEARS vs DYNOTEARS agreement + cost
+8. returns_distribution.png  daily-return fat tails (motivates PSR/DSR)
+9. dsr_mcs.png           PSR/DSR + 90% Model Confidence Set membership (w252)
+
+Figures 8-9 read results/robust_stats.csv (and the bundles), produced by
+``python -m scripts.robust_stats`` — run that first.
 
 Run:  python -m scripts.plot_thesis_figures
 """
@@ -244,6 +249,68 @@ def fig_nts_probe():
     _save(fig, "nts_probe.png")
 
 
+# --- 8. Returns distribution (fat tails motivate PSR/DSR) ----------------
+def fig_returns_distribution():
+    from scipy import stats
+    pooled = []
+    for v in VARIANTS:
+        nav = _nav(v, 252)
+        if nav is not None:
+            pooled.append(nav.pct_change().dropna().to_numpy())
+    if not pooled:
+        return
+    r = np.concatenate(pooled)
+    exk = float(stats.kurtosis(r, fisher=True, bias=False))
+    fig, ax = plt.subplots(figsize=(7.5, 5))
+    ax.hist(r, bins=200, density=True, color="#0072B2", alpha=0.55,
+            label="daily net returns (pooled)")
+    xs = np.linspace(r.min(), r.max(), 500)
+    ax.plot(xs, stats.norm.pdf(xs, r.mean(), r.std(ddof=0)), color="#D55E00",
+            lw=1.8, label="fitted normal")
+    ax.set_yscale("log")  # log-y exposes the tails the normal misses
+    ax.set_xlabel("daily net return")
+    ax.set_ylabel("density (log)")
+    ax.set_title(f"Daily returns are heavy-tailed (excess kurtosis ≈ {exk:.1f})\n"
+                 "— why the Sharpe is supplemented by PSR/DSR", fontsize=11)
+    ax.legend(frameon=False, loc="upper right")
+    ax.grid(True, alpha=0.3, which="both")
+    fig.tight_layout()
+    _save(fig, "returns_distribution.png")
+
+
+# --- 9. DSR / MCS adjudication -------------------------------------------
+def fig_dsr_mcs():
+    df = _csv("robust_stats.csv")
+    if df is None:
+        return
+    order = ["V0_w252", "V0prime_w252", "V1-DYNOTEARS_w252", "V1-VARLiNGAM_w252"]
+    df = df[df.config.isin(order)].set_index("config").reindex(order).dropna(how="all")
+    if df.empty:
+        return
+    labels = ["V0", "V0′", "V1-DYNO", "V1-VAR"][:len(df)]
+    x = np.arange(len(df)); bw = 0.38
+    fig, ax = plt.subplots(figsize=(8.5, 5))
+    ax.bar(x - bw / 2, df.psr_vs_zero, bw, color="#56B4E9", label="PSR (vs 0)")
+    ax.bar(x + bw / 2, df.dsr, bw, color="#0072B2", label="DSR (deflated, N trials)")
+    ax.axhline(0.95, color="k", ls=":", lw=0.9, alpha=0.6)
+    ax.text(len(df) - 0.5, 0.952, "0.95", fontsize=7.5, va="bottom", ha="right")
+    for xi, (_, row) in zip(x, df.iterrows()):
+        ax.text(xi, 0.02, f"Sharpe {row.sharpe_ann:.3f}", ha="center", va="bottom",
+                fontsize=8, rotation=90, color="white")
+        if str(row.get("in_mcs90", "")).lower() == "true":
+            ax.text(xi, max(row.psr_vs_zero, row.dsr) + 0.01, "★ MCS",
+                    ha="center", va="bottom", fontsize=8, color="#009E73")
+    ax.set_xticks(x); ax.set_xticklabels(labels)
+    ax.set_ylim(0, 1.08)
+    ax.set_ylabel("probability")
+    ax.set_title("Distribution- and multiplicity-aware Sharpe (window 252)\n"
+                 "★ = in the 90% Model Confidence Set", fontsize=11)
+    ax.legend(frameon=False, loc="lower right")
+    ax.grid(True, axis="y", alpha=0.3)
+    fig.tight_layout()
+    _save(fig, "dsr_mcs.png")
+
+
 def _save(fig, name):
     out = FIG / name
     fig.savefig(out, dpi=200)
@@ -255,7 +322,8 @@ def main():
     FIG.mkdir(parents=True, exist_ok=True)
     print("Generating thesis figures (frozen-EEM) …")
     for fn in (fig_nav_curves, fig_sharpe_matrix, fig_k_sensitivity, fig_feedback_grid,
-               fig_regime_excess, fig_directional_prior, fig_nts_probe):
+               fig_regime_excess, fig_directional_prior, fig_nts_probe,
+               fig_returns_distribution, fig_dsr_mcs):
         try:
             fn()
         except Exception as exc:  # one figure failing must not kill the rest
