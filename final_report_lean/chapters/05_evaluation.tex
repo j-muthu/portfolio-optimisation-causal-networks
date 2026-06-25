@@ -50,10 +50,11 @@ $21$-day holding window, so its sampling error is large: for a near-zero true
 Sharpe the standard error of a Sharpe estimated from $n$ observations is
 approximately $\sqrt{1/n}\approx\rsSharpeSE$ at $n=21$. Empirically, across the
 $215$ rebalances $R[t]$ has mean $\rsRewardMean$ and standard deviation
-$\rsRewardStd$ --- a per-observation signal-to-noise ratio of just $\rsRewardSNR$.
-A monthly update therefore carries about as much noise as signal. This is one
-half of why the loop cannot learn (Section~\ref{sec:loop-eval}); the other half
-is structural. The frequency is not incidental: a higher-frequency reward would
+$\rsRewardStd$ --- a per-observation signal-to-noise ratio of just $\rsRewardSNR$
+(indeed the mean reward is marginally negative). A monthly update is therefore
+overwhelmingly noise: the per-rebalance signal is roughly an order of magnitude
+below its own sampling variability. This is one half of why the loop cannot learn
+(Section~\ref{sec:loop-eval}); the other half is structural. The frequency is not incidental: a higher-frequency reward would
 shrink this error, which is why the measurement problem, not the feedback rule,
 is the first thing future work should change.
 
@@ -297,26 +298,39 @@ are not merely the luckiest of many tries.
 
 \paragraph{Does the best strategy beat the baseline (RC/SPA)?} The question Q
 actually poses is comparative: does the \emph{best causal variant} beat the
-correlation baseline once the search is accounted for? White's Reality Check
-gives $p=\rsSpaRC$ and Hansen's SPA $p=\rsSpaConsistent$ for the best causal
-variant against V0 at the one-year window. Unlike the single-comparison bootstrap
-(which flagged VARLiNGAM and V0$'$ as significant), these family-wise tests
-\emph{do not} establish that causal selection beats correlation once the
-\rsNtrials-way search is corrected for.
+correlation baseline once the search is accounted for? Taking net return as the
+performance measure (the variants' volatilities are near-identical at
+${\approx}\,16.5\%$, so this ordering mirrors the Sharpe ordering), White's
+Reality Check gives $p=\rsSpaRC$ and Hansen's SPA $p=\rsSpaConsistent$ for the
+best causal variant against V0 at the one-year window. Even after correcting for
+the \rsNtrials-way search, these family-wise tests \emph{reject} the null that
+the best causal variant fails to beat the correlation baseline: at one year, the
+strongest causal-structure variant out-returns V0 by more than data-snooping
+alone can explain.
 
 \paragraph{Which strategies are indistinguishable (MCS)?} The Model Confidence
 Set returns the variants statistically indistinguishable from the best at the
-$90\%$ level. It contains \rsMcsSize\ variants (\rsMcsMembers), and --- the
-decisive point --- the correlation baseline V0 \rsMcsVzeroIn\ among them. If the
-baseline cannot be excluded from the confidence set, then no causal variant can
-be said to beat it on this evidence.
+$90\%$ level. It contains just \rsMcsSize\ variants (\rsMcsMembers); the
+correlation baseline V0 \rsMcsVzeroIn\ among them. The decisive --- and most
+disciplining --- detail is \emph{which} variants survive: the asset-only V0$'$
+and VARLiNGAM-V1, but \emph{not} the driver-based DYNOTEARS-V1 (which the set
+eliminates alongside V0). The confidence set of best strategies is therefore
+exactly the two causal-\emph{structure} variants, excluding both the correlation
+baseline and the project's headline causal-\emph{driver-selection} method.
 
-\paragraph{Verdict on Q5.} The absolute risk-adjusted returns survive correction
-for non-normality and multiplicity, but the \emph{causal-over-correlation edge}
-does not: it is real under a single pre-specified test, yet does not clear a
-data-snooping-aware one, and the baseline survives in the Model Confidence Set.
-This is the honest answer to the second half of Q, and it tempers --- without
-erasing --- the short-window findings of
+\paragraph{Verdict on Q5.} The battery splits Q into two answers. The absolute
+risk-adjusted returns survive correction for non-normality and multiplicity (all
+DSR ${>}\,0.92$), and at the one-year window the best causal-structure variants
+\emph{do} clear a data-snooping-aware comparison against the correlation baseline
+($p=\rsSpaRC$; V0 \rsMcsVzeroIn\ in the $90\%$ MCS). But the specific claim Q
+puts first --- that causal \emph{driver selection} (DYNOTEARS-V1) beats
+correlation --- is \emph{not} supported: that variant is itself eliminated from
+the confidence set, indistinguishable from the baseline. What survives the most
+stringent test is the asset-only and non-Gaussian-ICA \emph{structure}, not the
+driver-selection mechanism the project was built around --- and, as the
+two-year-window results above showed, none of it survives the move to a
+two-year window. The data-snooping battery thus refines rather than erases the
+short-window findings of
 Sections~\ref{sec:causal-vs-corr}--\ref{sec:v0prime-eval}.
 
 \begin{figure}[tbp]
@@ -335,9 +349,10 @@ Sections~\ref{sec:causal-vs-corr}--\ref{sec:v0prime-eval}.
   \caption{Data-snooping-aware adjudication of the \rsNtrials\ configurations.
     Per-variant annualised Sharpe with the Probabilistic Sharpe (vs zero) and the
     multiplicity-deflated Deflated Sharpe; markers indicate membership of the
-    $90\%$ Model Confidence Set. The correlation baseline V0 \rsMcsVzeroIn\
-    retained, so no causal variant is established as beating it once the search is
-    corrected for.}
+    $90\%$ Model Confidence Set. The MCS retains only V0$'$ and VARLiNGAM-V1; the
+    correlation baseline V0 \rsMcsVzeroIn\ among them --- but neither is the
+    driver-based DYNOTEARS-V1, so what survives the search-corrected test is causal
+    \emph{structure}, not the driver-selection mechanism.}
   \label{fig:dsrmcs}
 \end{figure}
 

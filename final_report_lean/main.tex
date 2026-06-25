@@ -61,17 +61,22 @@ these conclusions corrected an earlier, more optimistic reading after a
 data-determinism bug was found and fixed, making the whole pipeline
 bit-reproducible. \textbf{(iv)} A data-snooping- and distribution-aware battery
 (Probabilistic and Deflated Sharpe ratios, White's Reality Check, Hansen's SPA,
-and the Model Confidence Set) tempers the picture further: the absolute
-risk-adjusted returns survive correction for non-normality and for the
-multiplicity of the \rsNtrials\ configurations tried, but the apparent
-causal-over-correlation edge does not clear a data-snooping-corrected test, and
-the correlation baseline \rsMcsVzeroIn\ retained in the $90\%$ Model Confidence
-Set. The loop's inertness is, additionally, a \emph{measurement} problem: a
-monthly reward estimated over a $21$-day window has a signal-to-noise ratio of
-only \rsRewardSNR. The contribution is a complete, reproducible characterisation
-of where causal structure helps portfolio construction (the short window, and
-most via asset-only structure) and where it does not (the long window, the
-feedback extension, and once data-snooping is corrected for).
+and the Model Confidence Set) sharpens rather than overturns the picture: the
+absolute risk-adjusted returns survive correction for non-normality and for the
+multiplicity of the \rsNtrials\ configurations tried, and at the one-year window
+the best causal-\emph{structure} variants do beat the correlation baseline even
+after data-snooping correction ($p=\rsSpaRC$; V0 \rsMcsVzeroIn\ in the $90\%$
+Model Confidence Set, which retains only \rsMcsMembers). Crucially, the
+driver-based DYNOTEARS method the project was built around is itself eliminated
+from that set, indistinguishable from the baseline --- so it is causal structure,
+not causal driver \emph{selection}, that survives. The loop's inertness is,
+additionally, a \emph{measurement} problem: a monthly reward estimated over a
+$21$-day window is almost all noise (signal-to-noise ${\approx}\,\rsRewardSNR$).
+The contribution is a precise, reproducible characterisation of where causal
+structure helps portfolio construction (the short window, via asset-only and
+non-Gaussian structure) and where it does not (the long window, the feedback
+extension, and the driver-selection mechanism once data-snooping is corrected
+for).
 \end{abstract}
 
 \begin{acknowledgements}
