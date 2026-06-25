@@ -60,6 +60,113 @@ def calmar_ratio(returns: pd.Series, periods_per_year: int = 252) -> float:
 
 
 # ============================================================================
+# Distribution- and multiplicity-aware Sharpe (Bailey & Lopez de Prado)
+# ============================================================================
+# The plain Sharpe ratio assumes IID-normal returns and ignores how many
+# strategy configurations were tried before the reported one was selected.
+# Daily equity returns are heavily non-normal (excess kurtosis ~16-17 on this
+# universe), and this study evaluates ~41 configurations, so both corrections
+# matter. These helpers operate on the *raw per-period* return series (not the
+# annualised Sharpe): the Probabilistic and Deflated Sharpe ratios are unitless
+# probabilities and only require that every Sharpe entering them is expressed in
+# the same per-period units. See ``scripts/robust_stats.py`` for the report
+# battery built on top of these.
+
+_EULER_MASCHERONI = 0.5772156649015329
+
+
+def _per_period_sharpe_moments(returns: pd.Series) -> tuple[float, float, float, int]:
+    """Return ``(sr_hat, skew, kurt, T)`` for the per-period (non-annualised)
+    Sharpe and the higher moments used by the PSR/DSR formulae.
+
+    ``kurt`` is the *non-excess* kurtosis (3.0 for a normal distribution), which
+    is the convention in Bailey & Lopez de Prado.
+    """
+    from scipy import stats
+
+    r = returns.dropna().to_numpy(dtype=float)
+    T = len(r)
+    if T < 3:
+        return 0.0, 0.0, 3.0, T
+    sigma = r.std(ddof=0)
+    if sigma < 1e-12:
+        return 0.0, 0.0, 3.0, T
+    sr_hat = float(r.mean() / sigma)
+    skew = float(stats.skew(r, bias=False))
+    kurt = float(stats.kurtosis(r, fisher=False, bias=False))  # non-excess
+    return sr_hat, skew, kurt, T
+
+
+def probabilistic_sharpe_ratio(
+    returns: pd.Series, sr_benchmark: float = 0.0
+) -> float:
+    """Probabilistic Sharpe Ratio: ``P(true per-period SR > sr_benchmark)``.
+
+    Bailey & Lopez de Prado (2012): with the estimated per-period Sharpe
+    ``SR_hat``, skewness ``g3``, non-excess kurtosis ``g4`` and ``T`` samples,
+
+        PSR = Phi( (SR_hat - SR*) * sqrt(T-1)
+                   / sqrt(1 - g3*SR_hat + ((g4-1)/4)*SR_hat^2) ).
+
+    ``sr_benchmark`` is the threshold Sharpe (per-period), e.g. 0 for "better
+    than random" or another strategy's per-period Sharpe for a head-to-head.
+    Returns a probability in [0, 1].
+    """
+    from scipy.stats import norm
+
+    sr_hat, skew, kurt, T = _per_period_sharpe_moments(returns)
+    if T < 3:
+        return 0.0
+    denom_sq = 1.0 - skew * sr_hat + ((kurt - 1.0) / 4.0) * sr_hat ** 2
+    denom = np.sqrt(max(denom_sq, 1e-12))
+    z = (sr_hat - sr_benchmark) * np.sqrt(T - 1) / denom
+    return float(norm.cdf(z))
+
+
+def expected_max_sharpe(sr_variance: float, n_trials: int) -> float:
+    """Expected maximum of ``n_trials`` IID Sharpe estimates under the null of
+    zero true skill — the Deflated Sharpe benchmark ``SR*`` of Bailey & Lopez de
+    Prado (2014):
+
+        SR* = sqrt(V) * [ (1 - gamma) * Z^-1(1 - 1/N)
+                          +     gamma  * Z^-1(1 - 1/(N*e)) ],
+
+    where ``V`` is the cross-trial variance of the Sharpe estimates, ``N`` the
+    number of trials, ``gamma`` the Euler-Mascheroni constant and ``Z^-1`` the
+    standard-normal quantile. ``sr_variance`` must be in the same (per-period)
+    units as the Sharpes passed to :func:`deflated_sharpe_ratio`.
+    """
+    from scipy.stats import norm
+
+    if n_trials <= 1 or sr_variance <= 0.0:
+        return 0.0
+    sqrt_v = np.sqrt(sr_variance)
+    g = _EULER_MASCHERONI
+    term = (1.0 - g) * norm.ppf(1.0 - 1.0 / n_trials) \
+        + g * norm.ppf(1.0 - 1.0 / (n_trials * np.e))
+    return float(sqrt_v * term)
+
+
+def deflated_sharpe_ratio(
+    returns: pd.Series, all_trial_sharpes
+) -> float:
+    """Deflated Sharpe Ratio: PSR evaluated against the multiplicity-adjusted
+    benchmark ``SR*`` from :func:`expected_max_sharpe`.
+
+    ``all_trial_sharpes`` is the collection of *per-period* Sharpe estimates of
+    every configuration tried (including ``returns``'s own). The DSR is the
+    probability that the strategy's true Sharpe exceeds the expected best Sharpe
+    obtainable from that many trials under the null of no skill — i.e. PSR after
+    deflating for selection bias. As ``N -> 1`` (a single trial) ``SR* -> 0`` and
+    the DSR collapses to ``PSR(SR* = 0)``.
+    """
+    sharpes = np.asarray([s for s in all_trial_sharpes if np.isfinite(s)], dtype=float)
+    n = len(sharpes)
+    sr_star = expected_max_sharpe(float(np.var(sharpes, ddof=1)) if n > 1 else 0.0, n)
+    return probabilistic_sharpe_ratio(returns, sr_benchmark=sr_star)
+
+
+# ============================================================================
 # Drawdown
 # ============================================================================
 def max_drawdown(returns: pd.Series) -> float:
@@ -206,6 +313,9 @@ __all__ = [
     "annualised_sharpe",
     "annualised_sortino",
     "calmar_ratio",
+    "probabilistic_sharpe_ratio",
+    "expected_max_sharpe",
+    "deflated_sharpe_ratio",
     "max_drawdown",
     "time_underwater",
     "annualised_return",
