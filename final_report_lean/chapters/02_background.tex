@@ -115,21 +115,21 @@ autoregression (SVAR),
 where $X$ is the $n \times d$ panel, $Y_p$ its lags, and $Z$ noise; acyclicity
 applies only to $W$, since lagged edges point forward in time.
 
-\textbf{DYNOTEARS} \cite{pamfil2020dynotears} applies the NOTEARS smoothed
-acyclicity constraint to this SVAR, minimising a penalised least-squares loss
+Three tools instantiate this SVAR, and the project uses them as a primary method
+plus two comparators rather than surveying them in depth. \textbf{DYNOTEARS}
+\cite{pamfil2020dynotears} applies the NOTEARS smoothed acyclicity constraint to
+the SVAR, minimising the penalised least-squares loss
 $\tfrac{1}{2n}\lVert X - XW - \sum_p Y_p A_p\rVert_F^2 + \lambda_W\lVert W\rVert_1
-+ \lambda_A\sum_p\lVert A_p\rVert_1$ subject to $h(W)=0$. It is the primary method
-here: score-based (no faithfulness assumption), scalable, and able to forbid
-specific edges, which is exactly what enforcing the directional prior of C1
-requires. \textbf{VARLiNGAM} \cite{hyvarinen2010varlingam} estimates an SVAR by
-taking the non-Gaussian residuals of a reduced-form autoregression, applying
-independent component analysis, and recovering a DAG over the instantaneous
-effects; its non-Gaussian assumption matches financial returns, and it is
++ \lambda_A\sum_p\lVert A_p\rVert_1$ subject to $h(W)=0$; it is the \emph{primary}
+method here because it is score-based (no faithfulness assumption), scalable, and
+able to forbid specific edges --- exactly what enforcing the directional prior of
+C1 requires. \textbf{VARLiNGAM} \cite{hyvarinen2010varlingam} instead exploits
+non-Gaussian residuals via independent component analysis to identify the
+instantaneous DAG, an assumption that matches heavy-tailed returns, and is
 retained as a robustness comparator. \textbf{NTS-NOTEARS}
-\cite{sun2023ntsnotears} replaces the linear edge functions with 1D convolutional
-networks, allowing non-linear causal relationships and, in principle, unifying
-discovery and sensitivity extraction in one model; it is examined here as a
-reduced-scope probe (Section~\ref{sec:nts}).
+\cite{sun2023ntsnotears} replaces the linear edges with 1D convolutional networks
+for non-linear structure, examined here only as a reduced-scope probe
+(Section~\ref{sec:nts}).
 
 \section{Causal methods in quantitative finance}
 \label{sec:cd-finance}
@@ -152,6 +152,36 @@ strategies from time-series causal-discovery output (including VARLiNGAM) on
 Chinese and US markets, finding profitable signals but identifying computational
 cost and scalability as binding constraints --- a caution this project
 encountered directly (Section~\ref{sec:nts}, Section~\ref{sec:cache}).
+
+\section{Evaluating backtests honestly}
+\label{sec:rigour}
+
+A theme running through López de Prado's work --- from Hierarchical Risk Parity
+\cite{lopezdeprado2016hrp} to the case for \emph{causal} factor investing
+\cite{lopezdeprado2023causal} --- is that most of the difficulty in quantitative
+finance is not finding a strategy that looks good in a backtest but establishing
+that the result is not an artefact of \emph{data snooping}: try enough
+configurations and the best Sharpe ratio will look impressive by chance alone.
+This work adopts that standard explicitly, and its evaluation (the third pillar
+of this background, alongside HSP and Howard et al.) is built on the resulting
+toolkit. Two threats are distinguished. First, the \emph{Sharpe ratio itself is
+unreliable} on non-normal returns: it assumes Gaussianity, yet daily equity
+returns are heavily skewed and fat-tailed. Bailey and López de Prado address this
+with the \emph{Probabilistic Sharpe Ratio} (PSR), the probability that the true
+Sharpe exceeds a benchmark given the sample's skewness, kurtosis and length
+\cite{bailey2012psr}, and the \emph{Deflated Sharpe Ratio} (DSR), which sets that
+benchmark to the Sharpe one would expect from the \emph{best} of $N$ trials under
+the null of no skill --- deflating directly for selection bias
+\cite{bailey2014deflated}. Second, when many strategies are compared against a
+benchmark, the right question is whether the \emph{best} beats it after
+accounting for the search: White's \emph{Reality Check} \cite{white2000reality}
+and Hansen's \emph{Superior Predictive Ability} (SPA) test \cite{hansen2005spa}
+answer exactly this via the stationary block bootstrap, and the \emph{Model
+Confidence Set} \cite{hansen2011mcs} returns the subset of strategies that are
+statistically indistinguishable from the best --- if the correlation baseline
+survives in that set, no causal variant can be said to beat it. This battery is
+applied to Q in Section~\ref{sec:believe-rigour}; it is what separates a genuine
+edge from a data-snooped one.
 
 \section{Research gap}
 \label{sec:gap}

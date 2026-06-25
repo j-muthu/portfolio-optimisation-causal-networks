@@ -54,11 +54,66 @@ driver-utility score that shapes the next period's selection. I call HSP with
 causally-selected drivers \emph{Causal-HSP}, and the version with feedback
 \emph{closed-loop Causal-HSP}.
 
+\section{The scientific question}
+\label{sec:question}
+
+The motivation above is sharpened into a single, precisely-stated question that
+the rest of this dissertation answers in depth and returns to throughout.
+
+\begin{quote}
+\noindent\fbox{\parbox{\dimexpr\linewidth-2\fboxsep-2\fboxrule\relax}{%
+\textbf{Q.}\ \emph{For a long-only, monthly-rebalanced portfolio of the
+${\sim}100$ largest S\&P-500 constituents over 2007--2024, does choosing
+Hierarchical Sensitivity Parity's common drivers by temporal causal discovery
+(DYNOTEARS), rather than by cumulative correlation, deliver a higher
+out-of-sample, net-of-cost, risk-adjusted return --- and does any such advantage
+survive correction for the multiplicity of strategies tried and the
+non-normality of returns?}}}
+\end{quote}
+
+Every term is operationalised and held fixed for the whole study:
+\begin{itemize}[itemsep=1pt, topsep=3pt]
+  \item \emph{Out-of-sample}: a walk-forward backtest --- drivers, sensitivities
+    and weights at each rebalance use only data up to that date.
+  \item \emph{Net of cost}: returns are charged $5$\,bps per unit of one-way
+    turnover (swept over $\{0,5,10,20\}$\,bps).
+  \item \emph{Risk-adjusted return}: primarily the annualised Sharpe ratio, but
+    --- because daily returns here have excess kurtosis ${\approx}\,\rsKurtosis\
+    ---$ also the Sortino and Calmar ratios and, decisively, the
+    distribution-aware \emph{Probabilistic} and \emph{Deflated} Sharpe ratios
+    \cite{bailey2012psr,bailey2014deflated} (Section~\ref{sec:method},
+    Section~\ref{sec:believe-rigour}).
+  \item \emph{Multiplicity}: the \rsNtrials\ distinct configurations actually
+    evaluated (variants $\times$ discovery methods $\times$ windows $\times$ $K$
+    $\times$ feedback grid), against which the Deflated Sharpe, Reality Check,
+    SPA and Model Confidence Set deflate.
+\end{itemize}
+
+\noindent Q decomposes into five sub-questions, each answered in its own section
+of Chapter~\ref{chap:evaluation} and each tied to an achievement:
+\begin{enumerate}[label=\textbf{Q\arabic*}, itemsep=1pt, topsep=3pt]
+  \item Does causal driver selection beat cumulative-correlation selection on net
+    out-of-sample risk-adjusted return? \emph{(the treatment; A1/A2,
+    Section~\ref{sec:causal-vs-corr})}
+  \item Are exogenous drivers necessary at all, or does asset-only causal
+    structure suffice? \emph{(necessity; A2, Section~\ref{sec:v0prime-eval})}
+  \item Is any edge robust to the lookback window and to the number of drivers
+    $K$? \emph{(robustness; A1/A3, Section~\ref{sec:ksens})}
+  \item Can a monthly performance-feedback loop be learned from at all?
+    \emph{(feedback; A3, Section~\ref{sec:loop-eval})}
+  \item Does any edge survive correction for multiplicity and non-normality?
+    \emph{(rigour; A3, Section~\ref{sec:believe-rigour})}
+\end{enumerate}
+
 \section{Challenges, novel contributions, and quantified benefits}
 \label{sec:challenges}
 
 The project is framed around three technical challenges, the contributions that
-address them, and the quantified benefits actually measured.
+address them, and the quantified benefits actually measured. Each challenge maps
+onto Q: \textbf{C1} is the \emph{treatment} in Q (causal vs correlation
+selection); \textbf{C2} is the \emph{mechanism}, and through the asset-only
+control the \emph{necessity}, of using directional structure; \textbf{C3} is the
+\emph{rigour and feedback} on which Q5 and Q4 turn.
 
 \begin{enumerate}
   \item \textbf{Key technical challenges.}

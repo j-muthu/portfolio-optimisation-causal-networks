@@ -35,8 +35,23 @@ The results, stated objectively:
         edge is window-dependent.
   \item \textbf{The closed loop adds nothing.} Across the entire $\alpha,\gamma$
         grid the feedback is inert, because utility can only re-rank within the
-        causally-selected set. The C3 hypothesis is rejected for this design.
+        causally-selected set --- and, even where it could, a monthly reward's
+        signal-to-noise ratio of $\rsRewardSNR$ is too low to learn from. The C3
+        hypothesis is rejected for this design.
+  \item \textbf{The edge does not survive data-snooping correction.} Subjecting
+        the \rsNtrials\ configurations to the Deflated Sharpe ratio, White's
+        Reality Check, Hansen's SPA and the Model Confidence Set, the absolute
+        Sharpe levels survive correction for non-normality and multiplicity, but
+        the causal-over-correlation \emph{edge} does not clear a family-wise test
+        and the correlation baseline \rsMcsVzeroIn\ retained in the $90\%$ Model
+        Confidence Set. The second half of Q is answered in the negative.
 \end{enumerate}
+
+Stated as a direct answer to Q: causal driver selection does deliver a higher
+risk-adjusted return than correlation selection, but only at the short window,
+only modestly, and not in a way that survives correction for the multiplicity of
+strategies tried --- while the strongest short-window result comes from
+\emph{asset-only} causal structure with no exogenous drivers at all.
 
 The blunt overall assessment is that, for this framework and universe, causal
 methods are \emph{mildly and conditionally} effective, not robustly so: the only
@@ -76,6 +91,11 @@ The limitations are intrinsic to the claims and are stated without hedging.
         FDR-significant drivers means the ``causal'' driver scores, at this
         universe size, are not far above noise --- a caveat for any
         driver-level interpretation.
+  \item \textbf{Edge does not clear data-snooping correction.} The single-
+        comparison significance of the short-window asset-only and VARLiNGAM
+        results does not survive the family-wise battery
+        (Section~\ref{sec:believe-rigour}): the baseline is retained in the Model
+        Confidence Set, so the comparative claim in Q is, strictly, unproven.
 \end{itemize}
 
 \section{Future work}
