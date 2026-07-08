@@ -357,20 +357,24 @@ recession D0 ≥ D1. Direction-aware allocation earns its keep in calm markets,
 not crises.
 
 **E7 — the seed audit (Ce Guo's instability critique, quantified).**
-Re-running the committed V1-DYNOTEARS w252 K=17 pipeline over 10 FFNN seeds
-(discovery cached; FFNN cache off; everything else frozen):
+Re-running the committed V1-DYNOTEARS w252 K=17 pipeline over 20 FFNN seeds
+(discovery cached; FFNN cache off; everything else frozen). The first 10 and
+the full 20 give the same distribution (median 0.390 → 0.389), so the
+estimate is stable:
 
 | | min | p25 | median | p75 | max |
 |---|---|---|---|---|---|
-| V1 net Sharpe across seeds | 0.381 | 0.387 | 0.390 | 0.393 | 0.396 |
+| V1 net Sharpe across 20 seeds | 0.375 | 0.385 | 0.389 | 0.391 | 0.396 |
 
-The committed value (0.381, seed 0 — bit-reproduced on re-run) is the **most
-pessimistic of the ten seeds**, and the seed range (0.015) **exceeds the
-entire committed V1−V0 edge (+0.010)**: the causal-driver-selection result
-lives inside its own seed noise. Every Phase-II D-variant is deterministic by
-construction (two consecutive D0 runs byte-identical), and D0/D1/D2s all sit
-*above the seed-cloud maximum* — the direction-aware graph route dominates the
-FFNN route under any seed (`results/seed_audit.csv`,
+The committed value (0.381, seed 0 — bit-reproduced on re-run) sits at the
+**5th percentile** of its own seed distribution, and the seed range (0.021)
+is **more than twice the committed V1−V0 edge (+0.010)** — at the worst seed
+(0.375) that edge all but vanishes (+0.004 over V0's 0.371): the
+causal-driver-selection result lives inside its own seed noise. Every
+Phase-II D-variant is deterministic by construction (two consecutive D0 runs
+byte-identical), and D0/D1/D2s all sit *above the seed-cloud maximum*
+(0.396 < 0.403) — the direction-aware graph route dominates the FFNN route
+under any seed (`results/seed_audit.csv`,
 `results/figures/phase_ii_seed.png`).
 
 **Artefacts.** `results/phase_ii_matrix.csv`, `phase_ii_contrasts.csv`,

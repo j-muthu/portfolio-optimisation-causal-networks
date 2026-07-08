@@ -19,7 +19,7 @@ D-variant backtest ≈ 40 s, vs the ~15 h naïve estimate):
    refits, zero WRDS calls.
 2. **Every E1 cell ran at both windows** (28 runs) + E2 GRANGER (4), E3 τ-sweep
    (9), E6 cost sweep (18), E4 82-trial battery, E5 regime tables, E7 seed
-   audit (10 seeds) — all with bootstrap p-values.
+   audit (20 seeds) — all with bootstrap p-values.
 3. **The §0.2 answer:** direction-aware allocation does *not* significantly
    beat its symmetrised counterpart family-wise. Strongest effect: D1−D0 =
    +0.023 at w504 (pairwise p = 0.049; all five DYNO direction-aware contrasts
@@ -32,11 +32,13 @@ D-variant backtest ≈ 40 s, vs the ~15 h naïve estimate):
    (p = 0.04). Deviation from plan hypothesis: the direction edge concentrates
    in *calm* (VIX-bottom-quintile) regimes, not stress. GRANGER: suffices for
    ordering (D2) but not for Σ_struct (Option 2 verdict).
-4. **Seed audit (implemented deviation: 10 seeds × V1 only, user-approved
-   minimum):** V1 Sharpe spans 0.381–0.396 across FFNN seeds — the seed range
-   (0.015) exceeds the committed V1−V0 edge (+0.010), and the committed value
-   is the most pessimistic seed. All D-variants deterministic and above the
-   seed-cloud maximum.
+4. **Seed audit (20 seeds × V1 — plan-spec count; V0 arm dropped as the
+   user-approved narrowing):** V1 Sharpe spans 0.375–0.396 across FFNN seeds
+   (median 0.389, stable between the 10- and 20-seed runs) — the seed range
+   (0.021) is more than twice the committed V1−V0 edge (+0.010), the
+   committed value sits at the 5th percentile of its own seed distribution,
+   and at the worst seed the edge over V0 all but vanishes (+0.004). All
+   D-variants deterministic and above the seed-cloud maximum.
 5. FINDINGS.md §1d written; figures F1–F5 in `results/figures/phase_ii_*.png`;
    the new test files green alongside the full suite; pipeline
    bit-reproducible.
