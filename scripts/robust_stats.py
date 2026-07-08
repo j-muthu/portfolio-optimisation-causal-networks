@@ -87,6 +87,28 @@ def _all_trial_tags() -> dict[str, str]:
     return tags
 
 
+# Phase-II direction-aware allocators (fixed-graph ablation). D0 duplicates
+# V0prime byte-for-byte under DYNOTEARS — that is the designed replication
+# check; drop_duplicate_configs removes it before SPA/MCS.
+PHASE_II_ALLOCS = ("D0", "D0s", "D1", "D2", "D2s", "D3", "D4")
+PHASE_II_METHODS = (("dynotears", "DYNO"), ("varlingam", "VARL"))
+
+
+def _phase_ii_tags() -> dict[str, str]:
+    """name -> bundle tag for every Phase-II configuration evaluated."""
+    tags: dict[str, str] = {}
+    for w in WINDOWS:
+        for method, short in PHASE_II_METHODS:
+            for a in PHASE_II_ALLOCS:
+                tags[f"{short}-{a}_w{w}"] = f"phase_ii_{method}_{a}_w{w}"
+    for a in ("D0", "D1", "D2", "D3"):      # E2 GRANGER arm (w252 only)
+        tags[f"GRAN-{a}_w252"] = f"phase_ii_granger_{a}_w252"
+    for tau in ("0.01", "0.05", "0.1"):     # E3 τ sweep (DYNO w252)
+        for a in ("D0", "D2", "D3"):
+            tags[f"DYNO-{a}_w252_tau{tau}"] = f"phase_ii_dynotears_{a}_w252_tau{tau}"
+    return tags
+
+
 # ============================================================================
 # Bundle loading (impure)
 # ============================================================================
@@ -283,17 +305,32 @@ def write_macros(path: pathlib.Path, macros: dict[str, str]) -> None:
 # ============================================================================
 # Orchestration
 # ============================================================================
-def main() -> None:
+def main(argv: list[str] | None = None) -> None:
+    import argparse
+
+    ap = argparse.ArgumentParser(description="Robust-stats battery (PSR/DSR/SPA/RC/MCS).")
+    ap.add_argument(
+        "--phase-ii", action="store_true",
+        help="extend the trial universe with the Phase-II D-variant bundles; "
+             "writes robust_stats_phase_ii.csv and does NOT touch the report "
+             "macros (the committed Phase-I battery stays frozen until the "
+             "report-reorientation stage).",
+    )
+    args = ap.parse_args(argv)
+
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
 
-    returns, loaded = load_return_matrix(_all_trial_tags())
+    tags = _all_trial_tags()
+    if args.phase_ii:
+        tags = {**tags, **_phase_ii_tags()}
+    returns, loaded = load_return_matrix(tags)
     if returns.empty:
         log.error("No bundles found under %s — this script must run where the "
                   "gitignored closed_loop.pkl bundles live.", RESULTS)
         return
     n_trials = returns.shape[1]
     log.info("loaded %d configurations over %d common days", n_trials, len(returns))
-    if n_trials != 41:
+    if not args.phase_ii and n_trials != 41:
         log.warning("expected 41 trials, loaded %d (partial result set)", n_trials)
 
     # --- PSR / DSR table over every trial (baseline = correlation V0 at w252) ---
@@ -307,16 +344,51 @@ def main() -> None:
         returns, [f"{n}_w252" for n in HEADLINE if f"{n}_w252" in returns.columns])
     causal252 = [c for c in headline252 if not c.startswith("V0_")]
     spa = run_spa(returns, benchmark="V0_w252", candidates=causal252)
-    mcs_in, _ = run_mcs(returns, headline252)
-    # mark MCS membership on the table (only meaningful for the headline universe)
-    table["in_mcs90"] = [bool(c in mcs_in) if c in headline252 else ""
+
+    # Universe for the MCS: the w252 headline, plus (in --phase-ii mode) every
+    # distinct w252 D-variant, so the set answers "which strategies survive
+    # jointly once the Phase-II arm is on the table".
+    mcs_universe = list(headline252)
+    spa_phase_ii = None
+    spa_direction: dict[int, dict] = {}
+    if args.phase_ii:
+        d252 = [c for c in returns.columns
+                if c.startswith(("DYNO-", "VARL-", "GRAN-")) and c.endswith("_w252")
+                and "_tau" not in c]
+        d252 = drop_duplicate_configs(returns, mcs_universe + d252)
+        d_only = [c for c in d252 if c not in mcs_universe]
+        if d_only:
+            spa_phase_ii = run_spa(returns, benchmark="V0_w252", candidates=d_only)
+        mcs_universe = d252
+        # The family-wise adjudication of the Phase-II question itself: does
+        # ANY direction-aware allocator beat its own symmetrised control D0
+        # (≡ V0prime), per window? This is the fixed-graph direction effect
+        # with the multiplicity of the whole direction-aware grid priced in.
+        for w in WINDOWS:
+            bench = f"V0prime_w{w}"
+            cands = [c for c in returns.columns
+                     if c.split("_")[0] in {f"{s}-D{v}" for s in ("DYNO", "VARL")
+                                            for v in ("1", "2", "2s", "3", "4")}
+                     and c.endswith(f"_w{w}") and "_tau" not in c]
+            cands = [c for c in drop_duplicate_configs(returns, [bench] + cands)
+                     if c != bench]
+            if bench in returns.columns and cands:
+                spa_direction[w] = run_spa(returns, benchmark=bench, candidates=cands)
+    mcs_in, _ = run_mcs(returns, mcs_universe)
+    # mark MCS membership on the table (only meaningful for the MCS universe)
+    table["in_mcs90"] = [bool(c in mcs_in) if c in mcs_universe else ""
                          for c in table.config]
     RESULTS.mkdir(exist_ok=True)
-    table.to_csv(RESULTS / "robust_stats.csv", index=False)
+    out_csv = RESULTS / ("robust_stats_phase_ii.csv" if args.phase_ii else "robust_stats.csv")
+    table.to_csv(out_csv, index=False)
     print("\n=== PSR / DSR by configuration ===")
     print(table.to_string(index=False))
     print(f"\n=== SPA/RC (causal vs V0, w252) ===\n{spa}")
-    print(f"\n=== MCS 90% set (w252 headline) ===\n{mcs_in}")
+    if spa_phase_ii is not None:
+        print(f"\n=== SPA/RC (Phase-II D-variants vs V0, w252) ===\n{spa_phase_ii}")
+    for w, res in spa_direction.items():
+        print(f"\n=== SPA/RC (direction-aware vs D0/V0prime, w{w}) ===\n{res}")
+    print(f"\n=== MCS 90% set (w252 universe, n={len(mcs_universe)}) ===\n{mcs_in}")
 
     # --- measurement problem on the closed loop (V2/V1 w252) ---
     rtag = "phase_i_v2_w252" if (RESULTS / "phase_i_v2_w252").exists() else "phase_i_v1_w252"
@@ -331,6 +403,12 @@ def main() -> None:
             print(f"  {n:24s} {annualised_sharpe(returns[n]):.4f}")
 
     # --- emit report macros (per named w252 variant + battery verdicts) ---
+    if args.phase_ii:
+        # Report macros stay frozen on the committed 41-trial Phase-I battery
+        # until the report-reorientation stage; the Phase-II battery lives in
+        # robust_stats_phase_ii.csv + FINDINGS.md only.
+        print(f"\nsaved → {out_csv} (report macros NOT regenerated in --phase-ii mode)")
+        return
     def cell(config: str, col: str) -> float:
         hit = table.loc[table.config == config, col]
         return float(hit.iloc[0]) if len(hit) else float("nan")

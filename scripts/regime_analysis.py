@@ -59,6 +59,21 @@ VARIANTS = [
     ("V2-DYNOTEARS","dynotears","phase_i_v2_w{w}"),
     ("V1-VARLiNGAM","varlingam","phase_i_v1_varlingam_w{w}"),
     ("V2-VARLiNGAM","varlingam","phase_i_v2_varlingam_w{w}"),
+    # Phase-II direction-aware allocators (fixed-graph ablation). DYNO-D0 is
+    # byte-identical to V0prime, so only the VARLiNGAM D0 row is added.
+    ("VARL-D0",     "varlingam","phase_ii_varlingam_D0_w{w}"),
+    ("DYNO-D0s",    "dynotears","phase_ii_dynotears_D0s_w{w}"),
+    ("DYNO-D1",     "dynotears","phase_ii_dynotears_D1_w{w}"),
+    ("DYNO-D2",     "dynotears","phase_ii_dynotears_D2_w{w}"),
+    ("DYNO-D2s",    "dynotears","phase_ii_dynotears_D2s_w{w}"),
+    ("DYNO-D3",     "dynotears","phase_ii_dynotears_D3_w{w}"),
+    ("DYNO-D4",     "dynotears","phase_ii_dynotears_D4_w{w}"),
+    ("VARL-D0s",    "varlingam","phase_ii_varlingam_D0s_w{w}"),
+    ("VARL-D1",     "varlingam","phase_ii_varlingam_D1_w{w}"),
+    ("VARL-D2",     "varlingam","phase_ii_varlingam_D2_w{w}"),
+    ("VARL-D2s",    "varlingam","phase_ii_varlingam_D2s_w{w}"),
+    ("VARL-D3",     "varlingam","phase_ii_varlingam_D3_w{w}"),
+    ("VARL-D4",     "varlingam","phase_ii_varlingam_D4_w{w}"),
 ]
 WINDOWS = [252, 504]
 
