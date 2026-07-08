@@ -196,6 +196,8 @@ def run_shakedown(
     linkage_method: str = "single",
     selection_method: str = "causal_greedy",
     discovery_method: str | None = "dynotears",
+    allocator: str | None = None,
+    graph_tau: float = 0.0,
     discovery_kwargs: dict | None = None,
     sensitivities_kwargs: dict | None = None,
     correlation_kwargs: dict | None = None,
@@ -234,6 +236,8 @@ def run_shakedown(
         linkage_method=linkage_method,
         selection_method=selection_method,
         discovery_method=discovery_method,
+        allocator=allocator,
+        graph_tau=graph_tau,
         tag=tag,
     )
 
@@ -465,6 +469,8 @@ def run_shakedown(
         gamma_ema=gamma_ema,
         selection_method=selection_method,
         discovery_method=discovery_method,
+        allocator=allocator,
+        graph_tau=graph_tau,
         discovery_kwargs=discovery_kwargs or {},
         selector_kwargs={"alpha": alpha, "burn_in_rebalances": burn_in_rebalances},
         sensitivities_kwargs=sensitivities_kwargs or {},

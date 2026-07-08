@@ -37,6 +37,7 @@ import numpy as np
 import pandas as pd
 
 from pipeline._vendored import THESIS_ROOT
+from pipeline.discovery.asset_graph import asset_graph_from_discovery
 from pipeline.feedback import (
     CreditAttribution,
     UtilityStore,
@@ -50,6 +51,7 @@ from pipeline.portfolio import (
     v0prime_asset_only_causal_hrp,
     v2_causal_hsp_closed_loop,
 )
+from pipeline.portfolio.directed import dispatch_allocator
 from pipeline.stage1_pipeline import Stage1Rebalance, fit_stage1_rebalance
 
 logger = logging.getLogger(__name__)
@@ -108,6 +110,8 @@ def run_closed_loop(
     gamma_ema: float = 0.3,
     selection_method: str = "causal_greedy",
     discovery_method: str | None = "dynotears",
+    allocator: str | None = None,
+    graph_tau: float = 0.0,
     discovery_kwargs: dict | None = None,
     selector_kwargs: dict | None = None,
     sensitivities_kwargs: dict | None = None,
@@ -251,14 +255,28 @@ def run_closed_loop(
             common = [a for a in asset_names if a in disc_cols]
             if len(common) < 2:
                 return equal_weight(asset_names)
-            pos = [disc_cols.index(a) for a in common]
-            W_aa = s1.discovery.asset_to_asset_block(0)[np.ix_(pos, pos)]
             end_pos_ret = asset_returns.index.searchsorted(t, side="right")
             start_pos_ret = max(0, end_pos_ret - lookback_days)
             ret_window = asset_returns.iloc[start_pos_ret:end_pos_ret][common]
-            w = v0prime_asset_only_causal_hrp(
-                W_aa, common, ret_window, linkage_method=linkage_method
-            )
+            if allocator is None:
+                # V0′ path, byte-identical to Phase I.
+                pos = [disc_cols.index(a) for a in common]
+                W_aa = s1.discovery.asset_to_asset_block(0)[np.ix_(pos, pos)]
+                w = v0prime_asset_only_causal_hrp(
+                    W_aa, common, ret_window, linkage_method=linkage_method
+                )
+            else:
+                # Phase-II D-variant path: same graph, direction-aware
+                # allocation. The chokepoint slices/thresholds M and computes
+                # the structural residual variances on the fit window.
+                graph = asset_graph_from_discovery(
+                    s1.discovery, joint_window,
+                    method=discovery_method or "dynotears",
+                    tau=graph_tau, universe=common,
+                )
+                w = dispatch_allocator(
+                    allocator, graph, ret_window, linkage_method=linkage_method
+                )
             padded = w.reindex(asset_names).fillna(0.0)
             total = padded.sum()
             return padded / total if total > 1e-12 else equal_weight(asset_names)
@@ -351,6 +369,8 @@ def run_closed_loop(
         "gamma_ema": gamma_ema,
         "selection_method": selection_method,
         "discovery_method": discovery_method,
+        "allocator": allocator,
+        "graph_tau": graph_tau,
         "discovery_kwargs": discovery_kwargs,
         "selector_kwargs": selector_kwargs,
         "sensitivities_kwargs": sensitivities_kwargs,

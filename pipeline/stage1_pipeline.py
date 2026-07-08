@@ -175,21 +175,76 @@ def fit_stage1_rebalance(
     sel: SelectionResult | CorrelationSelectionResult
 
     if selection_method == "asset_only":
-        # V0′ path: run the SAME joint discovery V1 uses (drivers present,
-        # asset→driver edges masked), but use only the asset–asset block of W
-        # downstream — no driver selection, no FFNN. Return an empty selection
-        # so the shared "no selected drivers" branch yields an empty
+        # V0′ / Phase-II path: run the SAME joint discovery V1 uses (drivers
+        # present, asset→driver edges masked), but use only the asset–asset
+        # block downstream — no driver selection, no FFNN. Return an empty
+        # selection so the shared "no selected drivers" branch yields an empty
         # SensitivityWindow; the closed-loop strategy reads
-        # ``discovery.asset_to_asset_block`` instead.
-        disc = load_or_compute_discovery(
-            lambda: run_dynotears_joint_window(
-                joint_window, driver_columns=driver_columns,
-                asset_columns=asset_columns, **discovery_kwargs,
-            ),
-            joint_window=joint_window, driver_columns=driver_columns,
-            asset_columns=asset_columns, method="dynotears",
-            discovery_kwargs=discovery_kwargs, use_cache=discovery_cache,
-        )
+        # ``discovery.asset_to_asset_block`` instead. The discovery backend is
+        # selectable (Phase II runs the same D-allocators on DYNOTEARS,
+        # VARLiNGAM and the ridge-VAR(1) GRANGER comparator); the default
+        # stays "dynotears" so Phase-I V0′ reproductions are bit-identical.
+        if discovery_method in (None, "dynotears"):
+            disc = load_or_compute_discovery(
+                lambda: run_dynotears_joint_window(
+                    joint_window, driver_columns=driver_columns,
+                    asset_columns=asset_columns, **discovery_kwargs,
+                ),
+                joint_window=joint_window, driver_columns=driver_columns,
+                asset_columns=asset_columns, method="dynotears",
+                discovery_kwargs=discovery_kwargs, use_cache=discovery_cache,
+            )
+        elif discovery_method == "varlingam":
+            disc = load_or_compute_discovery(
+                lambda: run_varlingam_joint_window(
+                    joint_window, driver_columns=driver_columns,
+                    asset_columns=asset_columns, **discovery_kwargs,
+                ),
+                joint_window=joint_window, driver_columns=driver_columns,
+                asset_columns=asset_columns, method="varlingam",
+                discovery_kwargs=discovery_kwargs, use_cache=discovery_cache,
+            )
+        elif discovery_method == "granger":
+            from pipeline.discovery.granger import run_granger_joint_window
+
+            # Per-window density matching: with the sentinel flag set, the
+            # paired DYNOTEARS window (a guaranteed cache hit in Phase-II
+            # runs) supplies the asset-block edge density so the cheap
+            # directed graph is compared at like-for-like sparsity. The
+            # resolved density enters the granger cache key, keeping keys
+            # honest per window.
+            g_kwargs = dict(discovery_kwargs)
+            if g_kwargs.pop("density_match_dynotears", False):
+                dyno = load_or_compute_discovery(
+                    lambda: run_dynotears_joint_window(
+                        joint_window, driver_columns=driver_columns,
+                        asset_columns=asset_columns,
+                    ),
+                    joint_window=joint_window, driver_columns=driver_columns,
+                    asset_columns=asset_columns, method="dynotears",
+                    discovery_kwargs={}, use_cache=discovery_cache,
+                )
+                A = dyno.asset_to_asset_block(0)
+                n_a = A.shape[0]
+                off = A[~np.eye(n_a, dtype=bool)]
+                g_kwargs["target_density"] = (
+                    float(np.count_nonzero(off)) / max(n_a * (n_a - 1), 1)
+                )
+            disc = load_or_compute_discovery(
+                lambda: run_granger_joint_window(
+                    joint_window, driver_columns=driver_columns,
+                    asset_columns=asset_columns, **g_kwargs,
+                ),
+                joint_window=joint_window, driver_columns=driver_columns,
+                asset_columns=asset_columns, method="granger_ridge",
+                discovery_kwargs=g_kwargs, use_cache=discovery_cache,
+            )
+        else:
+            raise ValueError(
+                f"discovery_method must be 'dynotears', 'varlingam' or "
+                f"'granger' for selection_method='asset_only', got "
+                f"{discovery_method!r}"
+            )
         sel = CorrelationSelectionResult(
             rebalance_date=pd.Timestamp(rebalance_date),
             selected=[], scores=pd.Series(dtype=float), K=0, lags=(),

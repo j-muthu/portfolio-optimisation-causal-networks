@@ -524,6 +524,12 @@ class JointVarLingamWindow:
         mat = self.B0 if lag == 0 else self.B_lags[lag - 1]
         return mat[np.ix_(self.asset_idx, self.driver_idx)]
 
+    def asset_to_asset_block(self, lag: int) -> np.ndarray:
+        """``M[a, a]`` — the asset-only causal block (Phase-II direction-aware
+        allocation; mirrors ``JointDynotearsWindow.asset_to_asset_block``)."""
+        mat = self.B0 if lag == 0 else self.B_lags[lag - 1]
+        return mat[np.ix_(self.asset_idx, self.asset_idx)]
+
 
 @dataclass
 class RollingJointVarLingamResult:
