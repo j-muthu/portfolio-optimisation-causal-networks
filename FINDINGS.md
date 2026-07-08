@@ -272,6 +272,118 @@ CNN kernel → a `(W, A)` pair slotting into the DYNOTEARS interface); probe
 
 ---
 
+## 1d. Phase II — direction-aware allocation (the fixed-graph ablation)
+
+**The question (pre-registered in `PHASE_II_PLAN.md` §0.2):** *holding the
+discovered asset–asset graph fixed, does a direction-aware allocator outperform
+its own symmetrised counterpart?* V0′ symmetrises the asset–asset block
+(`causal_embedding_distance`) before clustering — it discards exactly the
+directional information causal discovery paid for. Phase II keeps it, through
+five allocators fed the byte-identical per-window `M`: **D1** (embedding
+distance + SEM-implied structural covariance `Σ = D_σ B Σ_ε Bᵀ D_σ`,
+`B = (I−Mᵀ)⁻¹`), **D2/D2s** (topological order replaces the dendrogram —
+recursive bisection over the DAG's causal order, sample/structural cov),
+**D3** (no hierarchy: long-only ERC on Σ_struct — structural-shock risk
+parity), **D4** (co-ancestry distance from `B̃B̃ᵀ`), plus a second
+symmetrisation control **D0s**. All deterministic, seed-free, no drivers, no
+FFNN. Same universe/costs/calendar as Phase I; every graph a cache hit
+(836/836; zero refits). New code: `pipeline/discovery/asset_graph.py`
+(chokepoint), `pipeline/portfolio/{directed,topological}.py`,
+`pipeline/discovery/granger.py`, `scripts/run_phase_ii.py` + 50 unit tests.
+
+**Replication gate passed byte-perfectly**: D0 (the V0′ math through the new
+harness) reproduces the committed `phase_i_v0prime_w252` bundle with
+ΔSharpe = 0.0 and max|Δweight| = 0.0 over all 215 rebalances.
+
+**E1 matrix (net Sharpe; V0 baseline 0.371/0.370):**
+
+| allocator | DYNO w252 | DYNO w504 | VAR w252 | VAR w504 |
+|---|---|---|---|---|
+| D0 (sym control ≡ V0′) | 0.403 | 0.372 | 0.397 | 0.377 |
+| D0s (2nd sym control) | 0.398 | 0.383 | 0.396 | 0.390 |
+| **D1 (Σ_struct)** | **0.411** | **0.395** | 0.385 | 0.383 |
+| D2 (topo order) | 0.399 | 0.382 | 0.388 | 0.372 |
+| **D2s (topo + Σ_struct)** | **0.406** | **0.399** | 0.386 | 0.375 |
+| D3 (shock-space ERC) | 0.397 | 0.387 | 0.392 | 0.375 |
+| D4 (co-ancestry) | 0.393 | 0.387 | 0.402 | 0.370 |
+
+**The §0.2 answer, stated precisely:** *direction-aware allocation does not
+significantly outperform its symmetrised counterpart once the multiplicity of
+allocators tried is priced in.* The strongest effect — D1−D0 = **+0.023 at
+w504 (pairwise Politis–Romano p = 0.049)**, with D2s−D0 +0.027 (p = 0.067)
+and *all five* DYNOTEARS direction-aware contrasts positive at w504 — does
+**not survive family-wise correction** (SPA over the 10-variant
+direction-aware grid vs D0: p ≈ 0.15 at w504, p ≈ 0.33 at w252). At w252
+direction adds nothing over D0 (D1−D0 +0.009, ns), and under VARLiNGAM graphs
+the effect is absent everywhere (all contrasts ≈ 0 or negative) — the
+direction signal is DYNOTEARS-specific. A characterised, honest near-null:
+suggestive at the long window, not significant family-wise.
+
+**What direction *does* buy — cross-window consistency.** The Phase-I story's
+sharpest negative was V0′'s window-fragility (0.403 → 0.372). D1 and D2s are
+the only variants strong at *both* windows (0.411/0.395 and 0.406/0.399):
+keeping direction substantially repairs the w504 collapse of the undirected
+skeleton. The repair is cost-invariant (D1−D0 at w504: +0.022→+0.025 across
+0→20 bps; D1's turnover 0.102 is *below* D0's 0.112) and τ-robust (E3 sweep:
+D2/D3 flat-to-better as the edge threshold rises to 0.1; D3 0.397→0.407).
+Additionally, **best(D1) − V1 = +0.030 (p = 0.04) at w252**: the
+direction-aware graph route beats the entire Phase-I driver/FFNN machinery
+(same multiplicity caveat applies).
+
+**E2 — the GRANGER comparator (Option 2 verdict).** A ridge-VAR(1) directed
+graph, density-matched per window to DYNOTEARS: fine for *ordering* (D2 0.393
+vs DYNO-D2 0.399) but poor for *structural covariance* (D1 0.352, D3 0.350) —
+cheap directed structure suffices for the topology-only allocator but its
+coefficient magnitudes cannot support Σ_struct. GRANGER−DYNO at the best
+allocator: −0.060 (p = 0.12).
+
+**E4 — the 82-trial battery (Bailey–LdP/White/Hansen, extended).**
+`robust_stats --phase-ii` (separate output `robust_stats_phase_ii.csv`; the
+committed 41-trial Phase-I macros stay frozen). **DYNO-D1 w252 tops the whole
+82-config universe** (Sharpe 0.4114, DSR 0.9442) with Phase-II cells filling
+the top of the table. But family-wise: D-variants vs V0 at w252 give SPA
+p = 0.12 (vs p = 0.0015 for the Phase-I headline set) — the bigger family and
+noisier differentials eat the significance; and the joint 90% MCS over all 21
+distinct w252 strategies keeps 20, excluding **only V0** — with this many
+highly-correlated causal variants the MCS has no discriminating power beyond
+re-confirming the correlation baseline's inferiority.
+
+**E5 — the stress hypothesis is rejected.** The directional-prior verification
+(J1) had direction assignment most consequential in 2008/2022, motivating
+"direction should matter most in stress". The regime tables say otherwise: the
+D1/D2s edge over V0 concentrates in the *VIX bottom quintile* (+0.22/+0.25
+Sharpe) and is ≈ 0 (D1) to negative (D2s) in the top quintile; in NBER
+recession D0 ≥ D1. Direction-aware allocation earns its keep in calm markets,
+not crises.
+
+**E7 — the seed audit (Ce Guo's instability critique, quantified).**
+Re-running the committed V1-DYNOTEARS w252 K=17 pipeline over 10 FFNN seeds
+(discovery cached; FFNN cache off; everything else frozen):
+
+| | min | p25 | median | p75 | max |
+|---|---|---|---|---|---|
+| V1 net Sharpe across seeds | 0.381 | 0.387 | 0.390 | 0.393 | 0.396 |
+
+The committed value (0.381, seed 0 — bit-reproduced on re-run) is the **most
+pessimistic of the ten seeds**, and the seed range (0.015) **exceeds the
+entire committed V1−V0 edge (+0.010)**: the causal-driver-selection result
+lives inside its own seed noise. Every Phase-II D-variant is deterministic by
+construction (two consecutive D0 runs byte-identical), and D0/D1/D2s all sit
+*above the seed-cloud maximum* — the direction-aware graph route dominates the
+FFNN route under any seed (`results/seed_audit.csv`,
+`results/figures/phase_ii_seed.png`).
+
+**Artefacts.** `results/phase_ii_matrix.csv`, `phase_ii_contrasts.csv`,
+`robust_stats_phase_ii.csv`, `seed_audit.csv`, `phase_ii_dag_diagnostics.csv`,
+regime tables (extended), figures `results/figures/phase_ii_{heatmap,forest,
+nav,seed,regime}.png`. Compute: the whole phase ran in ~1 afternoon on the
+warm discovery cache (each 215-rebalance D-variant backtest ≈ 40 s; the naïve
+estimate without the cache was ~15 h/run). DAG diagnostics: DYNOTEARS
+asset-graphs average ~625 edges (density 0.064) with DAG depth ~50 of 99 —
+deep directed chains, so the ablation had real direction to work with.
+
+---
+
 ## 2. Regime-conditional findings (the differentiator)
 
 From `scripts/regime_analysis.py` → `results/regime_analysis/` (zero re-compute;
