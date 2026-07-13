@@ -133,7 +133,7 @@ questions:
 4. should I run it on google colab so it has gpu/tpu access? would that be faster than my local machine, even at the free tier? or should I buy a paid tier?
 5. what's the current window size? is it 2 years - do you think that's a good choice? can it be changed easily?
 
-## Change of plans following call w/ Ce 21/05
+## Change of plans following call w/ Ce -- 21 May
 
 we need some error propagation! portfolio backtesting results need to somehow act as a signal to affect the clustering
 

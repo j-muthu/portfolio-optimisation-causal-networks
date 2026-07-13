@@ -206,17 +206,30 @@ Declarations: See here
 
 Appendices: Appendices contain information that is peripheral to the main body of the report. The report should still make sense if the appendices are removed, and there is no guarantee that anything in this section will be read in detail or considered for marking. Often this is used to supply extra information that may be useful but would otherwise break up the flow of the text, for example tables, proofs and graphs. Please do not include source code listings as these will be available in your repo.
 
-# Feedback on my Interim report from my second marker - this is very important, and we need to reorient the final report accordingly
+# Feedback on my Interim report from my second marker (25 Jun) - **this is very important, and we need to reorient the final report accordingly**
 OVERALL -- **Be more precise & focused**:
 - I talk about "Higher returns" — what kind of returns??
 - I talk about "closed-loop feedback loop" - How frequent are the updates in the closed-loop feedback loop?
     - This changes the measurement problem - we can spend time talking about that!
 - Abstract is too vague - needs to be brief but detailed — whet appetite
 - Can’t just rely on Sharpe ratio — need 2-3 alternatives — look at distributions — deflated Sharpe, Hansens SPA test, white’s reality check, model-confidence set Bailey & Lopez de Prado
-- Crucially: **Need to provide a precise scientific question you’re trying to answer** — narrow the scope of the question and answer it in depth!! Be very very precise — make a clear contribution
+- Crucially: **Need to provide a precise, single scientific question you’re trying to answer** — narrow the scope of the question and answer it in depth!! Be very very precise — make a clear contribution
 - Your literature review shouldn't be vague and overarching -- pick fewer (2-3) papers and just analyse them in-depth & thematically
 - Socratic method!
 
+# Notes on follow-up conversation with my supervisor, Ce Guo (7 July) - **likewise, we need to reorient the final report and plan out next steps & a new research direction (adjustment)**:
+The problem is that your work has not got a clear, knockdown headline result - the picture is mixed. Also, the interim report is mostly analytical work and does not make a clear, novel contribution.
+The overall result is that the work seems unfocused & imprecise.
+
+Another problem is that HSP is flawed: results are highly dependent on random seeds, which makes it likely that the results reported in the original HSP paper are cherry picked. The neural network and the use of driver vectors to predict returns further adds to instability & unreliability.
+
+Overall, I need to make a more novel, clear-cut contribution.
+Ce Guo has suggested 3 options:
+1. **Allowing for asymmetric matrices in the clustering step of portfolio optimisation algorithms.** This would be a methodological improvement -- current portfolio optimisation algorithms like HRP & HSP (which I've been focusing on) use symmetric matrices to cluster assets before the allocation step. This is problematic because it doesn't allow for unidirectional, informative relationships between assets. Obviously this would mean we couldn't use clustering - we'd need a new way to identify linked assets and then to allocate them to the portfolio. For example, if asset A causally affects B, then, if A changes, our algorithm could make a small adjustment to the portfolio's holding of B to compensate.
+
+2. **Use a low-variance ML method to learn Granger-causal relationships between assets.** HSP uses a neural network to assign weights to the driver sensitivity vectors to predict asset performance. This has 2 drawbacks: (a) the neural networks are unstable and have high variance, and (b) the usage of vectors is lossy - it loses information. An alternative this project could develop would be to use an ML method to directly learn relationships between asset time series. This could be, for example, Granger causality between assets (lead-lag effects). Similarly, ML methods could be used during clustering to learn distances between assets, rather than simply using mechanical formulas like cosine or euclidean distance.
+
+3. **Pick your own novel algorithmic/methodological improvement to existing algorithms.** I currently don't have any good ideas for what other improvements I could implement, but I'm open to ideas.
 
 # likely oral presentation questions (not relevant at the moment)
 - What are your 3 most important insights
