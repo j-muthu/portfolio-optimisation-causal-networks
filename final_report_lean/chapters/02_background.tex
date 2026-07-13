@@ -3,212 +3,202 @@
 \label{chap:background}
 % ============================================================
 
-\section{Portfolio optimisation}
-\label{sec:po}
+Rather than survey the two literatures this project sits between, this chapter
+analyses in depth the three works it directly builds on, one per theme:
+L\'opez de Prado's Hierarchical Risk Parity and backtest-rigour agenda
+(Section~\ref{sec:hrp-theme}), which supplies both the allocator whose
+symmetric clustering step C2 targets and the inferential standard C3 adopts;
+Howard, Lohre and Mudde's causal networks on the S\&P~500
+(Section~\ref{sec:howard-theme}), the closest causal-finance work, which stops
+exactly one step short of the question Q asks; and Rodr\'iguez-Dom\'inguez's
+Hierarchical Sensitivity Parity (Section~\ref{sec:hsp-theme}), the framework
+this project began from and whose instabilities the evaluation quantifies.
+Section~\ref{sec:cd-tools} compresses the causal-discovery toolkit into the
+facts the pipeline relies on, and Section~\ref{sec:gap} states the gap.
 
-Modern portfolio theory \cite{markowitz1952portfolio} chooses weights $w$ to
-minimise portfolio variance $w^\top \Sigma w$ for a given expected return, where
-$\Sigma$ is the return covariance matrix. The solution requires inverting
-$\Sigma$, which is problematic in practice: sample covariance matrices for large
-universes are noisy and near-singular, so the optimiser amplifies estimation
-error and produces unstable weights that perform poorly out of sample. Factor
-models address part of this by attributing returns to a few common factors, each
-asset carrying a vector of factor sensitivities (betas); CAPM
-\cite{sharpe1964capm} uses a single market factor, which Arbitrage Pricing Theory
-\cite{ross1976apt} generalises to several. Under these models risk splits into a
-systematic component, reduced by managing factor exposure, and an idiosyncratic
-component, reduced by diversifying across assets. These two forms of
-diversification usually trade off against one another, and reconciling them is a
-recurring theme in the literature.
+\section{Theme I --- hierarchical allocation and honest backtests:
+L\'opez de Prado}
+\label{sec:hrp-theme}
 
-\section{Hierarchical Risk Parity}
-\label{sec:hrp}
+Mean--variance optimisation \cite{markowitz1952portfolio} requires inverting a
+covariance matrix that, for a 100-asset universe estimated on a one-year
+window, is noisy and near-singular; the optimiser amplifies the estimation
+error and produces concentrated, unstable weights. Hierarchical Risk Parity
+\cite{lopezdeprado2016hrp} avoids the inversion with a three-step scheme.
+\textbf{(i) Clustering:} convert the correlation matrix $\rho$ into the
+distance $d_{ij} = \sqrt{\tfrac{1}{2}(1-\rho_{ij})}$ and build a
+single-linkage dendrogram. \textbf{(ii) Quasi-diagonalisation:} reorder assets
+by the dendrogram's leaf order, concentrating large covariances near the
+diagonal. \textbf{(iii) Recursive bisection:} split the ordered list in half,
+allocate between halves in inverse proportion to their cluster variances, and
+recurse. Because no matrix is inverted, HRP is robust to ill-conditioning and
+beats mean--variance and inverse-variance portfolios out of sample
+\cite{lopezdeprado2016hrp}.
 
-Hierarchical Risk Parity (HRP) \cite{lopezdeprado2016hrp} avoids matrix inversion
-entirely. It proceeds in three steps. First, it converts the correlation matrix
-into a distance matrix and applies hierarchical (single-linkage) clustering to
-obtain a dendrogram of the assets. Second, it quasi-diagonalises the covariance
-matrix by reordering assets so that similar assets sit close together,
-concentrating large covariances near the diagonal. Third, it allocates capital by
-recursive bisection: starting from the top of the tree it splits the asset set
-into two clusters, computes each cluster's variance using inverse-variance
-weights, and allocates between the two in inverse proportion to their variances,
-recursing down the tree. Because it never inverts the covariance matrix, HRP
-avoids the ill-conditioning that destabilises mean--variance optimisation, and it
-outperforms minimum-variance and inverse-variance portfolios out of sample
-\cite{lopezdeprado2016hrp}. Two properties matter here: the clustering step needs
-only a symmetric, non-negative distance matrix, and the allocation step needs
-only cluster variances. The two stages are cleanly separable, which is what lets
-the present work swap in a different distance matrix while leaving allocation
-untouched.
+Two structural observations drive this dissertation. First, \emph{the
+dendrogram exists only to produce an ordering}: allocation itself (step iii)
+consumes an ordered list plus cluster variances, not the tree. Any procedure
+that yields an economically meaningful asset ordering can replace the
+clustering step wholesale --- the observation behind causal-ordered bisection
+(Section~\ref{sec:d2}). Second, \emph{every input to steps (i)--(ii) is
+symmetric by construction}. The pipeline is therefore structurally blind to
+directionality: if the true data-generating process contains one-way influence
+--- $A$ moves $B$ with a sign and magnitude that $B$ does not reciprocate ---
+no correlation-fed hierarchical allocator can represent that fact. This is not
+a defect of correlation estimation but of the interface: the clustering step
+\emph{cannot accept} an asymmetric matrix. Making that interface accept
+directional information, without breaking what makes HRP work, is challenge
+C2.
 
-\section{Hierarchical Sensitivity Parity}
-\label{sec:hsp}
+The same author's later programme supplies the evaluation standard. The core
+claim of the backtest-overfitting agenda \cite{bailey2014deflated,
+lopezdeprado2023causal} is that the hard problem in quantitative finance is
+not finding a configuration that looks good in a backtest, but establishing
+that its performance is not an artefact of the search that found it. Two
+instruments follow. The \emph{Probabilistic Sharpe Ratio} \cite{bailey2012psr}
+replaces the Gaussian sampling theory of the Sharpe ratio --- untenable at the
+excess kurtosis of ${\approx}\,\rsKurtosis$ measured here --- with a version
+that corrects for the sample's skewness, kurtosis and length; the
+\emph{Deflated Sharpe Ratio} \cite{bailey2014deflated} then raises the
+benchmark from zero to the best Sharpe expected from $N$ independent trials
+under the null of no skill, directly discounting selection bias. For
+family-wise comparison against a benchmark, White's Reality Check
+\cite{white2000reality} and Hansen's SPA test \cite{hansen2005spa} bootstrap
+the null that \emph{no} candidate beats it, and the Model Confidence Set
+\cite{hansen2011mcs} returns the subset of strategies statistically
+indistinguishable from the best. This battery is applied to every claim in
+Chapter~\ref{chap:evaluation}, over all \rsNtrials\ configurations this
+project evaluated; several headline-looking effects do not survive it, and
+reporting that is treated as part of the result rather than a failure.
 
-Hierarchical Sensitivity Parity (HSP) \cite{rodriguez2023hsp} extends HRP by
-changing \emph{what} the assets are clustered on. Instead of the correlation of
-returns, it clusters on the similarity of assets' sensitivities to a set of
-common drivers. The motivation is the \emph{commonality principle}: the optimal
-drivers of a portfolio are those most frequently and persistently selected across
-its constituents, both in persistence over time and in probability of being
-causal. Rodriguez Dominguez \cite{rodriguez2023hsp,rodriguez2025causal} argues,
-via the Reichenbach common-cause principle \cite{hitchcock2020reichenbach}, that
-if the drivers satisfy the commonality principle then a conformal map exists
-between the unconditional return space (where angles between asset vectors
-represent correlations) and the sensitivity space (whose coordinates are the
-common drivers). A conformal map preserves angles, hence correlation and
-clustering structure, so idiosyncratic and systematic diversification can be
-achieved at once, escaping the trade-off of Section~\ref{sec:po}.
+\section{Theme II --- causal graphs on equities, without allocation:
+Howard, Lohre and Mudde}
+\label{sec:howard-theme}
 
-For each asset, HSP trains a feed-forward neural network mapping driver values to
-the asset's return and extracts the sensitivity vector
-$s_i = (\partial f_i/\partial d_1, \ldots, \partial f_i/\partial d_K)$ by
-automatic differentiation, averaged over the fit window. The sensitivity distance
-$D_{ij} = \lVert s_i - s_j \rVert_2$ defines the matrix on which assets are
-clustered, with recursive bisection and sample-variance weights as in HRP. The
-weakness this project targets is that HSP still selects its common drivers by
-\emph{cumulative correlation} with the constituents --- the correlation-based
-selection that the commonality principle's appeal to causality was meant to move
-beyond. The author also flags regimes, non-stationarity and overfitting as open
-issues \cite{rodriguez2023hsp}.
+Howard, Lohre and Mudde \cite{howard2025causal} is the closest prior work: a
+large-scale application of DYNOTEARS to S\&P~500 constituents, 1996--2022,
+with rolling re-estimation --- structurally the same discovery machinery as
+Chapter~\ref{chap:discovery}. Three of their empirical findings shape this
+study's design. First, \emph{lagged edges are negligible} at daily-to-monthly
+horizons: the contemporaneous block $W$ carries essentially all the
+structure, which justifies this project's use of the contemporaneous
+asset--asset block as ``the graph'' and its lag-1 truncation elsewhere.
+Second, causal networks are \emph{regime-sensitive}: network density spikes
+in stress periods, which motivates the regime-conditional evaluation of
+Section~\ref{sec:regimes}. Third, their overall verdict is measured ---
+causal networks \emph{complement} rather than consistently beat
+correlation-based methods --- a claim Q sharpens into a decomposition:
+complement \emph{through what}, the skeleton or the orientations?
 
-\section{Causal discovery}
-\label{sec:cd}
+What they do \emph{not} do defines the gap this project fills. Their three
+use-cases --- peer groups for factor neutralisation, a low-centrality factor,
+and a density-based market-timing signal --- all consume the graph as a
+similarity structure or a scalar diagnostic. The graph is never handed to an
+allocator: no portfolio weights are ever computed \emph{from} the discovered
+network, and the directionality of the edges is used only implicitly (via
+centrality). Consequently their pipeline cannot ask, let alone answer, how
+much of the graph's allocation value lies in its orientations. Tang
+\cite{tang2024trading} builds trading signals from time-series causal
+discovery (including VARLiNGAM) and finds computational cost the binding
+constraint --- a warning this project met with a content-keyed discovery
+cache (Section~\ref{sec:cache}) rather than by shrinking the experiment.
 
-Causal discovery learns directed structure from observational data
-\cite{spirtes2000causation,kaddour2022causalml}. A structural causal model
-represents a system as a directed acyclic graph (DAG) over variables, each a
-function of its parents and a noise term; the DAG is a Bayesian network when the
-distribution factorises according to the local Markov condition. Reconstructing
-DAGs from data classically requires the \emph{faithfulness} assumption: that
-statistical independence in the data implies structural ($d$-) separation in the
-true graph. Constraint-based methods such as PC and FCI
-\cite{spirtes2000causation} test conditional independencies but scale
-exponentially in the number of nodes and lean on strong faithfulness, which is
-fragile in finance: markets contain many mutually offsetting causal relationships
-that can leave $d$-connected pairs with small marginal correlations, breaking the
-assumption \cite{howard2025causal}.
+\section{Theme III --- the driver route and its instabilities:
+Hierarchical Sensitivity Parity}
+\label{sec:hsp-theme}
 
-Score-based methods avoid invoking faithfulness by searching for the graph that
-best fits a regularised score, but the acyclicity constraint is combinatorial.
-NOTEARS \cite{zheng2018notears} reformulated acyclicity as a smooth equality
-constraint, $h(W) = \operatorname{tr}(e^{W \circ W}) - d = 0$, where $W$ is the
-weighted adjacency, $\circ$ the Hadamard product and $d$ the number of nodes,
-turning structure learning into continuous optimisation solvable with standard
-solvers, and making score-based discovery tractable at scale. The LiNGAM family
-\cite{shimizu2006lingam} takes a different route, exploiting the non-Gaussianity
-of the noise to identify a unique causal ordering without prior structure --- well
-suited to financial returns, which are heavy-tailed and non-Gaussian. This work
-uses the NOTEARS and LiNGAM families \cite{kaddour2022causalml,silva_causalinf}.
+Hierarchical Sensitivity Parity \cite{rodriguez2023hsp} keeps HRP's
+allocation but changes what assets are clustered on: instead of return
+correlations, the similarity of assets' \emph{sensitivities to common
+drivers}. For each asset a feed-forward neural network maps a set of
+macro-financial drivers (rates, commodities, FX, volatility indices) to the
+asset's return, and the sensitivity vector
+$s_i = (\partial f_i/\partial d_1, \ldots, \partial f_i/\partial d_K)$,
+extracted by automatic differentiation, embeds the asset in driver space; the
+distance $\lVert s_i - s_j\rVert_2$ feeds the unchanged HRP machinery. The
+theoretical appeal is the \emph{commonality principle}
+\cite{rodriguez2023hsp,rodriguez2025causal}: if the drivers are genuinely the
+common causes of the assets (in the sense of Reichenbach's common-cause
+principle \cite{hitchcock2020reichenbach}), clustering in sensitivity space
+diversifies systematic and idiosyncratic risk simultaneously.
 
-\section{Temporal causal discovery}
-\label{sec:temporal}
+Three weaknesses matter here, and this project measures all three. First, the
+drivers are selected by \emph{cumulative correlation} with the assets --- the
+very quantity the causal motivation was meant to transcend --- and the
+selection is demonstrably tautological in practice: on this study's universe
+the correlation selector locks onto the same international-equity ETFs and
+rates-curve points at essentially every rebalance
+(Section~\ref{sec:r1}). Second, the neural sensitivity step makes the
+output \emph{seed-dependent}: re-running the identical pipeline with 20
+different network initialisations moves its net Sharpe across a range
+($\rsSeedMin$--$\rsSeedMax$) wider than the edge the method claims over its
+own baseline --- consistent with the concern that results reported for such
+pipelines are sensitive to undisclosed seed choices
+(Section~\ref{sec:seed-audit}). Third, the framework's natural extension ---
+feeding realised performance back into driver selection --- founders on a
+\emph{measurement problem}: at a monthly rebalance the feedback reward is a
+Sharpe ratio estimated from 21 daily observations, whose sampling error
+exceeds the signal by an order of magnitude (Section~\ref{sec:r1}). This
+project began as an attempt to repair the first weakness (causal instead of
+correlational driver selection); the evaluation shows that route to be
+dominated by allocating from the asset--asset graph directly, which is what
+reoriented the study to Q.
 
-Asset returns are time series, so I use dynamic Bayesian networks, which add
-lagged variables to the graph. Edges split into intra-slice edges $W$
-(contemporaneous, at time $t$) and inter-slice edges $A_1,\ldots,A_P$ (lagged,
-from $t-p$ to $t$). In econometric terms this is a structural vector
-autoregression (SVAR),
-\begin{equation}
-  X = X W + \sum_{p=1}^{P} Y_p A_p + Z,
-\end{equation}
-where $X$ is the $n \times d$ panel, $Y_p$ its lags, and $Z$ noise; acyclicity
-applies only to $W$, since lagged edges point forward in time.
+\section{The causal-discovery toolkit}
+\label{sec:cd-tools}
 
-Three tools instantiate this SVAR, and the project uses them as a primary method
-plus two comparators rather than surveying them in depth. \textbf{DYNOTEARS}
-\cite{pamfil2020dynotears} applies the NOTEARS smoothed acyclicity constraint to
-the SVAR, minimising the penalised least-squares loss
-$\tfrac{1}{2n}\lVert X - XW - \sum_p Y_p A_p\rVert_F^2 + \lambda_W\lVert W\rVert_1
-+ \lambda_A\sum_p\lVert A_p\rVert_1$ subject to $h(W)=0$; it is the \emph{primary}
-method here because it is score-based (no faithfulness assumption), scalable, and
-able to forbid specific edges --- exactly what enforcing the directional prior of
-C1 requires. \textbf{VARLiNGAM} \cite{hyvarinen2010varlingam} instead exploits
-non-Gaussian residuals via independent component analysis to identify the
-instantaneous DAG, an assumption that matches heavy-tailed returns, and is
-retained as a robustness comparator. \textbf{NTS-NOTEARS}
-\cite{sun2023ntsnotears} replaces the linear edges with 1D convolutional networks
-for non-linear structure, examined here only as a reduced-scope probe
-(Section~\ref{sec:nts}).
-
-\section{Causal methods in quantitative finance}
-\label{sec:cd-finance}
-
-The closest work is Howard, Lohre and Mudde \cite{howard2025causal}, who apply
-DYNOTEARS to the S\&P~500 and build three use-cases on the discovered networks:
-peer groups for factor neutralisation, a low-centrality factor (long peripheral,
-short central stocks), and a market-timing indicator from changes in network
-density. Their conclusion is measured: causal networks \emph{complement} rather
-than consistently beat correlation-based methods --- they sometimes raise
-risk-adjusted returns but are computationally intensive and hard to interpret.
-Two of their findings bear directly on this project. First, the inter-slice
-(lagged) weights are almost always negligible for daily and monthly returns, so
-the contemporaneous block dominates --- evidence for retaining VARLiNGAM, which
-models lags and non-Gaussianity explicitly, as a check. Second, they never use
-the causal graph to set portfolio weights: their graph is mapped to an embedding
-and clustered into peer groups. This project, by contrast, converts causal
-structure directly into allocation. Tang \cite{tang2024trading} designs trading
-strategies from time-series causal-discovery output (including VARLiNGAM) on
-Chinese and US markets, finding profitable signals but identifying computational
-cost and scalability as binding constraints --- a caution this project
-encountered directly (Section~\ref{sec:nts}, Section~\ref{sec:cache}).
-
-\section{Evaluating backtests honestly}
-\label{sec:rigour}
-
-A theme running through López de Prado's work --- from Hierarchical Risk Parity
-\cite{lopezdeprado2016hrp} to the case for \emph{causal} factor investing
-\cite{lopezdeprado2023causal} --- is that most of the difficulty in quantitative
-finance is not finding a strategy that looks good in a backtest but establishing
-that the result is not an artefact of \emph{data snooping}: try enough
-configurations and the best Sharpe ratio will look impressive by chance alone.
-This work adopts that standard explicitly, and its evaluation (the third pillar
-of this background, alongside HSP and Howard et al.) is built on the resulting
-toolkit. Two threats are distinguished. First, the \emph{Sharpe ratio itself is
-unreliable} on non-normal returns: it assumes Gaussianity, yet daily equity
-returns are heavily skewed and fat-tailed. Bailey and López de Prado address this
-with the \emph{Probabilistic Sharpe Ratio} (PSR), the probability that the true
-Sharpe exceeds a benchmark given the sample's skewness, kurtosis and length
-\cite{bailey2012psr}, and the \emph{Deflated Sharpe Ratio} (DSR), which sets that
-benchmark to the Sharpe one would expect from the \emph{best} of $N$ trials under
-the null of no skill --- deflating directly for selection bias
-\cite{bailey2014deflated}. Second, when many strategies are compared against a
-benchmark, the right question is whether the \emph{best} beats it after
-accounting for the search: White's \emph{Reality Check} \cite{white2000reality}
-and Hansen's \emph{Superior Predictive Ability} (SPA) test \cite{hansen2005spa}
-answer exactly this via the stationary block bootstrap, and the \emph{Model
-Confidence Set} \cite{hansen2011mcs} returns the subset of strategies that are
-statistically indistinguishable from the best --- if the correlation baseline
-survives in that set, no causal variant can be said to beat it. This battery is
-applied to Q in Section~\ref{sec:believe-rigour}; it is what separates a genuine
-edge from a data-snooped one.
+The pipeline needs three facts from the causal-discovery literature
+\cite{spirtes2000causation,kaddour2022causalml}. \textbf{(i) Score-based
+discovery scales and accepts priors.} Constraint-based methods (PC, FCI) scale
+exponentially and lean on faithfulness --- fragile in markets, where offsetting
+mechanisms can leave causally-connected pairs with near-zero marginal
+correlation \cite{howard2025causal}. NOTEARS \cite{zheng2018notears} recasts
+acyclicity as the smooth constraint
+$h(W)=\operatorname{tr}(e^{W\circ W})-d=0$, making DAG learning a continuous
+optimisation; DYNOTEARS \cite{pamfil2020dynotears} extends it to the
+structural VAR $X = XW + \sum_p Y_p A_p + Z$ with acyclicity on the
+contemporaneous $W$ only, and natively supports forbidden-edge lists --- which
+is how the directional prior of C1 is enforced. It is the primary method here.
+\textbf{(ii) Non-Gaussianity identifies direction.} The LiNGAM family
+\cite{shimizu2006lingam} exploits non-Gaussian residuals to identify a unique
+causal ordering; VARLiNGAM \cite{hyvarinen2010varlingam} is its SVAR form and
+serves as the robustness comparator --- its identification rests on an
+assumption (heavy-tailed residuals) that financial returns satisfy at short
+windows but, by aggregation, progressively lose at longer ones, a mechanism
+the results repeatedly exhibit. \textbf{(iii) Cheap directed baselines
+exist.} A ridge-regularised VAR(1) coefficient matrix is a
+Granger-causal \cite{granger1969investigating} directed graph obtainable in
+closed form; it is deterministic, assumption-light, and serves as the
+``is expensive discovery even needed?'' comparator. (A non-linear extension,
+NTS-NOTEARS \cite{sun2023ntsnotears}, was probed at reduced scale and left as
+future work: its prior-knowledge mechanism transfers, but a full backtest
+costs ${\sim}10\times$ DYNOTEARS.)
 
 \section{Research gap}
 \label{sec:gap}
 
-Table~\ref{tab:gap} positions this work. The proposed closed-loop Causal-HSP
-addresses all three gaps: it selects drivers causally (C1), unlike HSP's
-correlation selector \cite{rodriguez2023hsp}; it routes that directional
-information into a symmetric allocator through the sensitivity space (C2), unlike
-Howard et al.'s embedding clustering \cite{howard2025causal}; and it adds a closed
-feedback loop in which realised performance affects subsequent selection (C3). It
-should be said at the outset that, as the evaluation will show, filling these gaps
-yields a genuine but \emph{modest and non-robust} improvement --- the scientific
-value lies as much in characterising the limits of the approach as in the gains.
+Table~\ref{tab:gap} positions the work. Reading the columns: HRP fixes the
+allocator but is blind to direction by interface; HSP routes information
+through driver sensitivities but selects drivers by correlation and inherits
+neural instability; Howard et al.\ discover directed graphs at scale but never
+allocate from them. No prior work sets hierarchical portfolio weights from a
+discovered asset--asset causal graph, and consequently none can decompose the
+graph's allocation value into skeleton and orientation --- the decomposition
+Q demands and Chapters~\ref{chap:sensitivity}--\ref{chap:evaluation} deliver.
 
 \begin{table}[t]
   \centering
-  \caption{Positioning of this work against the closest related approaches.}
+  \caption{Positioning against the closest related approaches.}
   \label{tab:gap}
   \begin{tabular}{l c c c c}
     \toprule
-    Approach & Driver selection & Directional & Weights from & Performance \\
-             &                  & structure   & graph        & feedback \\
+    Approach & Clusters on & Directed & Weights from & Skeleton/orientation \\
+             &             & input?   & causal graph & decomposition \\
     \midrule
-    HRP \cite{lopezdeprado2016hrp}         & none (correlation) & no  & n/a & no \\
-    HSP \cite{rodriguez2023hsp}            & cumulative corr.   & no  & yes & no \\
-    Howard et al.\ \cite{howard2025causal} & causal (DYNOTEARS) & yes & no  & no \\
-    \textbf{This work}                     & \textbf{causal}    & \textbf{yes} & \textbf{yes} & \textbf{yes} \\
+    HRP \cite{lopezdeprado2016hrp}         & correlation      & no  & n/a & n/a \\
+    HSP \cite{rodriguez2023hsp}            & driver sens.\    & no  & no  & no \\
+    Howard et al.\ \cite{howard2025causal} & (no allocation)  & yes & no  & no \\
+    \textbf{This work}                     & \textbf{causal graph} & \textbf{yes} & \textbf{yes} & \textbf{yes} \\
     \bottomrule
   \end{tabular}
 \end{table}

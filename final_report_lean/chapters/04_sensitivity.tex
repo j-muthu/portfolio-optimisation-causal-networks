@@ -1,105 +1,237 @@
 % ============================================================
-\chapter{A2: Causal-HSP in Sensitivity Space}
+\chapter{A2: From Graph to Weights --- the Allocator Family}
 \label{chap:sensitivity}
 % ============================================================
 
-This chapter presents the allocation stage (A2), which addresses the second
-challenge (C2): using directional causal structure inside an allocator that
-fundamentally requires a \emph{symmetric} distance matrix. It also introduces the
-four backtest variants and the asset-only control that turns out to be the most
-effective method in the study.
+This chapter presents the allocation machinery (A2, addressing C2) that makes
+Q answerable: a family of allocators fed the identical per-window graph, split
+into \emph{controls} that can see only the skeleton and \emph{treatments}
+that can see the orientations. Section~\ref{sec:symm} states the problem;
+Section~\ref{sec:sem} derives the structural quantities the treatments
+consume; Sections~\ref{sec:controls}--\ref{sec:d-family} define the
+allocators; Section~\ref{sec:ablation-design} assembles them into the
+fixed-graph ablation; and Section~\ref{sec:driver-route} summarises the
+driver-based route the project began from, retained as a supporting arm.
 
-\section{The symmetrisation problem}
+\section{The symmetric-clustering problem}
 \label{sec:symm}
 
-Hierarchical risk-parity clustering (Section~\ref{sec:hrp}) operates on a
-symmetric, non-negative distance matrix. A causal graph, by contrast, is
-\emph{directional}: the adjacency $W$ is asymmetric by design, and that asymmetry
-is the whole point. The naive fix --- symmetrise $W$, e.g.\ via
-$\tfrac{1}{2}(W + W^\top)$ --- would discard exactly the directional information
-that motivated using causal discovery. Resolving this tension without throwing
-away the causal content is the technical crux of A2.
+Hierarchical allocation (Section~\ref{sec:hrp-theme}) consumes a symmetric,
+non-negative distance matrix; a causal graph is asymmetric by design, and the
+asymmetry is the point. The naive fix --- symmetrise the adjacency, e.g.\
+$\tfrac{1}{2}(|M| + |M^\top|)$ --- discards exactly the orientations Q asks
+about. The challenge is therefore not to shoehorn $M$ into the existing
+interface but to build allocation steps that consume the \emph{directed}
+matrix natively, while changing as little else as possible, so that any
+performance difference is attributable to orientation and nothing else. Two
+observations open the way. First, HRP's dendrogram exists only to produce a
+leaf \emph{ordering} for recursive bisection --- and a DAG carries a natural
+ordering for free. Second, HRP's bisection step consumes cluster
+\emph{variances} from a covariance matrix --- and a DAG implies one.
 
-\section{Resolution via the sensitivity space}
-\label{sec:sensspace}
+\section{The structural model: total effects and the implied covariance}
+\label{sec:sem}
 
-The resolution reuses HSP's key idea (Section~\ref{sec:hsp}) but feeds it a
-causally-selected driver set. For each asset $i$, a feed-forward neural network
-$f_i$ is trained to map the selected drivers to the asset's return over the
-window, and its sensitivity vector is extracted by automatic differentiation,
+Both DYNOTEARS' $W$ and VARLiNGAM's $B_0$, restricted to the asset block and
+written in the $i\to j$ convention, define the structural equation model
 \begin{equation}
-  s_i = \Big( \tfrac{\partial f_i}{\partial d_1}, \ldots,
-               \tfrac{\partial f_i}{\partial d_K} \Big),
+  (I - M^\top)\, x = \varepsilon
+  \qquad\Longrightarrow\qquad
+  x = (I - M^\top)^{-1} \varepsilon \;=:\; B\,\varepsilon,
+  \label{eq:sem}
 \end{equation}
-averaged over the window's observations. Crucially, the $s_i$ live in a
-\emph{Euclidean} space whose coordinates are the (causally-selected) drivers, so
-the distance matrix
+where $x$ is the vector of (standardised) asset returns and $\varepsilon$ the
+vector of structural shocks. Because the asset block is a DAG, its adjacency
+is nilpotent, so the \emph{total-effect matrix}
+$B = \sum_{k\ge 0} (M^\top)^k$ terminates in at most $N$ terms and exists
+exactly --- no spectral-radius assumption. $B_{ij} = \partial x_i / \partial
+\varepsilon_j$ aggregates the influence of a unit shock at asset $j$ on asset
+$i$ over \emph{all} directed paths; it is the Leontief inverse of
+input--output economics, and its asymmetry is where orientation enters
+allocation natively. (For the non-DAG GRANGER comparator, $B$ is approximated
+by the truncated series with a spectral-radius guard --- a documented
+approximation.)
+
+The SEM implies a covariance. With $\Sigma_\varepsilon =
+\operatorname{diag}(\sigma^2_{\varepsilon,i})$ --- diagonality is the SEM's
+own independent-shocks assumption, and estimating a dense
+$\Sigma_\varepsilon$ would smuggle sample correlation back into a treatment
+meant to isolate the graph --- the \emph{structural covariance} in return
+units is
 \begin{equation}
-  D_{ij} = \lVert s_i - s_j \rVert_2
+  \Sigma_{\mathrm{struct}}
+  \;=\; D_\sigma \big( B\, \Sigma_\varepsilon\, B^\top \big) D_\sigma ,
+  \label{eq:sigma-struct}
 \end{equation}
-is symmetric \emph{by construction}. No symmetrisation of an asymmetric adjacency
-is ever performed: the directional causal information enters earlier, in
-\emph{which} drivers are selected and how they shape each asset's sensitivities,
-and is preserved through to a symmetric distance. The allocation step --- single-
-linkage clustering, quasi-diagonalisation, and recursive bisection with
-sample-covariance variances --- is then identical to HSP and HRP. This cleanly
-separates the contribution (causal selection $\to$ sensitivity space) from the
-unchanged, well-understood allocator.
+where the shock variances are estimated from the fit window's structural
+residuals $E = X_z (I - M)$, and $D_\sigma$ de-standardises from the
+$z$-scored units the graph was fitted in back to return units. The
+de-standardisation is not optional: recursive bisection compares cluster
+variances, and omitting $D_\sigma$ would silently equalise asset
+volatilities. Two caveats are stated rather than hidden: the asset-block SEM
+marginalises over the drivers, so $\varepsilon$ absorbs driver-explained
+variance and its diagonality is an approximation; and
+$\Sigma_{\mathrm{struct}}$ is nearest-PSD projected and lightly ridge-loaded
+so dense stress-window graphs cannot produce a singular input.
 
-\paragraph{Per-asset eligibility.} Late-inception names (e.g.\ tickers created by
-mergers mid-sample) would otherwise force the loss of entire rows. A per-asset
-eligibility mask keeps every row in which all drivers are populated, fills
-pre-inception asset cells, and masks them out of the network's training loss so
-the Jacobian is not biased toward zero. This handles ticker renames and
-late-listed constituents without discarding history for the survivors.
+\section{The controls: correlation and skeleton}
+\label{sec:controls}
 
-\section{The four variants}
-\label{sec:variants}
+\paragraph{\textsc{corr} --- the correlation matrix.} Textbook HRP
+\cite{lopezdeprado2016hrp}: distance $\sqrt{\tfrac{1}{2}(1-\rho_{ij})}$ on the
+lookback window's sample correlation, sample covariance for bisection. It is
+graph-blind (verified by unit test: changing the graph cannot change its
+weights) and anchors the decomposition.
 
-To isolate the effect of each design choice, I compare four variants that share
-the same universe, drivers, allocator and costs (Table~\ref{tab:variants}). V0 is
-standard HSP. V1 replaces its correlation selector with causal discovery (A1).
-V2 adds the closed loop (A3, Chapter~\ref{chap:evaluation}). V0$'$ is an
-asset-only control that uses \emph{no} exogenous drivers at all.
+\paragraph{D0 --- the skeleton.} The graph replaces the correlation matrix,
+but symmetrically: each asset is embedded by its edge profile
+$e_i = [\,M_{i\cdot},\, M_{\cdot i}\,]$ and the clustering distance is
+$D_{ij} = \lVert e_i - e_j \rVert_2$, with sample covariance for bisection.
+This embedding is \emph{provably orientation-blind}: transposing $M$
+(reversing every edge) swaps the two halves of every $e_i$, leaving all
+pairwise distances --- hence the dendrogram, hence the weights --- unchanged.
+The property is enforced by unit test, so D0 is a true skeleton-only
+allocator, not merely a weakly-directional one. D0 coincides exactly with the
+asset-only Causal-HRP variant of the project's first phase (there called
+V0$'$), which is what allows the new harness to be validated against a
+committed historical result (Section~\ref{sec:ablation-design}).
+
+\paragraph{D0s --- a second symmetrisation.} The same, but with the
+$\tfrac{1}{2}(|M|+|M^\top|)$ distance --- included so that ``the skeleton''
+is not accidentally identified with one particular symmetrisation.
+
+\section{The orientation-aware family}
+\label{sec:d-family}
+
+Five treatments consume the directed matrix, each through a different
+mechanism, so the results chapter can localise \emph{where} any orientation
+value arises. All are long-only, fully invested, deterministic and seed-free;
+all take the identical $(M,\ \text{returns window})$ inputs as the controls.
+
+\paragraph{D1 --- structural covariance.} Clustering as in D0 (so the
+ordering is held at the skeleton), but recursive bisection allocates on
+$\Sigma_{\mathrm{struct}}$ of Eq.~\eqref{eq:sigma-struct} instead of the
+sample covariance: orientation enters through the allocation step, via the
+shock-propagation asymmetry of $B$.
+
+\paragraph{D2 / D2s --- causal-ordered bisection.}
+\label{sec:d2}
+The clustering step is deleted entirely. HRP's dendrogram exists only to
+produce a quasi-diagonalising leaf order, and a DAG supplies an order
+natively: assets are sorted upstream$\to$downstream by a topological sort of
+$M$ (ties broken deterministically by total downstream influence
+$\sum_r |B_{ri}|$, then name), and the \emph{existing} recursive bisection
+runs on that order --- with the sample covariance (D2) or with
+$\Sigma_{\mathrm{struct}}$ (D2s). This is the most direct answer to the
+observation that one cannot cluster on an asymmetric matrix: do not cluster.
+One subtlety, discovered by the ablation's own tests, is worth recording:
+recursive bisection is \emph{mirror-invariant} (reversing the leaf order
+reproduces the identical partition tree), so D2 responds to orientation
+through the \emph{partition structure} the order induces, not through the
+upstream/downstream direction itself.
+
+\paragraph{D3 --- structural-shock risk parity.} No hierarchy at all.
+Portfolio variance under the SEM decomposes as
+$w^\top \Sigma_{\mathrm{struct}}\, w =
+\lVert \Sigma_\varepsilon^{1/2} B^\top w \rVert^2$, so equalising risk
+contributions on $\Sigma_{\mathrm{struct}}$ is parity over \emph{structural
+shock origins} --- where risk is injected into the causal system --- rather
+than over correlated returns. Weights are computed by Spinu's cyclical
+coordinate descent \cite{spinu2013erc} (long-only, deterministic,
+convergence asserted to risk-contribution parity within $10^{-8}$). Exact
+per-shock parity generally requires shorting; the long-only solution is the
+practical projection, stated as such.
+
+\paragraph{D4 --- co-ancestry clustering.} A halfway house that feeds
+orientation into an \emph{unchanged} symmetric pipeline: rows of the
+(row-normalised) total-effect matrix are shock-inheritance profiles, the
+similarity $S = \tilde{B}\tilde{B}^\top$ makes two assets close iff they
+inherit shocks from the same upstream sources --- even with no direct edge
+--- and the distance $\sqrt{2(1-S_{ij})}$ enters standard HRP with sample
+covariance.
+
+\section{The fixed-graph ablation}
+\label{sec:ablation-design}
+
+The experimental design is what turns the family into an answer to Q.
+
+\paragraph{Design.} At every rebalance the chokepoint
+(Section~\ref{sec:asset-graph}) hands the \emph{byte-identical} graph $M$ to
+all eight allocators
+$\{\textsc{corr},\text{D0},\text{D0s},\text{D1},\text{D2},\text{D2s},
+\text{D3},\text{D4}\}$; everything else --- universe, calendar, costs,
+covariance-estimation window, allocator internals downstream of the distance/
+covariance/ordering choice --- is shared code. Orientation is therefore the
+sole treatment variable, and the decomposition is two differences with a
+common anchor: $\text{D0}-\textsc{corr}$ (skeleton) and
+$\text{D}^{*}-\text{D0}$ (orientation). The grid --- 7 graph-consuming
+allocators $\times$ \{DYNOTEARS, VARLiNGAM\} $\times$ \{252, 504\}-day
+windows, plus the GRANGER arm, a sparsity sweep and a cost sweep --- was
+specified in a written plan before any treatment cell was run, and no
+allocator was added after results were seen.
+
+\paragraph{Verification before results.} Three gates preceded the grid.
+The \emph{unit-test gate}: 60+ tests written first, including the
+orientation-blindness of the controls, the orientation-sensitivity of every
+treatment, total-effect and structural-covariance identities against
+hand-computed cases, ERC parity, and topological-order properties on random
+DAGs. The \emph{cache gate}: all 836 (method, window) graph fits verified as
+cache hits --- zero refits --- so no allocator can have seen a different
+graph. The \emph{replication gate}: D0 run through the new harness reproduces
+the committed first-phase V0$'$ bundle with $\Delta\text{Sharpe}=0$ and
+maximum per-rebalance weight difference $0.0$ across all 215 rebalances ---
+byte-perfect, establishing both that the new machinery is faithful and that
+the pipeline is deterministic end-to-end.
 
 \begin{table}[t]
   \centering
-  \caption{The four backtest variants. All share the universe, allocator,
-    transaction costs and rebalance schedule; they differ only in how the
-    clustering distance is formed and whether feedback is applied.}
+  \caption{The allocator family and the supporting driver route. All share
+    the universe, calendar, transaction costs and rebalance schedule.}
   \label{tab:variants}
   \begin{tabular}{l l l l}
     \toprule
-    Variant & Driver selection & Clustered on & Feedback \\
+    Tag & Ordering from & Bisection covariance & Reads orientation? \\
     \midrule
-    V0 (HSP baseline)     & cumulative correlation & driver sensitivities & no \\
-    V1 (Causal-HSP)       & causal discovery       & driver sensitivities & no \\
-    V2 (closed-loop)      & causal + utility blend & driver sensitivities & yes \\
-    V0$'$ (Causal-HRP)    & none                   & asset--asset causal graph & no \\
+    \textsc{corr} & correlation distance & sample & no (graph-blind) \\
+    D0            & graph embedding      & sample & no (provably) \\
+    D0s           & $\tfrac{1}{2}(|M|{+}|M^\top|)$ & sample & no \\
+    D1            & graph embedding      & $\Sigma_{\mathrm{struct}}$ & allocation step \\
+    D2            & topological order    & sample & ordering step \\
+    D2s           & topological order    & $\Sigma_{\mathrm{struct}}$ & both steps \\
+    D3            & (none: shock-space ERC) & $\Sigma_{\mathrm{struct}}$ & shock propagation \\
+    D4            & co-ancestry distance & sample & distance construction \\
+    \midrule
+    V0/V1/V2      & driver sensitivities & sample & via driver selection \\
     \bottomrule
   \end{tabular}
 \end{table}
 
-\section{Asset-only Causal-HRP (V0$'$): weights directly from the graph}
-\label{sec:v0prime}
+\section{The incumbent driver route (V0, V1, V2)}
+\label{sec:driver-route}
 
-V0$'$ is the sharpest test of whether exogenous drivers add anything. It discards
-the driver pool and the sensitivity network entirely. From the \emph{same} joint
-DYNOTEARS fit that V1 uses, it reads the asset--asset block of the contemporaneous
-graph, converts it into a symmetric distance (via a causal embedding distance and
-a nearest-positive-semidefinite projection), and clusters and allocates exactly
-as before. It therefore converts an asset-level causal graph \emph{directly} into
-portfolio weights --- precisely the step the closest prior work
-\cite{howard2025causal} stops short of.
-
-V0$'$ matters for two reasons. Methodologically, it is the missing cell of the
-ablation: V0 isolates ``correlation versus causal selection'' only if there is
-also a variant that removes drivers altogether. Empirically --- and this is
-stated plainly because it is the most important and least expected result of the
-project --- V0$'$ is \emph{the single most effective variant at the one-year
-window}, with a Sharpe of $0.403$, significantly beating both the correlation
-baseline V0 ($p<0.001$) and the driver-based Causal-HSP V1 ($p=0.01$). On this
-universe, at the short window, asset--asset causal structure alone outperforms the
-entire exogenous-driver-and-sensitivity apparatus that the project was originally
-built around. The full numbers, significance, and the (important) caveat that this
-edge too is window-dependent are given in Chapter~\ref{chap:evaluation}.
+The project began from HSP's driver route, and it is retained as a supporting
+arm --- both because it supplies the seed-audit and measurement-problem
+evidence of Chapter~\ref{chap:evaluation}, and because its failure is what
+motivated Q. Its mechanics, compactly: at each rebalance $K{=}17$ drivers are
+selected from the pool --- by cumulative correlation with the assets (V0, the
+HSP baseline) or by the causal scores of Section~\ref{sec:selection} (V1) ---
+and a per-asset feed-forward network maps the selected drivers to asset
+returns; the Jacobian sensitivity vectors $s_i$ embed assets in driver space,
+and HRP runs on $\lVert s_i - s_j\rVert_2$ with sample covariance. V2 closes
+a feedback loop: the realised holding-period reward, the excess Sharpe over
+equal-weight,
+\begin{equation}
+  R[t] = \mathrm{Sharpe}\big(\text{portfolio over } [t, t{+}21\text{d}]\big)
+       - \mathrm{Sharpe}\big(\tfrac{1}{N}\big),
+\end{equation}
+is attributed to drivers in proportion to $\sum_i |w_i s_{i,d}|$, smoothed by
+an EMA $U_d[t] = \gamma\,\mathrm{credit}_d[t] + (1-\gamma)U_d[t-1]$, and
+blended into the next selection score
+$\alpha\, z(\mathrm{causal}_d) + (1-\alpha)\, z(U_d)$, with lookahead
+discipline enforced by keying utility on holding-period-\emph{end} dates and
+a tested leak canary. Note the update frequency: the loop learns from one
+21-observation Sharpe estimate per month --- the root of the measurement
+problem analysed in Section~\ref{sec:r1}. Unlike the D-family, this route is
+\emph{not} deterministic: the network initialisation seed changes the
+sensitivities, hence the weights --- quantified by the 20-seed audit of
+Section~\ref{sec:seed-audit}.

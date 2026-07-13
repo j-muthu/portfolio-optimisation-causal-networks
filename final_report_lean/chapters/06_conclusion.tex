@@ -6,127 +6,133 @@
 \section{Summary of findings}
 \label{sec:summary}
 
-This project asked whether replacing the correlation-based driver selection in
-Hierarchical Sensitivity Parity with causal structure produces more robust
-portfolios, and whether closing a performance-feedback loop helps further. It
-built and validated a complete pipeline: causal factor discovery under a
-directional prior (A1, C1), allocation in a causal sensitivity space that
-preserves directional information inside a symmetric allocator (A2, C2), and a
-closed feedback loop (A3, C3), evaluated on an approximate S\&P~100 over
-2007--2024 at two windows, two discovery methods, a range of $K$, and a feedback
-grid, with bootstrap significance throughout.
+This dissertation asked one question: when the correlation matrix in
+hierarchical portfolio allocation is replaced by a discovered causal graph,
+how much of the performance gain is attributable to the graph's skeleton
+versus its edge orientations? It made the question answerable by building the
+two things it presupposes --- a reproducible rolling discovery pipeline that
+delivers a byte-identical asset--asset DAG to every allocator (A1), and an
+orientation-aware allocator family with matched skeleton and correlation
+controls (A2) --- and answered it with multiplicity-, distribution- and
+stability-aware inference (A3).
 
-The results, stated objectively:
+The answer, stated as the decomposition Q demands (net annualised Sharpe,
+2007--2024, 215 monthly rebalances, 5\,bps costs):
+
 \begin{enumerate}[itemsep=2pt]
-  \item \textbf{Causal driver selection helps modestly, at the short window only,
-        and not robustly.} It beats correlation-HSP at one year (significantly for
-        VARLiNGAM, $p=0.004$; directionally but not significantly for DYNOTEARS),
-        but the edge disappears at two years and flips sign with $K$. The
-        per-driver causal signal is statistically weak (zero FDR-significant
-        drivers at calibration). The robust, window-independent finding is
-        qualitative: causal selection rotates across regime-relevant drivers
-        whereas correlation selection is tautological.
-  \item \textbf{The most effective method is asset-only causal structure.} V0$'$,
-        which uses \emph{no} exogenous drivers and converts an asset--asset causal
-        graph directly into weights, is the best variant at one year (Sharpe
-        $0.403$, significantly above both correlation-HSP and driver-based
-        Causal-HSP). On this universe, the exogenous-driver machinery does not
-        earn its place at the short window --- though, like everything else, this
-        edge is window-dependent.
-  \item \textbf{The closed loop adds nothing.} Across the entire $\alpha,\gamma$
-        grid the feedback is inert, because utility can only re-rank within the
-        causally-selected set --- and, even where it could, a monthly reward's
-        signal-to-noise ratio of $\rsRewardSNR$ is too low to learn from. The C3
-        hypothesis is rejected for this design.
-  \item \textbf{Causal \emph{structure} survives data-snooping correction, but
-        causal driver \emph{selection} does not.} Subjecting the \rsNtrials\
-        configurations to the Deflated Sharpe ratio, White's Reality Check,
-        Hansen's SPA and the Model Confidence Set, the absolute Sharpe levels
-        survive correction for non-normality and multiplicity, and at one year the
-        best causal-structure variant beats the baseline even family-wise
-        ($p=\rsSpaRC$). The $90\%$ Model Confidence Set retains only \rsMcsMembers;
-        the correlation baseline V0 \rsMcsVzeroIn\ in it --- but neither is the
-        driver-based DYNOTEARS-V1, which is eliminated alongside V0. So the part of
-        Q that asks whether causal \emph{driver selection} beats correlation is
-        answered in the negative; what survives is asset-only and non-Gaussian
-        structure, and only at the short window.
+  \item \textbf{At the one-year window the gain is the skeleton's.} Replacing
+        the correlation matrix with the DYNOTEARS graph is worth up to
+        $+0.031$ ($0.411$ vs $\rsCorrSharpe$), of which $+0.022$ comes from
+        the skeleton ($p=0.14$) and only $+0.009$ from orientation
+        ($p=0.47$).
+  \item \textbf{At the two-year window the split inverts.} The skeleton's
+        contribution collapses to $+0.009$; orientation restores
+        $+0.023$--$0.027$ (pairwise $p=0.05$--$0.07$, all five DYNOTEARS
+        orientation contrasts positive). Orientation buys \emph{robustness to
+        the estimation window}, not level: D1 ($0.411/0.395$) and D2s
+        ($0.406/0.399$) are the only allocators strong at both windows, the
+        increment is invariant to costs up to 20\,bps and to the graph's
+        sparsity threshold, and D1 attains the highest Deflated Sharpe ratio
+        of all \rsNtrials\ configurations evaluated ($\rsDoneDSR$).
+  \item \textbf{Nothing survives family-wise correction against honest
+        anchors.} Hansen's SPA rejects only where the benchmark is the weak
+        HSP baseline ($p=\rsSpaConsistent$); against the \textsc{corr}
+        control ($p=\rsSpaSkelWtwo$/$\rsSpaSkelWfive$) and against the
+        skeleton control ($p=\rsSpaDirWtwo$/$\rsSpaDirWfive$) the
+        decomposition's steps are directionally consistent but statistically
+        unconfirmed. The $90\%$ Model Confidence Set over \rsMcsUniverse\
+        one-year strategies eliminates only the HSP baseline.
+  \item \textbf{The effect is method- and regime-specific.} Under VARLiNGAM
+        graphs orientation adds nothing anywhere; under cheap ridge-Granger
+        graphs the topological \emph{ordering} survives but the structural
+        covariance collapses --- edge magnitudes, not just directions, are
+        what expensive discovery buys. The orientation edge concentrates in
+        calm (bottom-VIX-quintile) regimes; the stress hypothesis is
+        rejected.
+  \item \textbf{The incumbent driver route is dominated.} HSP-style driver
+        selection is $K$-fragile; its monthly feedback loop is exactly inert
+        across the full hyperparameter grid, and could not learn anyway
+        (reward signal-to-noise ${\approx}\,\rsRewardSNR$ --- the update
+        frequency \emph{is} the measurement problem); and its neural
+        sensitivity step makes its Sharpe seed-dependent across
+        $[\rsSeedMin,\rsSeedMax]$ over \rsSeedN\ seeds --- a range exceeding
+        its claimed edge, with the committed value at the $\rsSeedPct$th
+        percentile of its own seed distribution. Every deterministic
+        graph-based allocator beats it under every seed.
 \end{enumerate}
 
-Stated as a direct answer to Q: causal driver selection does deliver a higher
-risk-adjusted return than correlation selection, but only at the short window,
-only modestly, and not in a way that survives correction for the multiplicity of
-strategies tried --- while the strongest short-window result comes from
-\emph{asset-only} causal structure with no exogenous drivers at all.
+\section{Contributions}
+\label{sec:contributions}
 
-The blunt overall assessment is that, for this framework and universe, causal
-methods are \emph{mildly and conditionally} effective, not robustly so: the only
-statistically clean, economically modest win is asset-only causal structure at the
-one-year window. This is a more useful scientific outcome than an overstated
-``causal beats correlation'' headline would have been, precisely because the
-robustness checks (two windows, two methods, the $K$-sweep, and the reproducibility
-fix) were built to find fragility --- and found it. The project's contribution is
-therefore a careful, reproducible \emph{characterisation} of where causal structure
-helps portfolio construction and where it does not, together with a novel
-weights-directly-from-graph result (V0$'$) that the closest prior work
-\cite{howard2025causal} did not reach.
+\begin{itemize}[itemsep=2pt]
+  \item \textbf{Methodological:} the orientation-aware allocator family ---
+        structural (SEM-implied, de-standardised, residual-calibrated)
+        covariance allocation; causal-ordered bisection, which replaces the
+        clustering dendrogram with the DAG's topological order;
+        structural-shock risk parity; co-ancestry clustering --- together
+        with the fixed-graph ablation design that makes skeleton and
+        orientation separately measurable, with provably orientation-blind
+        controls. To my knowledge, both the family and the decomposition are
+        new; the closest prior work \cite{howard2025causal} never sets
+        weights from its graphs.
+  \item \textbf{Empirical:} the decomposition itself (skeleton-carried at
+        short windows, orientation-as-robustness at long windows, nothing
+        family-wise significant against honest controls), its method- and
+        regime-dependence, and the finding that plain HRP beats the HSP
+        machinery it is usually compared against.
+  \item \textbf{Meta-scientific:} a quantified seed audit substantiating the
+        instability critique of neural sensitivity-based allocation; the
+        identification of a monthly feedback loop's measurement problem
+        (one ${\sim}95\%$-noise observation per update); and a
+        bit-reproducible pipeline --- including a data-determinism defect
+        whose fix overturned two previously-drawn conclusions --- with every
+        experiment pre-registered, cache-verified, and gated on a
+        byte-perfect replication of the prior phase's result.
+\end{itemize}
 
 \section{Limitations}
 \label{sec:limitations}
 
-The limitations are intrinsic to the claims and are stated without hedging.
-\begin{itemize}[itemsep=2pt]
-  \item \textbf{Small, mostly sub-significant effects.} The headline edges are
-        $0.01$--$0.03$ in Sharpe; only two cells are significant and only at one
-        window, and the study is plausibly underpowered for effects this small
-        (Section~\ref{sec:believe}). Multiple comparisons across the configuration
-        grid further discount the significant cells.
-  \item \textbf{Window- and $K$-fragility.} No positive result survives the move
-        from a one-year to a two-year window, and the driver-based edge is not
-        robust to $K$. Robustness across regime \emph{conditioning} is good;
-        robustness across these \emph{design} choices is not.
-  \item \textbf{Long-only equity, single asset class.} Every variant absorbs the
-        full $\approx 51\%$ GFC drawdown; the work concerns relative
-        driver-selection quality within a long-only equity allocator, not absolute
-        return or drawdown control, and does not test other asset classes where
-        cross-asset causal structure might be richer.
-  \item \textbf{Universe approximation.} The top-by-market-cap reconstruction of
-        the S\&P~100 lacks the official index's sector-balancing discretion, and a
-        fixed snapshot-union universe carries mild residual survivorship effects.
-  \item \textbf{Weak per-driver causal signal.} The calibration finding of zero
-        FDR-significant drivers means the ``causal'' driver scores, at this
-        universe size, are not far above noise --- a caveat for any
-        driver-level interpretation.
-  \item \textbf{What survives is structure, not the driver-selection thesis, and
-        only at one window.} The family-wise battery
-        (Section~\ref{sec:believe-rigour}) leaves only the asset-only V0$'$ and
-        VARLiNGAM-V1 in the $90\%$ Model Confidence Set; the project's headline
-        DYNOTEARS driver-selection method is eliminated alongside the baseline,
-        and the surviving edge is confined to the one-year window. The precise
-        claim in Q --- that causal \emph{driver selection} beats correlation ---
-        is therefore not established; the affirmative evidence is for causal
-        \emph{structure} at the short horizon only.
-\end{itemize}
+Stated without hedging. \textbf{(i)} The decomposition's components are
+$0.01$--$0.03$ Sharpe: near the 18-year detection floor, individually
+non-significant against honest controls, and plausibly underpowered ---
+the point estimates are precise, the inference is thin. \textbf{(ii)} The
+orientation effect exists under one discovery method (DYNOTEARS); until
+another method reproduces it, it should be read as a property of DYNOTEARS'
+contemporaneous structure, not of markets. \textbf{(iii)} Long-only US
+large-cap equity only; every variant absorbs the full ${\approx}51\%$ GFC
+drawdown; transfer to richer universes is untested. \textbf{(iv)} The
+universe approximates the S\&P~100 by market-cap ranking and a fixed
+snapshot union, with mild residual survivorship effects. \textbf{(v)} The
+asset-block SEM marginalises over the macro drivers, so the structural
+shocks' assumed independence is an approximation; and the choice of Q ---
+though not the experiment --- was informed by the first phase's results,
+which the unified \rsNtrials-trial deflation universe only partly corrects.
 
 \section{Future work}
 \label{sec:future}
 
-Several directions follow directly. \textbf{(1) Full non-linear discovery.} The
-NTS-NOTEARS probe (Section~\ref{sec:nts}) showed the prior transfers and the
-method is a genuinely different lens; a full backtest (now feasible only with more
-compute or a smaller universe) could test whether non-linear causal structure
-changes the picture. \textbf{(2) Foreground the asset-only route.} Given that
-V0$'$ is the strongest variant, the natural follow-up is to develop asset-only
-Causal-HRP in its own right --- richer asset-level graph summaries, alternative
-graph-to-distance maps, and a test of whether its short-window edge generalises to
-other universes. \textbf{(3) Network-density regimes.} Conditioning on the
-discovered graph's density (in the manner of Howard et al.\
-\cite{howard2025causal}) needs only a cheap discovery-only re-run that persists
-per-window density, and would sharpen the regime analysis. \textbf{(4) Larger,
-multi-asset universes}, where the per-driver signal may strengthen and where
-cross-asset causal structure is plausibly more informative, addressing the
-weak-signal limitation. \textbf{(5) Latent-variable and path-dependent
-extensions}, to relax the causal-sufficiency assumption that no unobserved common
-cause sits behind the drivers and assets. Across all of these, the reproducibility
-infrastructure built here (the deterministic pipeline and the discovery cache)
-makes such sweeps cheap to run honestly --- which, as this project found, is a
-prerequisite for trusting the answers.
+\textbf{(1) A second orientation source.} The decomposition's biggest caveat
+is method-dependence: repeating the fixed-graph ablation on graphs from a
+different family (e.g.\ the non-linear NTS-NOTEARS, whose prior-transfer was
+verified in a reduced-scope probe but whose ${\sim}10\times$ fit cost
+deferred a full backtest) would test whether orientation value is a
+DYNOTEARS artefact. \textbf{(2) Fix the measurement problem, then revisit
+feedback.} The monthly loop failed for a measurement reason, not a learning
+one; a weekly rebalance (or a reward estimated over the full inter-rebalance
+path rather than a 21-day Sharpe) raises the update signal-to-noise by
+design, and only then is a feedback rule worth re-testing. \textbf{(3)}
+\textbf{Signed structural allocation.} The long-only ERC on
+$\Sigma_{\mathrm{struct}}$ is a projection of exact per-shock parity, which
+generally requires shorting; a long--short mandate is the natural home for
+structural-shock parity. \textbf{(4) Richer universes}, where cross-asset
+causal chains are plausibly longer-lived than among 99 co-moving large-caps
+--- multi-asset-class portfolios are where the skeleton/orientation split
+could genuinely differ. \textbf{(5) Orientation-aware risk attribution.} The
+total-effect matrix $B$ supports ex-post decompositions (which shocks drove
+this month's loss?) that the correlation toolkit cannot express ---
+worthwhile even where the allocation gain is modest. The reproducibility
+infrastructure built here --- the deterministic pipeline, the discovery cache
+and the ablation harness --- makes each of these a matter of days, not
+months, of compute; which, as this project found twice, is a prerequisite
+for trusting the answers.

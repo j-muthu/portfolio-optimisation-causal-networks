@@ -1,86 +1,81 @@
 % ============================================================
-\chapter{A1: Causal Factor Discovery}
+\chapter{A1: Discovering the Graph}
 \label{chap:discovery}
 % ============================================================
 
-This chapter presents the causal factor discovery pipeline (A1), which addresses
-the first challenge (C1): identifying genuinely causal drivers, under a
-directional prior, at a scale and cost that permits running the discovery at every
-monthly rebalance. Section~\ref{sec:data} describes the data layer;
-Section~\ref{sec:discovery-run} the rolling discovery and the directional prior,
-with its empirical verification; Section~\ref{sec:selection} the driver selection
-and the calibration of the number of drivers; Section~\ref{sec:nts} a
-reduced-scope probe of non-linear discovery; and Section~\ref{sec:cache} the
-engineering that makes the whole pipeline tractable and bit-reproducible.
+This chapter presents the discovery pipeline (A1, addressing C1) that produces
+the object at the centre of Q: a credible, reproducible asset--asset causal
+graph at every one of the 215 monthly rebalances. Section~\ref{sec:data}
+describes the data; Section~\ref{sec:discovery-run} the rolling discovery, the
+directional prior, and its empirical verification;
+Section~\ref{sec:asset-graph} the extraction chokepoint through which every
+allocator receives the identical graph, and what those graphs look like;
+Section~\ref{sec:comparators} the two comparator graphs;
+Section~\ref{sec:selection} the driver-selection arm retained from the
+project's starting framework; and Section~\ref{sec:cache} the engineering that
+makes the whole programme tractable and bit-reproducible.
 
 \section{Data layer}
 \label{sec:data}
 
 \paragraph{Universe.} Running the intended experiments on the full S\&P~500
 proved too computationally intensive, and a complete historical S\&P~100
-membership list was not available, so I approximate the S\&P~100 by taking, at
-each rebalance, the top constituents by market capitalisation from historical
-S\&P~500 membership. This yields a fixed 99-asset universe (the union across
-snapshots) over 2007--2024. Prices and point-in-time shares outstanding come from
-WRDS/CRSP, with a small Yahoo Finance fallback for the most recent days. Using
-point-in-time CRSP data removes survivorship bias from the price series, though
-the top-by-market-cap construction is an approximation of the official index and
-is noted as a limitation in Section~\ref{sec:limitations}.
+membership list was not available, so the S\&P~100 is approximated by taking
+the top constituents by market capitalisation from historical S\&P~500
+membership, yielding a fixed 99-asset universe (the union across snapshots)
+over 2007--2024. Prices and point-in-time shares outstanding come from
+WRDS/CRSP, with a small Yahoo Finance fallback for the most recent days.
+Point-in-time CRSP data removes survivorship bias from the price series; the
+top-by-market-cap construction remains an approximation of the official index
+and is noted as a limitation in Section~\ref{sec:limitations}.
 
-\paragraph{Driver pool.} The pool comprises 33 plausibly exogenous macroeconomic
-and financial series from FRED and Yahoo Finance: Treasury rates and slopes,
-credit spreads, commodities (crude, gas, metals), FX pairs, volatility indices,
-and international-equity ETFs. Equity baskets such as US sector ETFs and index
-returns are excluded because they are not credibly exogenous to a US large-cap
-portfolio --- including them would re-introduce exactly the co-movement
-tautology the project seeks to avoid.
+\paragraph{Driver pool.} Discovery runs on the \emph{joint} panel of assets
+and 33 plausibly exogenous macro-financial series from FRED and Yahoo Finance:
+Treasury rates and slopes, credit spreads, commodities, FX pairs, volatility
+indices, and international-equity ETFs. The drivers serve two purposes: they
+are the selection pool for the driver route (Section~\ref{sec:driver-route}),
+and --- more importantly for Q --- their presence in the joint fit means the
+asset--asset block is estimated \emph{conditional on} the common macro
+environment, absorbing driver-explained co-movement that would otherwise
+masquerade as asset-to-asset edges. Equity baskets such as US sector ETFs are
+excluded from the pool as not credibly exogenous to a US large-cap portfolio.
 
-\paragraph{Stationarity.} Causal discovery on an SVAR assumes (weakly) stationary
-inputs, so each series is transformed by type within each window: log-returns for
-prices, first differences for yields, year-on-year percentage change for level
-macro series, and so on. Stationarity is checked with \emph{both} the Augmented
-Dickey--Fuller (ADF) and the KPSS test. The two are complementary: ADF takes
-non-stationarity (a unit root) as its null while KPSS takes stationarity as its
-null, and ADF in particular has low power against near-unit-root alternatives, so
-agreement between the two opposite-null tests is a stronger signal than either
-alone. Flags are logged rather than used to drop series, since the per-type
-transforms are chosen \emph{a priori} on economic grounds.
+\paragraph{Stationarity.} SVAR-based discovery assumes weakly stationary
+inputs, so each series is transformed by type within each window (log-returns
+for prices, first differences for yields, year-on-year changes for level
+macro series), checked with both ADF and KPSS --- complementary because their
+nulls are opposite, so agreement is a stronger signal than either alone.
+Flags are logged rather than used to drop series, the per-type transforms
+being fixed \emph{a priori} on economic grounds.
 
 \section{Rolling discovery and the directional prior}
 \label{sec:discovery-run}
 
-At each rebalance date $t$, discovery runs on the joint panel
-$X = [\,D \mid A\,]$ of drivers and assets over the lookback window, after
-per-window $z$-scoring. The primary method is DYNOTEARS
-\cite{pamfil2020dynotears}, run on a rolling basis with lag $p=1$; VARLiNGAM
-\cite{hyvarinen2010varlingam} is run as a robustness comparator. Each fit yields
-the contemporaneous matrix $W$ and lagged matrix $A_1$ over the joint variable
-set, from which the driver$\to$asset block is read off.
+At each rebalance date $t$, DYNOTEARS \cite{pamfil2020dynotears} is fit on the
+per-window $z$-scored joint panel $X=[\,D \mid A\,]$ over the lookback window
+(252 or 504 trading days), with lag $p=1$, yielding the contemporaneous matrix
+$W$ (acyclicity enforced) and lagged matrix $A_1$ over the joint variable set.
+The convention throughout is $M[i,j]$ = effect of variable $i$ on variable
+$j$.
 
-\paragraph{Enforcing the prior.} The directional prior of C1 --- drivers cause
-assets, not the reverse --- is enforced natively. DYNOTEARS accepts a list of
-forbidden edges (\texttt{tabu\_edges}), which I populate with every
-asset$\to$driver pair at every lag, forcing the corresponding entries of $W$ and
-$A_1$ to zero. VARLiNGAM enforces the same prior through its prior-knowledge
-mechanism plus a post-fit projection. This is correct by economic construction:
-single large-cap stocks do not plausibly cause the 10-year Treasury yield at these
-scales. An early over-estimate of the engineering required here (the original plan
-assumed the optimiser would need wrapping) was avoided once the native
-edge-forbidding route was identified.
+\paragraph{Enforcing the prior.} The directional prior of C1 --- drivers may
+cause assets; individual large-cap stocks do not cause the 10-year Treasury
+yield at these scales --- is enforced natively: DYNOTEARS accepts a forbidden-
+edge list (\texttt{tabu\_edges}), populated with every asset$\to$driver pair
+at every lag, forcing those entries of $W$ and $A_1$ to zero. VARLiNGAM
+enforces the same prior through its prior-knowledge mechanism plus a post-fit
+projection.
 
-\paragraph{Does the prior matter? (verification).} A prior is only worth its place
-if it does real work. I refit DYNOTEARS with and without the prior on six windows
-spanning distinct regimes (2008 GFC, 2011 euro crisis, 2014 calm, 2018Q4 selloff,
-2020 COVID, 2022 rate-hike) and measured the change. Figure~\ref{fig:prior}
-summarises the result. Removing the prior lets DYNOTEARS spend \textbf{35--48\%}
-of total edge mass on economically implausible asset$\to$driver edges, and
-allowing those edges shifts the driver$\to$asset block actually used by
-52--72\% in $L_1$ norm; the prior also changes the top-$K$ selected drivers in a
-meaningful minority of windows (Jaccard $0.62$--$1.00$, lowest in the 2008 and
-2022 stress regimes). The prior is therefore consequential, not cosmetic: it
-cheaply removes a large block of spurious reverse-causation mass and protects the
-legitimate structure. This both validates a core modelling choice and quantifies
-its effect.
+\paragraph{Does the prior matter? (verification).} A prior is only worth its
+place if it does real work. Refitting DYNOTEARS with and without the prior on
+six windows spanning distinct regimes (2008, 2011, 2014, 2018Q4, 2020, 2022)
+shows that, unconstrained, the optimiser spends \textbf{35--48\%} of total
+edge mass on economically implausible asset$\to$driver edges, and admitting
+them distorts the legitimate driver$\to$asset block by 52--72\% in $L_1$
+(Figure~\ref{fig:prior}). The prior is consequential, not cosmetic --- it
+cheaply removes a large block of spurious reverse-causation mass --- and,
+because the asset--asset block is estimated jointly, it protects the graph
+that Q's allocators consume.
 
 \begin{figure}[tbp]
   \centering
@@ -88,111 +83,114 @@ its effect.
   \caption{Verification of the asset$\to$driver directional prior. Bars: the
     fraction of total DYNOTEARS edge mass that would fall on implausible
     asset$\to$driver edges if the prior were removed (35--48\% across regime
-    windows). Line (right axis): top-$K$ driver-set Jaccard with versus without
-    the prior. The prior removes a large block of spurious reverse-causation mass
-    and materially changes selection in the 2008 and 2022 stress regimes.}
+    windows). Line (right axis): top-$K$ driver-set Jaccard with versus
+    without the prior. The prior removes a large block of spurious
+    reverse-causation mass, and matters most in the 2008 and 2022 stress
+    regimes.}
   \label{fig:prior}
 \end{figure}
 
-\section{Driver selection and calibration of $K$}
+\section{The asset-graph chokepoint}
+\label{sec:asset-graph}
+
+Q's fixed-graph ablation is only valid if every allocator sees the
+\emph{byte-identical} graph, so extraction is centralised in a single
+chokepoint rather than left to each allocator. Per rebalance it: reads the
+asset--asset block $M$ of the fitted contemporaneous matrix; restricts rows
+\emph{and} columns together to the eligible universe at that date (so
+late-inception names can never desynchronise the graph from the returns
+panel); applies the magnitude threshold $\tau$ (default $0$; swept in the
+sparsity-robustness analysis); verifies acyclicity (a sub-block of a DAG is a
+DAG); and computes the per-asset structural residual variances on the fit
+window --- needed by the structural covariance of
+Section~\ref{sec:d-family} --- using the window's stored $z$-statistics, so
+the residuals correspond exactly to the data the graph was fitted on.
+
+\paragraph{What the graphs look like.} The DAGs are far from degenerate. At
+the one-year window the DYNOTEARS asset graphs average ${\sim}625$ directed
+edges (density $6.4\%$ of possible ordered pairs) with a longest directed path
+of ${\approx}50$ nodes out of 99 --- deep chains of influence, not a shallow
+hub-and-spoke. There is, in other words, substantial orientation structure
+for the treatment allocators to exploit; whatever the evaluation finds, it
+will not be because the graphs were trivially symmetric.
+
+\section{Comparator graphs}
+\label{sec:comparators}
+
+Two further graph sources feed the same chokepoint, so every allocator runs
+unchanged on them. \textbf{VARLiNGAM} \cite{hyvarinen2010varlingam} supplies
+the instantaneous matrix $B_0$, identified through non-Gaussianity rather
+than a score: LiNGAM's causal order makes the asset block a DAG by
+construction, and its identification assumption --- heavy-tailed residuals ---
+is one financial returns satisfy at short windows but progressively lose, by
+aggregation, at longer ones. \textbf{GRANGER} is the deliberately cheap
+comparator: a ridge-regularised VAR(1) on the asset panel, in closed form,
+with $M[i,j] = |{\rm coef}(x_{i,t-1}\!\to\!x_{j,t})|$, thresholded per window
+to match the paired DYNOTEARS graph's edge density so the comparison is at
+like-for-like sparsity. It is deterministic and assumption-light, but its
+matrix is lagged rather than contemporaneous and is not guaranteed acyclic;
+the allocators handle this honestly (truncated-Neumann total effects; minimal
+feedback-arc removal before topological ordering). If GRANGER allocates as
+well as DYNOTEARS, expensive discovery is not where the value lies. (A
+non-linear extension, NTS-NOTEARS \cite{sun2023ntsnotears}, was probed at
+reduced scale: its prior-knowledge mechanism drives the asset$\to$driver
+block to exactly zero and its discovered structure agrees with DYNOTEARS only
+modestly --- a genuinely different lens --- but at ${\sim}10\times$ the fit
+cost a full backtest is future work.)
+
+\section{The driver-selection arm}
 \label{sec:selection}
 
-Selection is a two-stage greedy procedure on the discovered graph. \textbf{Stage~A}
-scores each candidate driver by its aggregate lagged outgoing influence on the
-assets (edge magnitude weighted by a stability mask) and keeps a shortlist.
-\textbf{Stage~B} adds drivers to the selected set one at a time by their marginal
-gain in held-out predictive likelihood, stopping at the target count or when the
-marginal gain falls below a permutation threshold.
-
-\paragraph{Choosing $K$.} The number of drivers is not fixed \emph{a priori} but
-calibrated once on a burn-in window by two procedures in parallel: the Kneedle
-algorithm \cite{satopaa2011kneedle}, which finds the elbow in the sorted Stage-A
-score curve, and a permutation null with Benjamini--Hochberg false-discovery-rate
-control \cite{benjamini1995fdr}, which counts how many drivers clear significance
-against shuffled data. The honest empirical finding is that, at the dimensions
-tested, the FDR-controlled permutation test returns \emph{zero} significant
-drivers at the 5\% level --- the magnitude of the Stage-A causal scores is not
-statistically distinguishable from what shuffled (no-structure) data produces.
-This is reported rather than hidden: it means the per-driver causal signal on a
-99-asset universe is weak, and the operational selector is therefore the Kneedle
-elbow (which gives $K=17$ at the full scale and scales sensibly with universe
-size). The weakness of the per-driver signal is an important caveat for the whole
-``causal'' claim and is revisited in the evaluation (Section~\ref{sec:ksens}) and
-conclusions.
-
-\section{A non-linear-discovery probe: NTS-NOTEARS}
-\label{sec:nts}
-
-Both DYNOTEARS and VARLiNGAM model edges linearly. NTS-NOTEARS
-\cite{sun2023ntsnotears} replaces the linear edge functions with per-variable 1D
-convolutional networks, capturing non-linear causal relationships and, in
-principle, unifying discovery with sensitivity extraction. A full backtest is
-compute-prohibitive (a single fit at the thesis dimension $d\approx 130$ is
-roughly $10\times$ a DYNOTEARS fit, so $215$ rebalances $\times$ several variants
-is tens to hundreds of GPU/CPU-hours), so I ran a \emph{reduced-scope probe}: NTS
-and DYNOTEARS were fit on a handful of regime windows at a reduced universe
-($d=58$) and their discovered driver$\to$asset structure compared
-(Figure~\ref{fig:nts}).
-
-Three things follow. First, the directional prior \emph{transfers}: NTS's native
-prior-knowledge bounds drive the asset$\to$driver block to exactly zero in every
-window, so the approach is compatible with the rest of the pipeline. Second,
-non-linear discovery agrees with the linear graph only \emph{modestly} --- mean
-top-10 driver Jaccard $0.35$ (coincidentally close to the DYNOTEARS-versus-
-VARLiNGAM agreement of $0.34$), higher in stress windows --- so NTS-NOTEARS is a
-genuinely different lens, not a re-derivation, and a full non-linear backtest
-could plausibly give different results. Third, the cost ($\approx 10\times$
-DYNOTEARS even at reduced $d$) confirms that a full integration is future work
-rather than a present result.
-
-\begin{figure}[tbp]
-  \centering
-  \includegraphics[width=0.95\textwidth]{figures/nts_probe.png}
-  \caption{Non-linear-discovery probe (reduced universe $d=58$). (a) Agreement
-    between NTS-NOTEARS and DYNOTEARS on driver$\to$asset structure (top-10 driver
-    Jaccard and Stage-A score Spearman): modest overall, higher in stress windows.
-    (b) Per-window fit cost (log scale): NTS is $\approx 10\times$ DYNOTEARS even
-    at this reduced dimension, so a full backtest is left as future work.}
-  \label{fig:nts}
-\end{figure}
+The project's starting framework (HSP) needs $K$ drivers selected per
+rebalance; the arm is retained as a supporting comparison
+(Section~\ref{sec:driver-route}), so its mechanics are summarised. Selection
+is two-stage on the discovered graph: Stage~A scores each driver by its
+aggregate outgoing influence on the assets and shortlists; Stage~B adds
+drivers greedily by marginal held-out predictive gain. The count $K$ is
+calibrated once on a burn-in window by the Kneedle elbow
+\cite{satopaa2011kneedle} ($K=17$ at full scale), alongside a permutation
+null with Benjamini--Hochberg FDR control \cite{benjamini1995fdr} --- which
+returns the honest answer that \emph{zero} drivers clear 5\% significance
+against shuffled data: the per-driver causal signal at this universe size is
+weak, a caveat that foreshadows the arm's evaluation. Qualitatively the
+causal selector still does what the correlation selector cannot --- it
+rotates across ${\sim}26$ regime-tracking drivers where cumulative
+correlation locks onto the same international-equity ETFs and rates-curve
+points at essentially every rebalance --- but Q does not rest on this arm.
 
 \section{Engineering for tractability and reproducibility}
 \label{sec:cache}
 
-Two engineering points are worth recording because they bear on the credibility
-of every result in Chapter~\ref{chap:evaluation}.
+Two engineering results underwrite the credibility of every number in
+Chapter~\ref{chap:evaluation}.
 
-\paragraph{Discovery cache.} The causal-graph fit is the dominant per-rebalance
-cost ($\approx 15$ hours for a 215-rebalance backtest at $d=132$), and it depends
-only on the window data and discovery hyperparameters --- \emph{not} on the
-number of drivers $K$ or the feedback parameters $\alpha,\gamma$, which act
-downstream. A robustness sweep over $K$ or $\alpha,\gamma$ would therefore refit
-the identical graph dozens of times. I added a content-keyed disk cache for the
-fitted graph (keyed by the exact window content, column set, method and
-hyperparameters, with atomic writes), so the first run at each window pays the
-fit and every later sweep configuration reuses it. This turned an otherwise
-infeasible set of sweeps ($\sim 390$ hours) into roughly two days of wall-clock,
-and is what made the K-sensitivity and $\alpha,\gamma$ analyses of
-Chapter~\ref{chap:evaluation} possible.
+\paragraph{The discovery cache.} The graph fit is the dominant cost
+(${\approx}4$ minutes per window at $d\approx132$; ${\approx}15$ hours per
+215-rebalance backtest), yet it depends only on the window data and discovery
+hyperparameters --- not on anything downstream. A content-keyed disk cache
+(keyed by the exact window bytes, column set, method and hyperparameters,
+with atomic writes) therefore lets every configuration at a given window
+reuse one fit. The effect is decisive for Q: the entire fixed-graph ablation
+--- 28 allocator--method--window cells, plus sparsity, cost and comparator
+sweeps --- ran against 836 cached graph fits with a verified 100\% hit rate
+and zero refits, at ${\approx}40$ seconds per backtest instead of
+${\approx}15$ hours. The cache is also what \emph{guarantees} the ablation's
+premise: allocators cannot see different graphs, because there is exactly one
+graph per (method, window, data) key.
 
-\paragraph{A data-determinism bug, and why it matters.} Building the cache exposed
-a latent reproducibility defect. One driver (the emerging-markets ETF EEM, listed
-in 2003) had an inception date inside the two-year padding window before the
-sample start, so its cache-coverage check never passed and it was silently
-re-downloaded from Yahoo Finance on \emph{every} call. With auto-adjustment, the
-returned values jittered by $\approx 3\times10^{-7}$ run-to-run, which the
-non-convex DYNOTEARS optimiser amplified to changes of $\approx 0.14$ in the
-graph $W$. In other words, \emph{the pipeline was not bit-reproducible}, and each
-backtest had used a one-off realisation of one driver. I fixed this (reuse a
-cached series whenever the previously requested span covers the request; atomic
-writes) so that two independent processes now produce byte-identical windows, and
-re-ran the entire headline matrix under the corrected, deterministic pipeline.
-
-This is reported prominently for a methodological reason. The fix changed two
-headline conclusions: the apparent two-year-window edge of causal selection
-collapsed from $+0.012$ to $+0.001$ Sharpe, and an apparent ``significantly worse
-closed loop at the two-year window'' ($p=0.031$) disappeared once the feedback was
-shown to be exactly inert. A result that does not survive a determinism fix was
-never real; finding and correcting this is part of the contribution, and a
-reminder that reproducibility is a prerequisite for, not an afterthought to,
-empirical claims in this area \cite{lopezdeprado2023causal}.
+\paragraph{A data-determinism defect, found and fixed.} Building the cache
+exposed a latent reproducibility bug: one driver series (the
+emerging-markets ETF EEM) was silently re-downloaded on every call because
+its 2003 inception fell inside the cache-coverage check's padding window,
+and auto-adjustment jittered its values by ${\approx}3\times10^{-7}$
+run-to-run --- which the non-convex DYNOTEARS optimiser amplified into graph
+changes of ${\approx}0.14$ in $\lVert W\rVert$. The pipeline was, in other
+words, not bit-reproducible, and two previously-drawn conclusions (an
+apparent two-year edge for causal driver selection, and an apparently
+significantly-worse closed loop) did not survive the fix. All numbers in
+this report come from the corrected, deterministic pipeline: two independent
+runs now produce byte-identical windows, weights and NAVs --- verified
+end-to-end by the replication gate of Section~\ref{sec:ablation-design}. A
+result that does not survive a determinism fix was never real; treating
+reproducibility as a prerequisite rather than an afterthought is part of the
+method \cite{lopezdeprado2023causal}.

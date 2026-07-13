@@ -1,428 +1,418 @@
 % ============================================================
-\chapter{A3 and Evaluation: Closed-Loop Feedback and Results}
+\chapter{A3 and Evaluation: Decomposing the Gain}
 \label{chap:evaluation}
 % ============================================================
 
-This chapter presents the closed feedback loop (A3, addressing C3) and the full
-empirical evaluation. Section~\ref{sec:loop} describes the loop;
-Section~\ref{sec:method} the evaluation methodology; Sections~\ref{sec:headline}
-to \ref{sec:regimes} report the results --- the headline comparison, the
-causal-versus-correlation question, the sensitivity to the number of drivers, the
-(non-)value of the closed loop, the asset-only result, and the
-regime-conditional analysis. Section~\ref{sec:believe} then steps back and asks,
-under good epistemic norms, how much of this we should actually believe.
+This chapter evaluates (A3, addressing C3). It proceeds Socratically through
+the questions Q decomposes into: how should the gain be measured at all
+(Section~\ref{sec:method}); does the causal graph improve on the correlation
+matrix in the first place --- requirement R1 --- and what happened to the
+driver route this project began from (Section~\ref{sec:r1}); how does the
+gain split between skeleton and orientation --- the answer to Q ---
+and how robust is that split (Section~\ref{sec:decomposition}); and how much
+of all of it survives rigorous, multiplicity-aware inference
+(Section~\ref{sec:believe-rigour}). Section~\ref{sec:believe} closes with the
+threats to validity.
 
-\section{Closing the loop}
-\label{sec:loop}
-
-Achievement A3 extends HSP, which has no feedback. After the weights $w[t]$ are
-held for the month, the realised reward is the excess Sharpe ratio relative to an
-equal-weight portfolio over the same holding period,
-\begin{equation}
-  R[t] = \mathrm{Sharpe}\big(\text{portfolio over } [t, t{+}h]\big)
-       - \mathrm{Sharpe}\big(\tfrac{1}{N} \text{ over } [t, t{+}h]\big).
-\end{equation}
-The excess form controls for market-wide regime effects, so drivers are not
-punished for a crash that hit everything. Reward is attributed to drivers in
-proportion to how strongly each shaped the portfolio,
-\begin{equation}
-  \mathrm{credit}_d[t] = R[t]\,\frac{\mathrm{influence}_d}{\sum_{d'} \mathrm{influence}_{d'}},
-  \qquad
-  \mathrm{influence}_d = \sum_i \big| w_i[t]\, s_{i,d}[t] \big|,
-\end{equation}
-and each selected driver's utility follows an exponential moving average, which the
-next selection blends with causal evidence:
-\begin{equation}
-  U_d[t] = \gamma\, \mathrm{credit}_d[t] + (1-\gamma)\, U_d[t-1],
-  \qquad
-  \mathrm{score}_d[t] = \alpha\, z\big(\mathrm{causal}_d[t]\big) + (1-\alpha)\, z\big(U_d[t-1]\big).
-\end{equation}
-Here $\gamma$ sets the utility's memory and $\alpha$ weights causal evidence
-against history ($\alpha=1$ recovers open-loop V1). Lookahead discipline is
-enforced by keying utility on the holding-period-\emph{end} date and asserting a
-21-day gap on lookup, with a deliberately-leaky ``canary'' variant used in testing
-to confirm the guard fires. The full closed-loop method is V2.
-
-\paragraph{The measurement problem.} Whether such a loop can work at all is,
-before anything else, a question of measurement, and the \emph{update frequency}
-is central to it. The reward $R[t]$ is a Sharpe ratio estimated over a single
-$21$-day holding window, so its sampling error is large: for a near-zero true
-Sharpe the standard error of a Sharpe estimated from $n$ observations is
-approximately $\sqrt{1/n}\approx\rsSharpeSE$ at $n=21$. Empirically, across the
-$215$ rebalances $R[t]$ has mean $\rsRewardMean$ and standard deviation
-$\rsRewardStd$ --- a per-observation signal-to-noise ratio of just $\rsRewardSNR$
-(indeed the mean reward is marginally negative). A monthly update is therefore
-overwhelmingly noise: the per-rebalance signal is roughly an order of magnitude
-below its own sampling variability. This is one half of why the loop cannot learn
-(Section~\ref{sec:loop-eval}); the other half is structural. The frequency is not incidental: a higher-frequency reward would
-shrink this error, which is why the measurement problem, not the feedback rule,
-is the first thing future work should change.
-
-\section{Evaluation methodology}
+\section{How should the gain be measured?}
 \label{sec:method}
 
-All variants are evaluated on the same backtest: the approximate S\&P~100
-universe, monthly rebalancing over 2007--2024 (215 rebalances), $K=17$ calibrated
-once on a 2006 burn-in, at two lookback windows --- 252 trading days (one year)
-and 504 (two years) --- as the primary robustness check. Transaction costs of
-5\,bps per unit of one-way turnover are charged (with sweeps over
-$\{0,5,10,20\}$\,bps); results are net of costs. The \emph{risk-adjusted return} of Q is
-made precise here. The headline measure is the annualised Sharpe ratio, reported
-alongside CAGR, maximum drawdown, volatility, turnover and concentration. But the
-Sharpe ratio assumes normality, and daily returns on this universe have excess
-kurtosis ${\approx}\,\rsKurtosis$ (Figure~\ref{fig:retdist}); I therefore also
-report the Sortino and Calmar ratios and, for the rigour question Q5, the
-distribution-aware Probabilistic and Deflated Sharpe ratios
-\cite{bailey2012psr,bailey2014deflated}. The controlled scientific comparison
-holds the \emph{allocator} fixed and varies only the driver-selection mechanism,
-so the standard-HSP variant V0 is the baseline; the equal-weight ($1/N$) portfolio
-is the absolute reference used in the regime analysis. Pairwise differences in
-Sharpe are tested with a Politis--Romano stationary block bootstrap
-\cite{politis1994stationary} (2000 resamples), which respects the serial
-dependence of returns. Because the study evaluates \rsNtrials\ distinct
-configurations, those pairwise tests are supplemented in
-Section~\ref{sec:believe-rigour} by a data-snooping-aware battery (Deflated
-Sharpe, White's Reality Check, Hansen's SPA, and the Model Confidence Set) that
-corrects for the multiplicity. Regimes are defined by NBER recession dates,
-top-versus-bottom VIX quintiles, and named historical stress windows.
+\paragraph{Protocol.} Every configuration runs the identical walk-forward
+backtest: the fixed 99-name universe, monthly rebalancing over 2007--2024
+(215 rebalances), estimation windows of 252 and 504 trading days for both the
+graph fit and the sample covariance, weights held for 21 trading days,
+transaction costs of 5\,bps per unit of one-way turnover (swept over
+$\{0,5,10,20\}$\,bps). ``Performance'' always means the \emph{out-of-sample,
+net-of-cost, annualised Sharpe ratio of daily portfolio returns}, reported
+alongside CAGR, maximum drawdown and mean turnover; no in-sample or gross
+number appears anywhere in this report.
 
-\section{Headline results}
-\label{sec:headline}
+\paragraph{Inference.} Pairwise contrasts use the Politis--Romano stationary
+block bootstrap \cite{politis1994stationary} (2000 resamples, mean block 21
+days), which resamples the joint return panel so cross-strategy correlation
+is preserved. Because daily returns here are heavily non-normal (excess
+kurtosis ${\approx}\,\rsKurtosis$; Figure~\ref{fig:retdist}) and because this
+project evaluated \rsNtrials\ distinct configurations in total, pairwise
+$p$-values are never taken at face value: every claim is re-adjudicated by
+the battery of Section~\ref{sec:believe-rigour} --- Probabilistic and
+Deflated Sharpe ratios \cite{bailey2012psr,bailey2014deflated} (the DSR
+deflating against \emph{all} \rsNtrials\ trials), White's Reality Check
+\cite{white2000reality}, Hansen's SPA \cite{hansen2005spa} for each
+family-wise comparison, and the $90\%$ Model Confidence Set
+\cite{hansen2011mcs}. Regimes are defined by NBER recession dates and
+top/bottom VIX quintiles.
 
-Table~\ref{tab:matrix} gives the full matrix and Table~\ref{tab:sig} the pairwise
-significance; Figure~\ref{fig:nav} plots the net NAV trajectories and
-Figure~\ref{fig:sharpe} the Sharpe-by-variant comparison. All numbers are from the
-deterministic (frozen-EEM) pipeline (Section~\ref{sec:cache}).
-
-\begin{table}[t]
-  \centering
-  \caption{Full results matrix: annualised net Sharpe, 2007--2024, by discovery
-    method, variant and lookback window. V0 (cumulative correlation) is the shared
-    baseline; V0$'$ is asset-only (DYNOTEARS graph only).}
-  \label{tab:matrix}
-  \begin{tabular}{l l c c c c}
-    \toprule
-    Method & Window & V0 & V1 & V2 & V0$'$ \\
-    \midrule
-    DYNOTEARS & 252 & 0.371 & 0.381 & 0.381 & \textbf{0.403} \\
-    DYNOTEARS & 504 & 0.370 & 0.372 & 0.372 & 0.372 \\
-    VARLiNGAM & 252 & 0.371 & \textbf{0.399} & 0.399 & --- \\
-    VARLiNGAM & 504 & 0.370 & 0.357 & 0.357 & --- \\
-    \bottomrule
-  \end{tabular}
-\end{table}
-
-\begin{table}[t]
-  \centering
-  \caption{Pairwise Sharpe differences ($\Delta$Sharpe, $p$-value), Politis--Romano
-    block bootstrap, 2000 resamples. Positive favours the first variant.}
-  \label{tab:sig}
-  \begin{tabular}{l c c}
-    \toprule
-    Comparison & Window 252 & Window 504 \\
-    \midrule
-    V1$-$V0 (DYNOTEARS) & $+0.010$ ($p=0.27$) & $+0.001$ ($p=0.92$) \\
-    V1$-$V0 (VARLiNGAM) & $\mathbf{+0.028}$ ($\mathbf{p=0.004}$) & $-0.014$ ($p=0.14$) \\
-    V0$'-$V0 (asset-only) & $\mathbf{+0.032}$ ($\mathbf{p<0.001}$) & $+0.002$ ($p=0.84$) \\
-    V0$'-$V1 (DYNOTEARS) & $\mathbf{+0.022}$ ($\mathbf{p=0.01}$) & $+0.001$ ($p=0.94$) \\
-    V2$-$V1 (closed loop) & $0.000$ ($p=1.0$) & $0.000$ ($p=1.0$) \\
-    \bottomrule
-  \end{tabular}
-\end{table}
-
-\begin{figure}[tbp]
-  \centering
-  \includegraphics[width=0.97\textwidth]{figures/nav_curves.png}
-  \caption{Cumulative net-of-cost NAV, 2007--2024, for V0, V0$'$, V1-DYNOTEARS and
-    V1-VARLiNGAM at both windows (V2 omitted, being identical to V1). All variants
-    absorb the full $\approx 51\%$ GFC drawdown; differences are in risk-adjusted
-    return, not drawdown avoidance.}
-  \label{fig:nav}
-\end{figure}
-
-\begin{figure}[tbp]
-  \centering
-  \includegraphics[width=0.82\textwidth]{figures/sharpe_matrix.png}
-  \caption{Net Sharpe by variant and lookback window. At one year V0$'$ (0.403)
-    and VARLiNGAM-V1 (0.399) clearly exceed the baseline (0.371); at two years all
-    variants converge to $\approx 0.37$ and VARLiNGAM-V1 falls below it. The causal
-    edge is a short-window phenomenon.}
-  \label{fig:sharpe}
-\end{figure}
-
-The headline reading, stated plainly:
-\begin{itemize}[itemsep=2pt, topsep=3pt]
-  \item At the one-year window, the causal variants beat the correlation baseline,
-        and the best are V0$'$ (0.403) and VARLiNGAM-V1 (0.399), both significant.
-        DYNOTEARS-V1's edge ($+0.010$) is in the right direction but not
-        significant.
-  \item At the two-year window the entire effect disappears: V0, V1 and V0$'$ all
-        sit at $\approx 0.372$ and VARLiNGAM-V1 \emph{underperforms} the baseline.
-  \item The closed loop adds nothing anywhere: V2 equals V1 to four decimal places.
-  \item In absolute terms every variant has a low Sharpe ($\approx 0.37$--$0.40$)
-        and an $\approx 51\%$ drawdown: this is a study of \emph{relative}
-        driver-selection quality within a long-only equity allocator, not of
-        absolute performance or drawdown control.
-\end{itemize}
-
-\section{Does causal selection beat correlation? (Q1)}
-\label{sec:causal-vs-corr}
-
-The answer is a qualified yes at one year and a clear no at two years. Two
-mechanisms are worth noting. First, the cum-corr baseline is structurally
-tautological: V0 selects essentially the same $\approx 10$--$14$ drivers every
-rebalance --- mostly international-equity ETFs and the rates curve --- because
-these trivially co-move with US equity, whereas the causal selector rotates
-across $\approx 26$ drivers that track the macro regime (rates and credit before
-COVID, crude and credit at the April-2020 crash, safe-haven assets mid-crisis,
-volatility and rates in the recovery). This qualitative difference is robust and
-is the cleanest vindication of the causal approach, \emph{independent} of the
-modest Sharpe gap. Second, the two discovery methods disagree substantially ---
-mean top-$K$ driver Jaccard of only $0.34$ between DYNOTEARS and VARLiNGAM --- yet
-both beat V0 at one year: concordance of conclusion despite divergence of
-selection.
-
-The window-dependence is the central negative finding and admits a plausible
-mechanism for VARLiNGAM. Its identifiability rests on non-Gaussian residuals; a
-two-year window spans more regimes, so by the central limit theorem the residuals
-trend Gaussian, ICA identification weakens, the causal order becomes noisier, and
-selection degrades --- consistent with VARLiNGAM being strongest at one year and
-falling below baseline at two. DYNOTEARS, score-based and distribution-free, lacks
-this specific sensitivity but also lacks the one-year significance. The
-interaction between an algorithm's assumptions and the window length is itself a
-useful methodological observation, and a caution against quoting the strong
-one-year VARLiNGAM number without its two-year companion.
-
-\section{Sensitivity to the number of drivers $K$ (Q3)}
-\label{sec:ksens}
-
-$K$ is calibrated from the data ($K=17$ by Kneedle), but a robustness sweep over
-$K\in\{10,14,17,20,25\}$ (Figure~\ref{fig:ksens}) shows the causal-versus-
-correlation comparison is \emph{not} robust to it. At one year the V1$-$V0 edge is
-positive only near $K=17$; it turns negative at $K=10$, $20$ and $25$, driven
-mostly by the cum-corr baseline's Sharpe bouncing erratically between $0.37$ and
-$0.40$ while V1 stays near $0.38$. None of the per-$K$ differences is significant.
-At two years V1's Sharpe is flat at $\approx 0.372$ for $K\ge 14$ because the
-greedy selector exhausts the $\approx 13$ drivers that clear the Stage-A threshold.
-The honest implication is that the one-year DYNOTEARS edge holds at the
-\emph{data-chosen} $K$ but should not be presented as $K$-robust; this, together
-with the zero FDR-significant drivers found in calibration
-(Section~\ref{sec:selection}), tempers the strength of the driver-based claim.
-
-\begin{figure}[tbp]
-  \centering
-  \includegraphics[width=0.97\textwidth]{figures/k_sensitivity.png}
-  \caption{$K$-sensitivity of V0 versus V1 (DYNOTEARS). The cum-corr baseline
-    (grey) varies erratically with $K$ while causal V1 (blue) is stable, so the
-    sign of $V1-V0$ flips with $K$; V1 leads only near the Kneedle-calibrated
-    $K=17$ (dotted). No difference is significant. At two years V1 is flat for
-    $K\ge 14$ (pool exhaustion).}
-  \label{fig:ksens}
-\end{figure}
-
-\section{Is the closed loop useful? (Q4)}
-\label{sec:loop-eval}
-
-No. Sweeping the feedback strength over the full grid
-$\alpha\in\{0.4,0.6,0.8\}\times\gamma\in\{0.1,0.3,0.5\}$ at the one-year window
-gives a Sharpe of $0.381$ at \emph{every} setting, identical to open-loop V1 to
-four decimals (Figure~\ref{fig:grid}). The feedback machinery genuinely runs (the
-utility table is populated at all 215 rebalances), yet the per-rebalance weights
-are identical to V1 throughout. The mechanism is now understood: the utility blend
-can only \emph{re-rank drivers within} the causally-selected set --- it cannot
-promote a driver the causal selector never shortlisted --- so when the causal
-top-$K$ is stable, the selected set never changes and V2 collapses to V1 exactly.
-This structural inertness compounds the measurement problem of
-Section~\ref{sec:loop}: with a per-rebalance reward signal-to-noise ratio of only
-$\rsRewardSNR$, even where the loop \emph{could} re-rank the shortlist a single
-month's reward is too noisy to do so reliably --- both point the same way.
-This is the strongest possible form of the negative result: the closed loop is not
-merely unhelpful on average, it is \emph{inert} across the entire feedback grid.
-C3's hypothesis --- that feedback improves robustness --- is rejected for this
-design.
-
-\begin{figure}[tbp]
-  \centering
-  \includegraphics[width=0.7\textwidth]{figures/feedback_grid.png}
-  \caption{Closed-loop feedback grid: V2 net Sharpe over the $\alpha$ (causal/
-    utility blend) $\times\ \gamma$ (utility memory) grid at one year. The surface
-    is uniformly $0.381$, identical to open-loop V1: the feedback never changes the
-    selected driver set, so the loop is inert.}
-  \label{fig:grid}
-\end{figure}
-
-\section{Do exogenous drivers help at all? The asset-only result (Q2)}
-\label{sec:v0prime-eval}
-
-The most striking result is that removing the exogenous drivers \emph{improves}
-performance at the short window. Asset-only Causal-HRP (V0$'$) reaches Sharpe
-$0.403$ at one year, significantly above both the correlation baseline
-($+0.032$, $p<0.001$) and the driver-based Causal-HSP V1 ($+0.022$, $p=0.01$),
-with the smallest drawdown ($-50.5\%$). On this universe and window, the
-asset--asset causal graph alone is a better basis for clustering than the entire
-driver-selection-and-sensitivity apparatus. A plausible reading is that the
-exogenous-driver path adds estimation noise (driver selection, then a neural
-sensitivity fit) that the direct asset-graph route avoids, while still capturing
-the cross-asset structure that matters for clustering. This is an uncomfortable
-result for a project framed around \emph{driver} selection, and it is reported as
-the headline it deserves to be. The necessary caveat is that V0$'$ is also
-window-dependent: at two years it falls back to $\approx 0.372$, level with
-everything else.
-
-\section{What survives rigour? (Q5)}
-\label{sec:believe-rigour}
-
-% NB: the numbers in this section come from _generated/robust_stats.tex, written
-% by scripts/robust_stats.py. The committed file is a provisional placeholder;
-% regenerate it locally and reconcile the verdict wording if the significance
-% of any cell changes.
-The second half of Q is the decisive one: does any measured advantage survive
-correction for the multiplicity of the \rsNtrials\ configurations tried and for
-the non-normality of returns? The pairwise bootstrap of
-Section~\ref{sec:headline} answers a single pre-specified comparison; it does not
-discount the search that produced it. Two corrections are applied.
-
-\paragraph{Non-normality (PSR) and selection bias (DSR).} Daily returns are
-strongly non-normal (Figure~\ref{fig:retdist}, excess kurtosis
-${\approx}\,\rsKurtosis$), which the plain Sharpe ignores. The Probabilistic
-Sharpe Ratio --- the probability the true Sharpe exceeds zero given the sample's
-skewness, kurtosis and length --- is nonetheless high for every variant
-(V0 $\rsVzeroPSR$, V0$'$ $\rsVprimePSR$, V1-DYNOTEARS $\rsVoneDynoPSR$,
-V1-VARLiNGAM $\rsVoneVarPSR$): the \emph{level} of risk-adjusted return is real,
-not a fat-tail artefact. The Deflated Sharpe Ratio then sets the bar to the best
-Sharpe expected from \rsNtrials\ trials under the null of no skill. It deflates
-every variant (V0 $\rsVzeroDSR$, V0$'$ $\rsVprimeDSR$, V1-DYNOTEARS
-$\rsVoneDynoDSR$, V1-VARLiNGAM $\rsVoneVarDSR$; Figure~\ref{fig:dsrmcs}) but the
-leaders remain positive --- so the short-window asset-only and VARLiNGAM Sharpes
-are not merely the luckiest of many tries.
-
-\paragraph{Does the best strategy beat the baseline (RC/SPA)?} The question Q
-actually poses is comparative: does the \emph{best causal variant} beat the
-correlation baseline once the search is accounted for? Taking net return as the
-performance measure (the variants' volatilities are near-identical at
-${\approx}\,16.5\%$, so this ordering mirrors the Sharpe ordering), White's
-Reality Check gives $p=\rsSpaRC$ and Hansen's SPA $p=\rsSpaConsistent$ for the
-best causal variant against V0 at the one-year window. Even after correcting for
-the \rsNtrials-way search, these family-wise tests \emph{reject} the null that
-the best causal variant fails to beat the correlation baseline: at one year, the
-strongest causal-structure variant out-returns V0 by more than data-snooping
-alone can explain.
-
-\paragraph{Which strategies are indistinguishable (MCS)?} The Model Confidence
-Set returns the variants statistically indistinguishable from the best at the
-$90\%$ level. It contains just \rsMcsSize\ variants (\rsMcsMembers); the
-correlation baseline V0 \rsMcsVzeroIn\ among them. The decisive --- and most
-disciplining --- detail is \emph{which} variants survive: the asset-only V0$'$
-and VARLiNGAM-V1, but \emph{not} the driver-based DYNOTEARS-V1 (which the set
-eliminates alongside V0). The confidence set of best strategies is therefore
-exactly the two causal-\emph{structure} variants, excluding both the correlation
-baseline and the project's headline causal-\emph{driver-selection} method.
-
-\paragraph{Verdict on Q5.} The battery splits Q into two answers. The absolute
-risk-adjusted returns survive correction for non-normality and multiplicity (all
-DSR ${>}\,0.92$), and at the one-year window the best causal-structure variants
-\emph{do} clear a data-snooping-aware comparison against the correlation baseline
-($p=\rsSpaRC$; V0 \rsMcsVzeroIn\ in the $90\%$ MCS). But the specific claim Q
-puts first --- that causal \emph{driver selection} (DYNOTEARS-V1) beats
-correlation --- is \emph{not} supported: that variant is itself eliminated from
-the confidence set, indistinguishable from the baseline. What survives the most
-stringent test is the asset-only and non-Gaussian-ICA \emph{structure}, not the
-driver-selection mechanism the project was built around --- and, as the
-two-year-window results above showed, none of it survives the move to a
-two-year window. The data-snooping battery thus refines rather than erases the
-short-window findings of
-Sections~\ref{sec:causal-vs-corr}--\ref{sec:v0prime-eval}.
+\paragraph{Stability.} Two further checks target the failure modes of the
+incumbent framework specifically. The \emph{seed audit} re-runs the complete
+driver-route pipeline under \rsSeedN\ different neural-network seeds with
+everything else frozen, measuring how much of its performance is
+initialisation noise (Section~\ref{sec:seed-audit}); the D-family needs no
+such audit, being deterministic --- consecutive runs are byte-identical, a
+property verified by the replication gate
+(Section~\ref{sec:ablation-design}). And every number in this chapter comes
+from the bit-reproducible pipeline of Section~\ref{sec:cache}.
 
 \begin{figure}[tbp]
   \centering
   \includegraphics[width=0.7\textwidth]{figures/returns_distribution.png}
-  \caption{Distribution of daily net returns (pooled across variants) against a
-    fitted normal. The heavy tails (excess kurtosis ${\approx}\,\rsKurtosis$) are
-    why the plain Sharpe ratio is supplemented by the Probabilistic and Deflated
-    Sharpe ratios, which account for higher moments.}
+  \caption{Distribution of daily net returns (pooled across variants) against
+    a fitted normal, log-density axis. The heavy tails (excess kurtosis
+    ${\approx}\,\rsKurtosis$) are why the plain Sharpe ratio is supplemented
+    by the Probabilistic and Deflated Sharpe ratios throughout.}
   \label{fig:retdist}
 \end{figure}
 
+\section{R1: does the causal graph improve on the correlation matrix at
+all?}
+\label{sec:r1}
+
+Requirement R1 asks whether there is any gain to decompose. The like-for-like
+comparison is the graph-blind \textsc{corr} control against the
+skeleton-only D0 on the same allocator: at the one-year window
+$\textsc{corr}=\rsCorrSharpe$ against $\text{D0}=0.403$, a skeleton gain of
+$+0.022$ ($p=0.14$); adding orientation lifts the best cell to D1's $0.411$,
+a total causal-graph gain of $+0.031$ ($p=0.14$). At the two-year window
+$\textsc{corr}=\rsCorrSharpeWfive$ and the total gain is $+0.032$--$0.036$
+(D1/D2s, $p=0.12$/$0.08$). Every one of the twelve D-versus-\textsc{corr}
+contrasts is positive --- consistent in direction across allocators, methods
+and windows --- but \emph{none is individually significant}, and the
+family-wise test (Hansen's SPA, all causal-structure strategies against
+\textsc{corr}) gives $p=\rsSpaSkelWtwo$ at one year and $p=\rsSpaSkelWfive$
+at two. R1 is therefore supported directionally but not statistically: the
+causal graph consistently out-performs the correlation matrix by a modest
+margin that data-snooping correction cannot distinguish from a lucky search.
+
+Two contextual facts sharpen this reading. First, an earlier phase of this
+project reported the same comparison against the HSP baseline V0
+(correlation-\emph{selected} drivers plus neural sensitivities) and found it
+strongly significant ($+0.032$, $p<0.001$; family-wise
+$p=\rsSpaConsistent$). The \textsc{corr} control explains the discrepancy:
+plain correlation-distance HRP itself beats V0 ($\rsCorrSharpe$ vs $0.371$ at
+one year) --- \emph{the HSP driver-and-network machinery subtracts value
+relative to textbook HRP} --- so much of the earlier significance was a
+statement about V0's machinery, not about the correlation matrix. Stating Q
+against the stronger control is the epistemically honest choice, and it
+costs the headline its stars.
+
+\paragraph{The driver route is a documented dead end.} The rest of this
+section disposes of the arm the project began from, because its failure
+motivates allocating from the graph directly. Causal driver selection (V1)
+beats V0 only at the data-chosen $K{=}17$ ($+0.010$, $p=0.27$) and the sign
+flips across $K\in\{10,14,20,25\}$ (Figure~\ref{fig:ksens}) --- the edge is
+$K$-fragile, consistent with the calibration finding that zero drivers clear
+FDR-controlled significance (Section~\ref{sec:selection}). The closed loop
+(V2) is exactly \emph{inert}: across the full
+$\alpha\in\{0.4,0.6,0.8\}\times\gamma\in\{0.1,0.3,0.5\}$ grid its weights
+equal open-loop V1's at every rebalance (Figure~\ref{fig:grid}), because the
+utility blend can only re-rank drivers \emph{within} the causally-selected
+set. And even where it could act, it could not learn: the monthly reward
+$R[t]$ is a Sharpe ratio estimated from 21 daily observations, whose sampling
+standard error (${\approx}\,\rsSharpeSE$ for a near-zero true Sharpe) dwarfs
+the realised signal --- across 215 rebalances $R[t]$ has mean
+$\rsRewardMean$ and standard deviation $\rsRewardStd$, a per-update
+signal-to-noise ratio of ${\approx}\,\rsRewardSNR$. \emph{The update
+frequency is the measurement problem}: a monthly loop receives one number a
+month that is ${\sim}95\%$ noise, so no feedback rule at this frequency
+could extract the signal; a redesign would have to raise the update
+frequency (or lengthen the reward window) before touching the learning rule.
+Together with the seed instability quantified in
+Section~\ref{sec:seed-audit}, the driver route is dominated on every axis by
+the deterministic graph route --- which is precisely why Q is about the
+graph.
+
 \begin{figure}[tbp]
   \centering
-  \includegraphics[width=0.9\textwidth]{figures/dsr_mcs.png}
-  \caption{Data-snooping-aware adjudication of the \rsNtrials\ configurations.
-    Per-variant annualised Sharpe with the Probabilistic Sharpe (vs zero) and the
-    multiplicity-deflated Deflated Sharpe; markers indicate membership of the
-    $90\%$ Model Confidence Set. The MCS retains only V0$'$ and VARLiNGAM-V1; the
-    correlation baseline V0 \rsMcsVzeroIn\ among them --- but neither is the
-    driver-based DYNOTEARS-V1, so what survives the search-corrected test is causal
-    \emph{structure}, not the driver-selection mechanism.}
-  \label{fig:dsrmcs}
+  \includegraphics[width=0.97\textwidth]{figures/k_sensitivity.png}
+  \caption{The driver route's $K$-fragility: net Sharpe of V0 and V1
+    (DYNOTEARS) across the number of selected drivers $K$. The correlation
+    selector's Sharpe varies erratically with $K$ while V1 is stable, so the
+    sign of $V1-V0$ flips; V1 leads only near the calibrated $K=17$. No
+    difference is significant.}
+  \label{fig:ksens}
 \end{figure}
 
-\section{Regime-conditional analysis}
+\begin{figure}[tbp]
+  \centering
+  \includegraphics[width=0.7\textwidth]{figures/feedback_grid.png}
+  \caption{The closed loop is inert: V2 net Sharpe across the
+    $\alpha\times\gamma$ feedback grid (one-year window) is $0.381$
+    everywhere --- identical to open-loop V1 to four decimals. The feedback
+    can only re-rank within the causally-selected set, and its monthly reward
+    has signal-to-noise ${\approx}\,\rsRewardSNR$.}
+  \label{fig:grid}
+\end{figure}
+
+\section{The decomposition: skeleton versus orientation}
+\label{sec:decomposition}
+
+\subsection{The headline split}
+
+Figure~\ref{fig:decomp} is the dissertation's central result;
+Table~\ref{tab:decomp} gives the numbers and Figure~\ref{fig:heatmap} the
+full allocator--method matrix. At the \textbf{one-year window} the gain is
+\emph{skeleton-dominated}: the skeleton contributes $+0.022$ ($p=0.14$) and
+the best orientation increment adds only $+0.009$ on top (D1, $p=0.47$; D2s
+$+0.003$, $p=0.80$; the remaining treatments are at or below D0). At the
+\textbf{two-year window} the split \emph{inverts}: the skeleton's
+contribution collapses to $+0.009$ ($p=0.55$) while orientation contributes
+$+0.023$ (D1, pairwise $p=0.049$) to $+0.027$ (D2s, $p=0.067$) --- and all
+five DYNOTEARS orientation-aware contrasts are positive
+(Figure~\ref{fig:forest}). Family-wise, however, the orientation effect does
+not survive: Hansen's SPA over the ten direction-aware variants against their
+own skeleton control gives $p=\rsSpaDirWfive$ at two years (and
+$p=\rsSpaDirWtwo$ at one year, where there is no effect to find).
+
+\begin{figure}[tbp]
+  \centering
+  \includegraphics[width=0.99\textwidth]{figures/phase_ii_decomposition.png}
+  \caption{The answer to Q (DYNOTEARS graphs, net annualised Sharpe). At one
+    year the causal graph's gain over the correlation control is carried by
+    the skeleton; at two years the skeleton's gain collapses and orientation
+    carries it. Steps annotated with the pairwise bootstrap $\Delta$ and
+    $p$-value; no step survives family-wise correction.}
+  \label{fig:decomp}
+\end{figure}
+
+\begin{table}[t]
+  \centering
+  \caption{The decomposition (DYNOTEARS): pairwise $\Delta$Sharpe with
+    Politis--Romano $p$-values. The total splits by the shared anchor:
+    total $=$ skeleton $+$ orientation.}
+  \label{tab:decomp}
+  \begin{tabular}{l c c}
+    \toprule
+    Contrast & Window 252 & Window 504 \\
+    \midrule
+    skeleton\quad (D0 $-$ \textsc{corr}) & $+0.022$ ($p=0.14$) & $+0.009$ ($p=0.55$) \\
+    orientation, D1\quad (D1 $-$ D0)     & $+0.009$ ($p=0.47$) & $+0.023$ ($p=0.049$) \\
+    orientation, D2s\quad (D2s $-$ D0)   & $+0.003$ ($p=0.80$) & $+0.027$ ($p=0.067$) \\
+    \midrule
+    total, D1\quad (D1 $-$ \textsc{corr})   & $+0.031$ ($p=0.14$) & $+0.032$ ($p=0.12$) \\
+    total, D2s\quad (D2s $-$ \textsc{corr}) & $+0.026$ ($p=0.24$) & $+0.036$ ($p=0.084$) \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\begin{figure}[tbp]
+  \centering
+  \includegraphics[width=0.99\textwidth]{figures/phase_ii_heatmap.png}
+  \caption{Net Sharpe by discovery method $\times$ allocator at both windows
+    (boxed column: the skeleton control D0). The one-year row is
+    skeleton-strong; the two-year DYNOTEARS row is orientation-strong; the
+    VARLiNGAM rows show no orientation effect at all.}
+  \label{fig:heatmap}
+\end{figure}
+
+\begin{figure}[tbp]
+  \centering
+  \includegraphics[width=0.99\textwidth]{figures/phase_ii_forest.png}
+  \caption{The fixed-graph orientation effect: $\Delta$Sharpe of each
+    orientation-aware allocator against the skeleton control D0, with
+    $95\%$ block-bootstrap CIs ($\ast$: $p<0.05$). All five DYNOTEARS
+    contrasts are positive at the two-year window; none is at one year, and
+    none is under VARLiNGAM.}
+  \label{fig:forest}
+\end{figure}
+
+\subsection{What is orientation actually buying?}
+
+Not level, but \emph{consistency across estimation windows}. The skeleton
+allocator's performance is window-fragile ($0.403 \to 0.372$); D1
+($0.411/0.395$) and D2s ($0.406/0.399$) are the only allocators in the study
+strong at both windows (Figure~\ref{fig:nav} shows the one-year NAV paths). A
+mechanism consistent with this: at 504 days the sample covariance is
+estimated over regimes it averages away, while
+$\Sigma_{\mathrm{struct}}$ --- built from the contemporaneous graph and its
+shock variances --- imposes the causal structure of the \emph{current} fit
+window on the allocation, retaining information the long-window sample
+moments blur. On this reading, orientation acts as a regulariser of the
+allocation step rather than a source of extra return, which is exactly what
+the level-vs-robustness pattern shows.
+
+\begin{figure}[tbp]
+  \centering
+  \includegraphics[width=0.99\textwidth]{figures/phase_ii_nav.png}
+  \caption{Cumulative net NAV, one-year window: the correlation control, the
+    HSP baseline V0, the skeleton D0, the orientation-aware D1 and D2s, and
+    the driver route V1. All variants absorb the full ${\approx}51\%$ GFC
+    drawdown --- the study concerns relative allocation quality, not
+    drawdown avoidance.}
+  \label{fig:nav}
+\end{figure}
+
+\subsection{Is the split robust to the design knobs?}
+
+\paragraph{Sparsity ($\tau$).} Thresholding the graph at
+$\tau\in\{0,0.01,0.05,0.10\}$ leaves the treatments flat-to-better (D2:
+$0.399\to0.402$; D3: $0.397\to0.407$ at the heaviest threshold) while the
+skeleton control drifts down ($0.403\to0.394$) --- the orientation-aware
+allocators are not artefacts of the regularisation knob.
+
+\paragraph{Costs and turnover.} The orientation increment is
+cost-invariant: D1$-$D0 at two years moves from $+0.022$ to $+0.025$ as
+costs rise from 0 to 20\,bps, because D1's turnover ($0.102$ one-way per
+rebalance) is \emph{below} the control's ($0.112$); D3's is lower still
+($0.066$). Orientation does not win by trading less, and is not eroded by
+trading more.
+
+\paragraph{Discovery method.} Under VARLiNGAM graphs the orientation effect
+is absent everywhere (all contrasts ${\approx}0$ or negative;
+Figure~\ref{fig:forest}, right). The decomposition is therefore
+\emph{method-dependent}: DYNOTEARS' jointly-optimised, acyclicity-constrained
+$W$ supports orientation-aware allocation where VARLiNGAM's ICA-ordered
+$B_0$ does not --- consistent with VARLiNGAM's identification weakening as
+residuals Gaussianise over longer windows. Under the deliberately cheap
+GRANGER graphs the split is informative: causal-ordered bisection survives
+(D2 $=0.393$ vs DYNOTEARS' $0.399$) but the structural-covariance allocators
+collapse (D1 $=0.352$, D3 $=0.350$) --- a ridge-VAR coefficient matrix
+supports an \emph{ordering} but its magnitudes cannot support shock
+propagation. Expensive discovery earns its cost only for the allocators that
+consume edge weights, and the best-allocator gap (GRANGER $-$ DYNOTEARS at
+D1: $-0.060$, $p=0.12$) favours DYNOTEARS without reaching significance.
+
+\subsection{Where does orientation help --- stress or calm?}
 \label{sec:regimes}
 
-Because the hypothesised advantage of causal methods is robustness around regime
-changes, I condition performance on market regime (Figure~\ref{fig:regime},
-full tables in Appendix~\ref{app:tables}). At one year, every causal variant
-beats the correlation baseline in \emph{every} regime slice --- NBER recession and
-expansion, and high- and low-volatility --- and V0$'$ is the largest edge
-throughout, including the least-bad recession Sharpe ($-0.575$ versus V0's
-$-0.638$) and the smallest recession drawdown. This is the cleanest support for
-the core hypothesis: where causal structure helps, it helps most in stress. The
-caveat, again, is the window: at two years the regime edges collapse with the
-aggregate ones.
+The prior-verification result (Section~\ref{sec:discovery-run}) showed edge
+\emph{assignment} matters most in stress windows, motivating the hypothesis
+that orientation-aware allocation would earn its keep in crises. The
+regime-conditional analysis rejects this (Figure~\ref{fig:regime}): at the
+one-year window the orientation-aware allocators' edge over V0 concentrates
+in the \emph{bottom} VIX quintile ($+0.22$/$+0.25$ Sharpe for D1/D2s) and is
+approximately zero (D1) to negative (D2s) in the top quintile; in NBER
+recessions the skeleton allocator is the strongest and D1 adds nothing. A
+plausible reading is that in stress, correlations rise toward one and any
+structure --- causal or correlational --- is swamped by the common factor,
+while in calm markets cross-sectional causal heterogeneity is the signal;
+but whatever the mechanism, the hypothesis as stated was wrong, and is
+reported as such.
 
 \begin{figure}[tbp]
   \centering
-  \includegraphics[width=0.9\textwidth]{figures/regime_excess.png}
-  \caption{Regime-conditional Sharpe edge over the V0 baseline (one-year window),
-    across NBER recession/expansion and VIX high-/low-volatility regimes. Every
-    causal variant beats V0 in every regime; asset-only V0$'$ is the largest edge
-    throughout. Plotted as excess over V0 because absolute regime Sharpes span
-    $-1.4$ to $+5.7$.}
+  \includegraphics[width=0.9\textwidth]{figures/phase_ii_regime.png}
+  \caption{Regime-conditional Sharpe excess over V0 (one-year window). The
+    orientation-aware edge concentrates in the VIX bottom quintile (calm
+    markets), not in stress: the stress hypothesis is rejected.}
   \label{fig:regime}
 \end{figure}
+
+\section{What survives rigour?}
+\label{sec:believe-rigour}
+
+% Numbers in this section come from _generated/robust_stats.tex, regenerated
+% by `python -m scripts.robust_stats --phase-ii` over all evaluated bundles.
+
+\paragraph{Non-normality and selection bias (PSR/DSR).} Every headline
+allocator's Probabilistic Sharpe ratio (the probability its true Sharpe
+exceeds zero given the sample's higher moments) is high --- \textsc{corr}
+$\rsCorrPSR$, D0 $\rsVprimePSR$, D1 $\rsDonePSR$ at one year --- so the
+\emph{levels} are not fat-tail artefacts. Deflating against the best Sharpe
+expected from \rsNtrials\ no-skill trials, D1 attains the \emph{highest
+Deflated Sharpe ratio in the entire study} ($\rsDoneDSR$, vs the control's
+$\rsCorrDSR$ and the skeleton's $\rsVprimeDSR$), with D2s second among
+allocators ($\rsDtwosDSR$). The ordering of the decomposition survives
+deflation; its statistical separation does not, as the family-wise tests
+show.
+
+\paragraph{Family-wise comparisons (RC/SPA).} Four pre-specified SPA tests
+adjudicate the report's claims with the search priced in. \textbf{(i)}
+Causal-structure strategies vs the HSP baseline V0 at one year:
+$p=\rsSpaConsistent$ --- significant, but as Section~\ref{sec:r1} showed,
+substantially a verdict on V0's machinery. \textbf{(ii)} The same family vs
+the \textsc{corr} control: $p=\rsSpaSkelWtwo$ (one year) and
+$\rsSpaSkelWfive$ (two years) --- R1 not established family-wise.
+\textbf{(iii)} Orientation-aware variants vs their own skeleton control:
+$p=\rsSpaDirWtwo$/$\rsSpaDirWfive$ --- the orientation effect, suggestive
+pairwise at two years, does not survive its own multiplicity.
+\textbf{(iv)} The Phase-II variants against V0: $p=\rsSpaDvar$. The pattern
+is coherent: every family-wise test that anchors on a \emph{weak} benchmark
+(V0) rejects; every test that anchors on an honest one does not.
+
+\paragraph{The Model Confidence Set.} The $90\%$ MCS over the
+\rsMcsUniverse\ distinct one-year strategies retains \rsMcsSize\ of them,
+eliminating only \rsMcsExcluded. Read correctly, this is a statement about
+power, not a vindication of everything retained: with twenty-plus highly
+correlated long-only variants whose Sharpes span $0.35$--$0.41$, the
+equivalence test can only discriminate against the strategy that loses
+\emph{consistently} --- the HSP baseline V0. The MCS confirms V0's
+inferiority and otherwise declines to rank the causal family --- including
+declining to separate treatments from controls.
+
+\paragraph{The seed audit.}
+\label{sec:seed-audit}
+Re-running the committed driver-route configuration (V1, one-year window,
+$K{=}17$) under \rsSeedN\ neural-network seeds --- discovery cached, so the
+initialisation is the \emph{only} varying ingredient --- moves its net
+Sharpe across $[\rsSeedMin, \rsSeedMax]$ (median $\rsSeedMedian$;
+Figure~\ref{fig:seed}). The range ($\rsSeedRange$) is more than twice the
+$+0.010$ edge the arm claims over its own baseline, and the committed value
+sits at the $\rsSeedPct$th percentile of its own seed distribution --- at
+the unluckiest seed the edge all but vanishes. This quantifies, on this
+pipeline, the concern that neural sensitivity-based results are fragile to
+undisclosed seed choices; and it is the strongest argument for the
+deterministic D-family, every member of which sits \emph{above the seed
+cloud's maximum} and produces byte-identical results on every run.
+
+\begin{figure}[tbp]
+  \centering
+  \includegraphics[width=0.85\textwidth]{figures/phase_ii_seed.png}
+  \caption{The seed audit: net Sharpe of the driver route V1 across
+    \rsSeedN\ network seeds (one-year window), against the deterministic
+    graph-based allocators. The seed range exceeds V1's claimed edge over
+    its baseline; every D-variant sits above the seed-cloud maximum.}
+  \label{fig:seed}
+\end{figure}
+
+\paragraph{Verdict on Q, with uncertainty stated.} The decomposition's
+\emph{point estimates} are clear and internally consistent: skeleton-carried
+gain at one year, orientation-carried gain at two, with orientation acting
+as a cross-window stabiliser and D1 topping the study-wide DSR table. Its
+\emph{statistical support} is honest but thin: consistent signs across
+twelve contrasts and two windows, one pairwise-significant cell
+($p=0.049$), and no family-wise survival anywhere. The largest defensible
+claim is conditional: \emph{if} one replaces the correlation matrix with a
+DYNOTEARS graph, the skeleton is what pays at short windows, and keeping the
+orientations costs nothing while materially improving robustness to the
+estimation-window choice.
 
 \section{How much should we believe this?}
 \label{sec:believe}
 
-Good practice demands that the results be read against their own threats to
-validity, stated explicitly rather than buried.
+\paragraph{Effect sizes sit near the detection floor.} The decomposition's
+components are $0.01$--$0.03$ Sharpe over 18 years; at this sample length
+such effects are at the edge of detectability, so the absence of family-wise
+significance is not evidence of absence --- but equally the presence of one
+$p=0.049$ cell among ten orientation contrasts is exactly what multiplicity
+predicts under the null, which is why it is not claimed as a discovery.
 
-\paragraph{Effect sizes are small and mostly not significant.} The headline
-DYNOTEARS edge is $\approx 0.01$ Sharpe and not significant; only the asset-only
-V0$'$ and the one-year VARLiNGAM results clear conventional significance, and only
-at one window. Over $\approx 215$ monthly observations a $\Delta$Sharpe of
-$0.01$--$0.03$ is near the detection floor, so the study is plausibly
-\emph{underpowered} for effects of this size, and absence of significance is not
-evidence of absence of a (small) effect.
+\paragraph{Pre-registration limits, and residual garden-of-forking-paths
+risk.} The allocator grid, contrasts and controls were fixed in a written
+plan before any treatment cell ran, and no allocator was added afterwards;
+but the plan itself was written after the first phase's results were known,
+so the choice of \emph{question} was data-informed even though the
+\emph{experiment} was not. The unified deflation universe (all \rsNtrials\
+configurations ever evaluated, both phases) is the corrective applied.
 
-\paragraph{Multiple comparisons.} The study reports many comparisons --- four
-variants, two methods, two windows, five values of $K$, a nine-point feedback
-grid. Testing this many configurations inflates the probability of finding
-\emph{some} significant result by chance, so the significant cells (V0$'$ at one
-year, $p<0.001$; VARLiNGAM at one year, $p=0.004$) should be read with a
-multiple-testing discount in mind. They are reported as exploratory findings, not
-as pre-registered confirmatory tests, and the consistent direction across regimes
-(Section~\ref{sec:regimes}) is offered as corroborating, not confirmatory,
-evidence.
+\paragraph{Single asset class, one universe, approximated index.} Everything
+here concerns long-only allocation within ${\sim}100$ US large-caps; every
+variant absorbs the full ${\approx}51\%$ GFC drawdown. Whether the
+decomposition transfers to universes with richer exogenous structure
+(multi-asset, credit, commodities) is untested. The top-by-market-cap
+approximation of the S\&P~100 and the fixed snapshot-union universe carry
+mild residual survivorship effects.
 
-\paragraph{In-window-significant is not robust.} Every positive result here is
-single-window: nothing that is significant at one year survives at two years. The
-two-window design was deliberately adopted to expose exactly this kind of
-fragility, and it did.
+\paragraph{Method-dependence is a caveat on the mechanism.} The orientation
+effect exists under DYNOTEARS graphs only. Until a second discovery method
+reproduces it, the safest interpretation is ``DYNOTEARS' contemporaneous
+structure supports orientation-aware allocation'', not ``causal orientation
+in markets is allocatively valuable''.
 
-\paragraph{A result that needed a reproducibility fix.} As recorded in
-Section~\ref{sec:cache}, two earlier conclusions (a two-year causal edge; a
-``significantly worse'' closed loop) were artefacts of one non-deterministic
-driver and vanished once the pipeline was made reproducible. This is a concrete
-reminder of how fragile small financial-backtest effects are, and why the
-corrected numbers above should be treated as the only ones that count.
-
-\paragraph{What the evidence does and does not support.} It supports: (i) that
-correlation-based selection is tautological and causal selection is qualitatively
-more regime-adaptive; (ii) that, on this universe at the one-year window,
-asset-only causal structure modestly but significantly improves risk-adjusted
-return over correlation-HSP. It does \emph{not} support: a robust, large, or
-reliably significant advantage of causal \emph{driver} selection; any benefit from
-the closed-loop extension; or any of these effects at the two-year window. That
-asymmetry --- a genuine but narrow positive, surrounded by clearly characterised
-negatives --- is the scientific result.
+\paragraph{What the evidence supports, and does not.} It supports: the
+graph's consistent, modest, direction-uniform improvement over the
+correlation matrix; the window-dependent skeleton/orientation split; the
+robustness role of orientation; and the dominance of deterministic
+graph-based allocation over the seed-unstable, feedback-inert driver route.
+It does not support: any family-wise-significant improvement over an honest
+correlation control; any orientation effect under VARLiNGAM; or the stress
+hypothesis. That asymmetry --- precise point estimates, honestly thin
+inference --- is the finding.

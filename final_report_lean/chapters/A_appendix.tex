@@ -3,107 +3,155 @@
 \label{app:tables}
 % ============================================================
 
-This appendix collects the full tables referenced in
-Chapter~\ref{chap:evaluation} and a note on reproducibility. The report stands
-without it.
+This appendix collects the full tables behind Chapter~\ref{chap:evaluation}
+and the reproducibility notes. The report stands without it.
 
-\section{Regime-conditional Sharpe (one-year window)}
+\section{The full allocator matrix}
 
-Table~\ref{tab:regime-full} gives the per-regime annualised net Sharpe behind
-Figure~\ref{fig:regime}. Note the wide range of absolute values (low-volatility
-Sharpe is an order of magnitude above the others), which is why the main text
-plots the edge over V0 rather than absolute levels. V2 equals V1 in every cell
-and is omitted.
+Table~\ref{tab:matrix-full} gives every cell of the fixed-graph ablation
+(net annualised Sharpe) plus the supporting arms. The GRANGER row is
+one-year only (its two-year arm was conditional on a one-year signal that
+did not materialise for the structural allocators).
 
 \begin{table}[h]
   \centering
-  \caption{Regime-conditional annualised net Sharpe, window 252, frozen-EEM.}
+  \caption{Net annualised Sharpe, 2007--2024, by graph source, allocator and
+    window. \textsc{corr} is graph-blind (method-independent).}
+  \label{tab:matrix-full}
+  \begin{tabular}{l l c c c c c c c}
+    \toprule
+    Graph & Win & D0 & D0s & D1 & D2 & D2s & D3 & D4 \\
+    \midrule
+    DYNOTEARS & 252 & 0.403 & 0.398 & \textbf{0.411} & 0.399 & 0.406 & 0.397 & 0.393 \\
+    DYNOTEARS & 504 & 0.372 & 0.383 & 0.395 & 0.382 & \textbf{0.399} & 0.387 & 0.387 \\
+    VARLiNGAM & 252 & 0.397 & 0.396 & 0.385 & 0.388 & 0.386 & 0.392 & 0.402 \\
+    VARLiNGAM & 504 & 0.377 & 0.390 & 0.383 & 0.372 & 0.375 & 0.375 & 0.370 \\
+    GRANGER   & 252 & 0.389 & --- & 0.352 & 0.393 & --- & 0.350 & --- \\
+    \midrule
+    \multicolumn{2}{l}{Controls / driver route (w252 / w504):} &
+    \multicolumn{7}{l}{\textsc{corr} $\rsCorrSharpe/\rsCorrSharpeWfive$;\quad
+      V0 $0.371/0.370$;\quad V1 $0.381/0.372$;\quad V1-VAR $0.399/0.357$.} \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\section{Sparsity and cost sweeps}
+
+\begin{table}[h]
+  \centering
+  \caption{Graph-sparsity sweep (DYNOTEARS, one-year window): net Sharpe as
+    the edge-magnitude threshold $\tau$ rises.}
+  \label{tab:tau}
+  \begin{tabular}{l c c c c}
+    \toprule
+    Allocator & $\tau=0$ & $\tau=0.01$ & $\tau=0.05$ & $\tau=0.10$ \\
+    \midrule
+    D0 (skeleton) & 0.403 & 0.403 & 0.393 & 0.394 \\
+    D2            & 0.399 & 0.399 & 0.403 & 0.402 \\
+    D3            & 0.397 & 0.397 & 0.401 & 0.407 \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\begin{table}[h]
+  \centering
+  \caption{Transaction-cost sweep (DYNOTEARS): net Sharpe by one-way cost.
+    The orientation increment (D1$-$D0, D2s$-$D0) is cost-invariant.}
+  \label{tab:cost}
+  \begin{tabular}{l c c c c c}
+    \toprule
+    Allocator (window) & 0\,bps & 5\,bps & 10\,bps & 20\,bps & turnover \\
+    \midrule
+    D0 (252)  & 0.407 & 0.403 & 0.399 & 0.391 & 0.112 \\
+    D1 (252)  & 0.415 & 0.411 & 0.408 & 0.400 & 0.102 \\
+    D2s (252) & 0.411 & 0.406 & 0.401 & 0.391 & 0.140 \\
+    D0 (504)  & 0.376 & 0.372 & 0.368 & 0.361 & --- \\
+    D1 (504)  & 0.398 & 0.395 & 0.392 & 0.387 & --- \\
+    D2s (504) & 0.403 & 0.399 & 0.395 & 0.386 & --- \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\section{Regime-conditional Sharpe (one-year window)}
+
+\begin{table}[h]
+  \centering
+  \caption{Regime-conditional annualised net Sharpe, window 252. The
+    orientation-aware edge concentrates in the low-volatility regime.}
   \label{tab:regime-full}
   \begin{tabular}{l c c c c c}
     \toprule
     Variant & All & NBER rec. & NBER exp. & High-vol & Low-vol \\
     \midrule
-    V0                & 0.371 & $-0.638$ & 0.731 & $-1.351$ & 5.630 \\
-    V0$'$ (asset-only)& \textbf{0.403} & $\mathbf{-0.575}$ & \textbf{0.759} & $\mathbf{-1.317}$ & \textbf{5.744} \\
-    V1-DYNOTEARS      & 0.381 & $-0.616$ & 0.740 & $-1.342$ & 5.642 \\
-    V1-VARLiNGAM      & 0.399 & $-0.604$ & 0.759 & $-1.325$ & 5.710 \\
+    \textsc{corr}     & 0.381 & $-0.589$ & 0.737 & $-1.313$ & 5.564 \\
+    V0 (HSP baseline) & 0.371 & $-0.638$ & 0.731 & $-1.351$ & 5.630 \\
+    D0 (skeleton)     & 0.403 & $\mathbf{-0.575}$ & 0.758 & $-1.317$ & 5.744 \\
+    D1                & \textbf{0.411} & $-0.577$ & \textbf{0.762} & $-1.347$ & 5.854 \\
+    D2s               & 0.406 & $-0.606$ & 0.761 & $-1.361$ & \textbf{5.876} \\
+    V1 (driver route) & 0.381 & $-0.616$ & 0.740 & $-1.342$ & 5.642 \\
     \bottomrule
   \end{tabular}
 \end{table}
 
-\section{$K$-sensitivity (full sweep)}
-
-Table~\ref{tab:ksweep-full} gives the values behind Figure~\ref{fig:ksens}:
-net Sharpe of V0 and V1 (DYNOTEARS) across $K$, at both windows. At two years
-V1 is flat for $K\ge14$ owing to pool exhaustion in the greedy selector.
+\section{The seed audit (full table)}
 
 \begin{table}[h]
   \centering
-  \caption{$K$-sensitivity: net Sharpe (V0, V1-DYNOTEARS) and the difference,
-    by window. Block bootstrap $p$-values in parentheses.}
-  \label{tab:ksweep-full}
-  \begin{tabular}{c c c c | c c c}
+  \caption{E7 seed audit: the committed driver-route configuration (V1,
+    window 252, $K{=}17$) re-run under \rsSeedN\ network seeds; only the
+    initialisation varies. Committed value $=$ seed 0.}
+  \label{tab:seed-full}
+  \begin{tabular}{c c c c | c c c c}
     \toprule
-    & \multicolumn{3}{c|}{Window 252} & \multicolumn{3}{c}{Window 504} \\
-    $K$ & V0 & V1 & $\Delta$ ($p$) & V0 & V1 & $\Delta$ ($p$) \\
+    Seed & Sharpe & CAGR & MaxDD & Seed & Sharpe & CAGR & MaxDD \\
     \midrule
-    10 & 0.391 & 0.376 & $-0.015$ (0.13) & 0.370 & 0.370 & $-0.001$ (0.92) \\
-    14 & 0.387 & 0.389 & $+0.003$ (0.77) & 0.371 & 0.372 & $+0.000$ (1.00) \\
-    17 & 0.371 & 0.381 & $+0.010$ (0.27) & 0.370 & 0.372 & $+0.001$ (0.92) \\
-    20 & 0.400 & 0.384 & $-0.016$ (0.10) & 0.365 & 0.372 & $+0.007$ (0.42) \\
-    25 & 0.393 & 0.383 & $-0.010$ (0.24) & 0.383 & 0.372 & $-0.012$ (0.18) \\
-    \bottomrule
-  \end{tabular}
-\end{table}
-
-\section{Robust-stats battery}
-\label{app:robust}
-
-Table~\ref{tab:robust} gives the per-variant Probabilistic and Deflated Sharpe
-ratios behind Section~\ref{sec:believe-rigour} for the one-year headline universe;
-the full \rsNtrials-configuration table (every variant $\times$ method $\times$
-window $\times$ $K$ $\times$ feedback cell) is in \texttt{results/robust\_stats.csv},
-regenerated by \texttt{python -m scripts.robust\_stats}. PSR is the probability
-the true Sharpe exceeds zero given the sample's skewness, kurtosis and length;
-DSR deflates that benchmark to the best Sharpe expected from \rsNtrials\ trials
-under the null. The data-snooping tests (best causal variant vs V0, one-year)
-give White's Reality Check $p=\rsSpaRC$ and Hansen's SPA $p=\rsSpaConsistent$; the
-$90\%$ Model Confidence Set contains \rsMcsSize\ variants (\rsMcsMembers).
-
-\begin{table}[h]
-  \centering
-  \caption{Probabilistic and Deflated Sharpe ratios, one-year window, frozen-EEM.}
-  \label{tab:robust}
-  \begin{tabular}{l c c c}
-    \toprule
-    Variant & Sharpe & PSR ($>0$) & DSR \\
-    \midrule
-    V0                & 0.371 & \rsVzeroPSR    & \rsVzeroDSR \\
-    V0$'$ (asset-only)& 0.403 & \rsVprimePSR   & \rsVprimeDSR \\
-    V1-DYNOTEARS      & 0.381 & \rsVoneDynoPSR & \rsVoneDynoDSR \\
-    V1-VARLiNGAM      & 0.399 & \rsVoneVarPSR  & \rsVoneVarDSR \\
+    0 & 0.381 & 5.06\% & $-51.2$\% & 10 & 0.389 & 5.20\% & $-51.0$\% \\
+    1 & 0.392 & 5.24\% & $-51.0$\% & 11 & 0.385 & 5.12\% & $-51.0$\% \\
+    2 & 0.396 & 5.31\% & $-51.3$\% & 12 & 0.390 & 5.20\% & $-50.8$\% \\
+    3 & 0.387 & 5.15\% & $-50.8$\% & 13 & 0.389 & 5.19\% & $-51.1$\% \\
+    4 & 0.394 & 5.26\% & $-50.7$\% & 14 & 0.382 & 5.07\% & $-51.6$\% \\
+    5 & 0.391 & 5.22\% & $-51.5$\% & 15 & 0.375 & 4.95\% & $-52.0$\% \\
+    6 & 0.390 & 5.21\% & $-50.6$\% & 16 & 0.386 & 5.14\% & $-50.6$\% \\
+    7 & 0.387 & 5.14\% & $-50.5$\% & 17 & 0.385 & 5.13\% & $-51.3$\% \\
+    8 & 0.393 & 5.25\% & $-50.5$\% & 18 & 0.394 & 5.28\% & $-50.8$\% \\
+    9 & 0.389 & 5.20\% & $-51.1$\% & 19 & 0.387 & 5.15\% & $-51.1$\% \\
     \bottomrule
   \end{tabular}
 \end{table}
 
 \section{Hyperparameters}
 
-For reproducibility, the operative settings were: DYNOTEARS lag $p=1$, intra/
-inter-slice penalties $\lambda_W=\lambda_A=0.05$, edge threshold $0.01$; the
-sensitivity network searched depth $\in\{1,2\}$ and width $\in\{16,32,64\}$ by
-held-out RMSE; $K=17$ from Kneedle calibration on the 2006 burn-in; closed loop
-$\alpha=0.6$, $\gamma=0.3$ (default), swept over
-$\alpha\in\{0.4,0.6,0.8\}\times\gamma\in\{0.1,0.3,0.5\}$; transaction cost
-5\,bps one-way; lookback windows 252 and 504 trading days; holding and rebalance
-step 21 trading days; 215 rebalances over 2007-01 to 2024-11; significance by
-Politis--Romano stationary block bootstrap with 2000 resamples.
+For reproducibility, the operative settings. \emph{Discovery:} DYNOTEARS lag
+$p=1$, $\lambda_W=\lambda_A=0.05$, edge threshold $0.01$; VARLiNGAM with
+lingam pruning disabled (adaptive lasso fails at $d>n$); GRANGER ridge
+$\lambda=10^{-2}$ scaled by window length, density-matched per window to the
+paired DYNOTEARS graph. \emph{Allocators:} single-linkage where clustering is
+used; $\Sigma_{\mathrm{struct}}$ with diagonal shock variances from
+fit-window residuals, nearest-PSD projection and ridge load
+$10^{-6}\operatorname{tr}(\Sigma)/N$; ERC by cyclical coordinate descent,
+tolerance $10^{-12}$, parity asserted to $10^{-8}$; topological tie-break by
+total downstream influence then name. \emph{Driver route:} $K=17$ (Kneedle,
+2006 burn-in); sensitivity networks searched depth $\{1,2\}\times$ width
+$\{16,32,64\}$ by held-out RMSE; feedback grid
+$\alpha\in\{0.4,0.6,0.8\}\times\gamma\in\{0.1,0.3,0.5\}$.
+\emph{Protocol:} 5\,bps one-way (swept $\{0,5,10,20\}$); windows 252/504;
+holding and step 21 trading days; 215 rebalances 2007-01--2024-11;
+Politis--Romano bootstrap, 2000 resamples, mean block 21.
 
 \section{Reproducibility}
 
-All results derive from the committed code and cached data, and are
-bit-reproducible following the determinism fix of Section~\ref{sec:cache}. The
-headline matrix is regenerated by the full-sample backtest launcher across the
-four variants and two windows; the $K$-sweep and $\alpha,\gamma$ grid reuse the
-content-keyed discovery cache; the figures are regenerated from the persisted
-result bundles and summary CSVs by the plotting scripts. No result depends on a
-live network fetch: the universe, prices and driver series are all cached.
+All results derive from committed code and cached data and are
+bit-reproducible: after the data-determinism fix of Section~\ref{sec:cache},
+two independent end-to-end runs produce byte-identical graphs, weights and
+NAVs, verified by the replication gate (D0 vs the prior phase's committed
+bundle: $\Delta$Sharpe $= 0$, max weight difference $= 0.0$ over all 215
+rebalances). The ablation ran on 836 cache-verified graph fits with a 100\%
+hit rate; each backtest regenerates in ${\approx}40$ seconds from the cache.
+Every statistic quoted in the text is either a generated macro
+(\texttt{\_generated/robust\_stats.tex}, rebuilt by
+\texttt{scripts/robust\_stats.py -{}-phase-ii}) or traceable to a committed
+CSV (\texttt{results/phase\_ii\_matrix.csv},
+\texttt{phase\_ii\_contrasts.csv}, \texttt{robust\_stats\_phase\_ii.csv},
+\texttt{seed\_audit.csv}, \texttt{regime\_analysis/}); figures are
+regenerated by \texttt{scripts/plot\_phase\_ii\_figures.py}. No result
+depends on a live network fetch.
