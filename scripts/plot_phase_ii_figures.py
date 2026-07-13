@@ -132,6 +132,7 @@ def f2_forest(contrasts: pd.DataFrame) -> None:
 # ============================================================================
 def f3_nav() -> None:
     curves = {
+        "CORR  correlation-distance HRP": ("phase_ii_corr_hrp_w252", "#000000", ":"),
         "V0  correlation-HSP": ("phase_i_v0_w252", C["V0"], "-"),
         "D0 ≡ V0′  symmetrised causal": ("phase_ii_dynotears_D0_w252", C["D0"], "-"),
         "D1  structural covariance": ("phase_ii_dynotears_D1_w252", C["D1"], "-"),
@@ -220,6 +221,61 @@ def f5_regime() -> None:
     plt.close(fig)
 
 
+# ============================================================================
+# F6 — the decomposition (the master question in one picture)
+# ============================================================================
+def f6_decomposition(matrix: pd.DataFrame, contrasts: pd.DataFrame) -> None:
+    """Net Sharpe of CORR → D0 (+skeleton) → D1/D2s (+orientation), DYNOTEARS,
+    with the pairwise bootstrap Δ and p annotated on each step."""
+    def sharpe(method, alloc, w):
+        m = matrix[(matrix.method == method) & (matrix.allocator == alloc)
+                   & (matrix.window == w)]
+        return float(m.sharpe.iloc[0])
+
+    def delta(name, w, method="dynotears"):
+        c = contrasts[(contrasts.contrast == name) & (contrasts.window == w)
+                      & (contrasts.method == method)]
+        if c.empty:
+            return None
+        return float(c.delta_sharpe.iloc[0]), float(c.p_value.iloc[0])
+
+    bars = [("CORR", "#000000"), ("D0", C["D0"]), ("D1", C["D1"]), ("D2s", C["D2s"])]
+    all_vals = {w: [sharpe("phase_i", "CORR-HRP", w)] + [
+        sharpe("dynotears", a, w) for a, _ in bars[1:]] for w in (252, 504)}
+    lo = min(v for vs in all_vals.values() for v in vs) - 0.006
+    hi = max(v for vs in all_vals.values() for v in vs) + 0.007
+
+    fig, axes = plt.subplots(1, 2, figsize=(10.5, 3.9), sharey=True,
+                             constrained_layout=True)
+    # The step each bar adds relative to its reference (CORR for D0; D0 for D1/D2s).
+    steps = {1: ("D0-CORR", "+ skeleton"), 2: ("D1-D0", "+ orientation"),
+             3: ("D2s-D0", "+ orientation")}
+    for ax, w in zip(axes, (252, 504)):
+        vals = all_vals[w]
+        xs = np.arange(len(bars))
+        ax.bar(xs, vals, 0.62, color=[c for _, c in bars])
+        ax.axhline(vals[0], color="#000000", lw=0.9, ls=":")
+        for x, v in zip(xs, vals):
+            ax.annotate(f"{v:.3f}", (x, v + 0.0012), ha="center", fontsize=9)
+            if x in steps:
+                d = delta(steps[x][0], w)
+                if d is not None:
+                    dv, p = d
+                    ax.annotate(f"{steps[x][1]}\n{dv:+.3f}\n(p={p:.2f})",
+                                (x, lo + 0.55 * (min(vals) - lo) + 0.004),
+                                ha="center", va="bottom", fontsize=7.8,
+                                color="white", fontweight="bold")
+        ax.set_xticks(xs, [b for b, _ in bars])
+        ax.set_ylim(lo, hi)
+        ax.set_title(f"{w}-day window", fontsize=10)
+    axes[0].set_ylabel("net Sharpe")
+    fig.suptitle(
+        "Decomposing the causal-graph gain over the correlation matrix: "
+        "skeleton vs edge orientation (DYNOTEARS)", fontsize=10.5)
+    fig.savefig(FIG / "phase_ii_decomposition.png", dpi=200)
+    plt.close(fig)
+
+
 def main() -> None:
     FIG.mkdir(parents=True, exist_ok=True)
     matrix = pd.read_csv(RESULTS / "phase_ii_matrix.csv")
@@ -229,6 +285,7 @@ def main() -> None:
     f3_nav()
     f4_seed(matrix)
     f5_regime()
+    f6_decomposition(matrix, contrasts)
     print(f"figures → {FIG}/phase_ii_*.png")
 
 

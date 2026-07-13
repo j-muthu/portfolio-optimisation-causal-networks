@@ -43,6 +43,9 @@ PHASE_I = {
     "V0prime": "phase_i_v0prime_w{w}",
     "V1-DYNOTEARS": "phase_i_v1_w{w}",
     "V1-VARLiNGAM": "phase_i_v1_varlingam_w{w}",
+    # The like-for-like correlation control for the skeleton-vs-orientation
+    # decomposition (graph-blind, method-independent, same allocator).
+    "CORR-HRP": "phase_ii_corr_hrp_w{w}",
 }
 
 
@@ -137,6 +140,15 @@ def main() -> None:
             v0 = comparators.get(("V0", w))
             if v0 is not None:
                 out.append(_contrast("D0-V0", d0, v0, w, m))
+            # 2b. The decomposition anchors vs the pure correlation matrix:
+            #     total(D*) − CORR = skeleton(D0 − CORR) + orientation(D* − D0).
+            corr = comparators.get(("CORR-HRP", w))
+            if corr is not None:
+                out.append(_contrast("D0-CORR", d0, corr, w, m))
+                for a in ("D1", "D2s"):
+                    r = rets.get((m, a, w))
+                    if r is not None:
+                        out.append(_contrast(f"{a}-CORR", r, corr, w, m))
             # 3. best(D*) − V1 under the same discovery method.
             v1_key = "V1-DYNOTEARS" if m == "dynotears" else "V1-VARLiNGAM"
             v1 = comparators.get((v1_key, w))

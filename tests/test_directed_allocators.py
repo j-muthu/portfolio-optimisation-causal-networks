@@ -166,6 +166,34 @@ def test_every_allocator_returns_valid_longonly_weights(name):
     pd.testing.assert_series_equal(w, dispatch_allocator(name, g, rets))
 
 
+def test_corr_hrp_matches_hand_construction():
+    """CORR must equal hrp_weights on the textbook correlation distance,
+    routed through the same nearest-PSD house pattern as every D-variant."""
+    from pipeline.portfolio._old_v123 import correlation_distance, nearest_psd
+    from pipeline.portfolio.hrp import hrp_weights
+    from pipeline.portfolio.hsp import sample_covariance
+
+    N = 8
+    g = _graph(_random_dag(N, seed=31))
+    rets = _returns(g.asset_names, seed=17)
+    w = dispatch_allocator("CORR", g, rets)
+
+    sub = rets[g.asset_names].dropna()
+    dist = nearest_psd(correlation_distance(sub.corr().to_numpy()))
+    D = pd.DataFrame(dist, index=g.asset_names, columns=g.asset_names)
+    expected = hrp_weights(D, sample_covariance(sub))
+    pd.testing.assert_series_equal(w, expected, check_names=False)
+
+
+def test_corr_hrp_is_graph_blind():
+    """Two entirely different graphs must give identical CORR weights — the
+    control uses the graph only for its asset universe."""
+    rets = _returns([f"A{i}" for i in range(8)], seed=17)
+    w_a = dispatch_allocator("CORR", _graph(_random_dag(8, seed=1)), rets)
+    w_b = dispatch_allocator("CORR", _graph(_random_dag(8, seed=2)), rets)
+    pd.testing.assert_series_equal(w_a, w_b)
+
+
 def test_dispatch_rejects_unknown_allocator():
     g = _graph(np.zeros((2, 2)))
     with pytest.raises(ValueError, match="unknown allocator"):

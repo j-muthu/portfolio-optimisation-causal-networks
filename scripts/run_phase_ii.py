@@ -90,7 +90,12 @@ def main(argv: list[str] | None = None) -> None:
     else:
         discovery_kwargs = None
 
-    tag = f"phase_ii_{args.method}_{args.allocator}_w{args.window}"
+    if args.allocator == "CORR":
+        # The plain correlation-distance HRP control is graph-blind, so it is
+        # method-independent: one tag regardless of --method.
+        tag = f"phase_ii_corr_hrp_w{args.window}"
+    else:
+        tag = f"phase_ii_{args.method}_{args.allocator}_w{args.window}"
     if args.tau > 0.0:
         tag += f"_tau{args.tau:g}"
     if args.tag_suffix:

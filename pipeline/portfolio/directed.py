@@ -46,6 +46,7 @@ import pandas as pd
 from pipeline.discovery.asset_graph import AssetGraphWindow
 from pipeline.portfolio._old_v123 import (
     causal_embedding_distance,
+    correlation_distance,
     nearest_psd,
     symmetrise_distance,
 )
@@ -209,6 +210,28 @@ def _hrp_from_distance(
 # ============================================================================
 # The D-variant allocators
 # ============================================================================
+def corr_hrp_weights(
+    graph: AssetGraphWindow,
+    returns_window: pd.DataFrame,
+    linkage_method: str = "single",
+) -> pd.Series:
+    """CORR — plain correlation-distance HRP (López de Prado 2016), the
+    like-for-like control for the skeleton-vs-orientation decomposition.
+
+    Ignores the causal graph entirely: the distance is ``√(½(1−ρ))`` on the
+    sample correlation of the lookback window, everything downstream (the
+    nearest-PSD house pattern, sample covariance, linkage, recursive
+    bisection) is byte-identical to the D-variants — so D0 − CORR isolates
+    exactly the replacement of the correlation matrix by the graph skeleton.
+    The ``graph`` argument supplies only the asset universe.
+    """
+    rets = returns_window[list(graph.asset_names)].dropna()
+    corr = rets.corr().to_numpy()
+    return _hrp_from_distance(
+        correlation_distance(corr), graph, sample_covariance(rets), linkage_method,
+    )
+
+
 def d0_weights(
     graph: AssetGraphWindow,
     returns_window: pd.DataFrame,
@@ -281,7 +304,7 @@ def d4_coancestry_weights(
 # ============================================================================
 # Dispatch (the runner's single entry point)
 # ============================================================================
-ALLOCATORS = ("D0", "D0s", "D1", "D2", "D2s", "D3", "D4")
+ALLOCATORS = ("CORR", "D0", "D0s", "D1", "D2", "D2s", "D3", "D4")
 
 
 def dispatch_allocator(
@@ -301,6 +324,7 @@ def dispatch_allocator(
             covariance="structural" if name == "D2s" else "sample",
         )
     fn = {
+        "CORR": corr_hrp_weights,
         "D0": d0_weights,
         "D0s": d0s_weights,
         "D1": d1_weights,
@@ -315,6 +339,7 @@ def dispatch_allocator(
 __all__ = [
     "ALLOCATORS",
     "ERCConvergenceError",
+    "corr_hrp_weights",
     "dispatch_allocator",
     "d0_weights",
     "d0s_weights",

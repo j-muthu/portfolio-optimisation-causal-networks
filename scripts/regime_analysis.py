@@ -59,6 +59,9 @@ VARIANTS = [
     ("V2-DYNOTEARS","dynotears","phase_i_v2_w{w}"),
     ("V1-VARLiNGAM","varlingam","phase_i_v1_varlingam_w{w}"),
     ("V2-VARLiNGAM","varlingam","phase_i_v2_varlingam_w{w}"),
+    # The graph-blind correlation control for the skeleton-vs-orientation
+    # decomposition (plain correlation-distance HRP, method-independent).
+    ("CORR-HRP",    "—",        "phase_ii_corr_hrp_w{w}"),
     # Phase-II direction-aware allocators (fixed-graph ablation). DYNO-D0 is
     # byte-identical to V0prime, so only the VARLiNGAM D0 row is added.
     ("VARL-D0",     "varlingam","phase_ii_varlingam_D0_w{w}"),

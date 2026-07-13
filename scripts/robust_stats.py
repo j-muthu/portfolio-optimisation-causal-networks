@@ -98,6 +98,8 @@ def _phase_ii_tags() -> dict[str, str]:
     """name -> bundle tag for every Phase-II configuration evaluated."""
     tags: dict[str, str] = {}
     for w in WINDOWS:
+        # The like-for-like correlation control (graph-blind plain HRP).
+        tags[f"CORR-HRP_w{w}"] = f"phase_ii_corr_hrp_w{w}"
         for method, short in PHASE_II_METHODS:
             for a in PHASE_II_ALLOCS:
                 tags[f"{short}-{a}_w{w}"] = f"phase_ii_{method}_{a}_w{w}"
@@ -351,9 +353,10 @@ def main(argv: list[str] | None = None) -> None:
     mcs_universe = list(headline252)
     spa_phase_ii = None
     spa_direction: dict[int, dict] = {}
+    spa_skeleton: dict[int, dict] = {}
     if args.phase_ii:
         d252 = [c for c in returns.columns
-                if c.startswith(("DYNO-", "VARL-", "GRAN-")) and c.endswith("_w252")
+                if c.startswith(("DYNO-", "VARL-", "GRAN-", "CORR-")) and c.endswith("_w252")
                 and "_tau" not in c]
         d252 = drop_duplicate_configs(returns, mcs_universe + d252)
         d_only = [c for c in d252 if c not in mcs_universe]
@@ -374,6 +377,18 @@ def main(argv: list[str] | None = None) -> None:
                      if c != bench]
             if bench in returns.columns and cands:
                 spa_direction[w] = run_spa(returns, benchmark=bench, candidates=cands)
+        # R1 family-wise: does ANY causal-structure strategy beat the plain
+        # correlation-distance HRP control, per window? (The skeleton-vs-
+        # correlation half of the decomposition, with the full search priced in.)
+        for w in WINDOWS:
+            bench = f"CORR-HRP_w{w}"
+            cands = [c for c in returns.columns
+                     if (c.startswith(("DYNO-", "VARL-")) or c == f"V0prime_w{w}")
+                     and c.endswith(f"_w{w}") and "_tau" not in c]
+            cands = [c for c in drop_duplicate_configs(returns, [bench] + cands)
+                     if c != bench]
+            if bench in returns.columns and cands:
+                spa_skeleton[w] = run_spa(returns, benchmark=bench, candidates=cands)
     mcs_in, _ = run_mcs(returns, mcs_universe)
     # mark MCS membership on the table (only meaningful for the MCS universe)
     table["in_mcs90"] = [bool(c in mcs_in) if c in mcs_universe else ""
@@ -388,6 +403,8 @@ def main(argv: list[str] | None = None) -> None:
         print(f"\n=== SPA/RC (Phase-II D-variants vs V0, w252) ===\n{spa_phase_ii}")
     for w, res in spa_direction.items():
         print(f"\n=== SPA/RC (direction-aware vs D0/V0prime, w{w}) ===\n{res}")
+    for w, res in spa_skeleton.items():
+        print(f"\n=== SPA/RC (causal structure vs CORR-HRP, w{w}) ===\n{res}")
     print(f"\n=== MCS 90% set (w252 universe, n={len(mcs_universe)}) ===\n{mcs_in}")
 
     # --- measurement problem on the closed loop (V2/V1 w252) ---
@@ -402,23 +419,43 @@ def main(argv: list[str] | None = None) -> None:
         if n in returns.columns:
             print(f"  {n:24s} {annualised_sharpe(returns[n]):.4f}")
 
-    # --- emit report macros (per named w252 variant + battery verdicts) ---
-    if args.phase_ii:
-        # Report macros stay frozen on the committed 41-trial Phase-I battery
-        # until the report-reorientation stage; the Phase-II battery lives in
-        # robust_stats_phase_ii.csv + FINDINGS.md only.
-        print(f"\nsaved → {out_csv} (report macros NOT regenerated in --phase-ii mode)")
+    # --- emit report macros (owned by the unified --phase-ii battery) ---
+    if not args.phase_ii:
+        # Since the 2026-07 report rewrite the report quotes ONE battery over
+        # everything ever evaluated; the 41-trial default mode must not
+        # overwrite those macros with a smaller deflation universe.
+        print(f"\nsaved → {out_csv} (report macros unchanged — regenerate with --phase-ii)")
         return
+
     def cell(config: str, col: str) -> float:
         hit = table.loc[table.config == config, col]
         return float(hit.iloc[0]) if len(hit) else float("nan")
 
-    pretty_mcs = ", ".join(
-        m.replace("_w252", "").replace("V0prime", "V0$'$") for m in mcs_in) or "none"
+    # The joint MCS keeps most of the correlated causal variants, so the
+    # informative quantity is who is EXCLUDED, not the long member list.
+    excluded = [c for c in mcs_universe if c not in mcs_in]
+    pretty_excluded = ", ".join(
+        e.replace("_w252", "").replace("V0prime", "V0$'$") for e in excluded) or "none"
+
+    # E7 seed audit (results/seed_audit.csv, written by scripts/run_seed_audit.py).
+    seed_macros: dict[str, str] = {}
+    seed_csv = RESULTS / "seed_audit.csv"
+    if seed_csv.exists():
+        sa = pd.read_csv(seed_csv)
+        committed = float(sa.loc[sa.seed == 0, "sharpe"].iloc[0])
+        seed_macros = {
+            "rsSeedN":      str(len(sa)),
+            "rsSeedMin":    _fmt(sa.sharpe.min()),
+            "rsSeedMedian": _fmt(sa.sharpe.median()),
+            "rsSeedMax":    _fmt(sa.sharpe.max()),
+            "rsSeedRange":  _fmt(sa.sharpe.max() - sa.sharpe.min()),
+            "rsSeedPct":    str(int(round(100 * float((sa.sharpe < committed).mean())))),
+        }
+
     macros = {
         "rsNtrials": str(n_trials),
         "rsKurtosis": _fmt(pooled_excess_kurtosis(returns), 1),
-        # per-variant PSR (vs zero) and DSR (multiplicity-deflated), w252 headline
+        # per-variant PSR (vs zero) and DSR (deflated vs ALL trials), w252
         "rsVzeroPSR":    _fmt(cell("V0_w252", "psr_vs_zero")),
         "rsVzeroDSR":    _fmt(cell("V0_w252", "dsr")),
         "rsVprimePSR":   _fmt(cell("V0prime_w252", "psr_vs_zero")),
@@ -427,21 +464,38 @@ def main(argv: list[str] | None = None) -> None:
         "rsVoneDynoDSR": _fmt(cell("V1-DYNOTEARS_w252", "dsr")),
         "rsVoneVarPSR":  _fmt(cell("V1-VARLiNGAM_w252", "psr_vs_zero")),
         "rsVoneVarDSR":  _fmt(cell("V1-VARLiNGAM_w252", "dsr")),
-        # data-snooping battery (best causal variant vs V0, w252)
+        # the correlation control and the leading direction-aware allocators
+        "rsCorrSharpe":      _fmt(cell("CORR-HRP_w252", "sharpe_ann")),
+        "rsCorrSharpeWfive": _fmt(cell("CORR-HRP_w504", "sharpe_ann")),
+        "rsCorrPSR":         _fmt(cell("CORR-HRP_w252", "psr_vs_zero")),
+        "rsCorrDSR":         _fmt(cell("CORR-HRP_w252", "dsr")),
+        "rsDoneSharpe":  _fmt(cell("DYNO-D1_w252", "sharpe_ann")),
+        "rsDonePSR":     _fmt(cell("DYNO-D1_w252", "psr_vs_zero")),
+        "rsDoneDSR":     _fmt(cell("DYNO-D1_w252", "dsr")),
+        "rsDtwosSharpe": _fmt(cell("DYNO-D2s_w252", "sharpe_ann")),
+        "rsDtwosDSR":    _fmt(cell("DYNO-D2s_w252", "dsr")),
+        # data-snooping battery
         "rsSpaRC":         _fmt(spa["rc_lower"]),
         "rsSpaConsistent": _fmt(spa["spa_consistent"]),
+        "rsSpaDvar":       _fmt(spa_phase_ii["spa_consistent"]) if spa_phase_ii else "--",
+        "rsSpaDirWtwo":    _fmt(spa_direction[252]["spa_consistent"]) if 252 in spa_direction else "--",
+        "rsSpaDirWfive":   _fmt(spa_direction[504]["spa_consistent"]) if 504 in spa_direction else "--",
+        "rsSpaSkelWtwo":   _fmt(spa_skeleton[252]["spa_consistent"]) if 252 in spa_skeleton else "--",
+        "rsSpaSkelWfive":  _fmt(spa_skeleton[504]["spa_consistent"]) if 504 in spa_skeleton else "--",
         "rsMcsSize":       str(len(mcs_in)),
-        "rsMcsMembers":    pretty_mcs,
+        "rsMcsUniverse":   str(len(mcs_universe)),
+        "rsMcsExcluded":   pretty_excluded,
         "rsMcsVzeroIn":    "is" if "V0_w252" in mcs_in else "is not",
         # closed-loop measurement problem
         "rsRewardMean": _fmt(mp.get("reward_mean", float("nan"))),
         "rsRewardStd":  _fmt(mp.get("reward_std", float("nan"))),
         "rsRewardSNR":  _fmt(mp.get("reward_snr", float("nan")), 2),
         "rsSharpeSE":   _fmt(mp.get("sharpe_se_window", float("nan")), 2),
+        **seed_macros,
     }
     write_macros(GEN / "robust_stats.tex", macros)
-    print(f"\nsaved → {RESULTS}/robust_stats.csv")
-    print(f"saved → {GEN}/robust_stats.tex (report macros)")
+    print(f"\nsaved → {out_csv}")
+    print(f"saved → {GEN}/robust_stats.tex (report macros, unified battery)")
 
 
 if __name__ == "__main__":

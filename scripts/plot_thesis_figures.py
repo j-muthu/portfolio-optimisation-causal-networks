@@ -140,7 +140,7 @@ def fig_k_sensitivity():
         ax.grid(True, alpha=0.3)
     axes[0].set_ylabel("Annualised Sharpe (net)")
     axes[0].legend(frameon=False, loc="best")
-    fig.suptitle("J4a — K-sensitivity: the V1>V0 edge is not robust to K", fontsize=12)
+    fig.suptitle("K-sensitivity: the V1>V0 edge is not robust to K", fontsize=12)
     fig.tight_layout()
     _save(fig, "k_sensitivity.png")
 
@@ -161,7 +161,7 @@ def fig_feedback_grid():
             ax.text(j, i, f"{piv.values[i, j]:.3f}", ha="center", va="center",
                     color="white", fontsize=9)
     fig.colorbar(im, ax=ax, label="V2 net Sharpe")
-    ax.set_title("J4b — V2 Sharpe across the α/γ grid:\nclosed loop is inert (V2 ≡ V1 = 0.381 everywhere)",
+    ax.set_title("V2 Sharpe across the α/γ feedback grid:\nclosed loop is inert (V2 ≡ V1 = 0.381 everywhere)",
                  fontsize=11)
     fig.tight_layout()
     _save(fig, "feedback_grid.png")
@@ -210,7 +210,7 @@ def fig_directional_prior():
     ax2.plot(x, df.topK_jaccard, "o-", color="#D55E00", label="top-K driver Jaccard (with vs without prior)")
     ax2.set_ylabel("top-K Jaccard", color="#D55E00")
     ax2.set_ylim(0, 1.05)
-    ax.set_title("J1 — the asset→driver prior is consequential:\nit suppresses 35–48% spurious reverse-causation mass and shifts selection",
+    ax.set_title("The asset→driver prior is consequential:\nit suppresses 35–48% spurious reverse-causation mass and shifts selection",
                  fontsize=11)
     lines = ax.get_legend_handles_labels()[0] + ax2.get_legend_handles_labels()[0]
     labs = ax.get_legend_handles_labels()[1] + ax2.get_legend_handles_labels()[1]
