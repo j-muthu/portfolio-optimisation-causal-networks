@@ -29,6 +29,11 @@ window,variant,method,regime,turnover_1way_annual,n_rebalances
 252,V2-VARLiNGAM,varlingam,nber_expansion,1.5349,194
 252,V2-VARLiNGAM,varlingam,low_vol,1.6296,40
 252,V2-VARLiNGAM,varlingam,high_vol,1.7527,41
+252,CORR-HRP,—,all,1.1771,214
+252,CORR-HRP,—,nber_recession,1.3957,20
+252,CORR-HRP,—,nber_expansion,1.1806,194
+252,CORR-HRP,—,low_vol,1.3981,40
+252,CORR-HRP,—,high_vol,1.5084,41
 252,VARL-D0,varlingam,all,1.3795,214
 252,VARL-D0,varlingam,nber_recession,1.5474,20
 252,VARL-D0,varlingam,nber_expansion,1.3821,194
@@ -124,6 +129,11 @@ window,variant,method,regime,turnover_1way_annual,n_rebalances
 504,V2-VARLiNGAM,varlingam,nber_expansion,1.4119,194
 504,V2-VARLiNGAM,varlingam,low_vol,1.5236,40
 504,V2-VARLiNGAM,varlingam,high_vol,1.6394,41
+504,CORR-HRP,—,all,0.9882,214
+504,CORR-HRP,—,nber_recession,1.2839,20
+504,CORR-HRP,—,nber_expansion,0.9771,194
+504,CORR-HRP,—,low_vol,1.103,40
+504,CORR-HRP,—,high_vol,1.3933,41
 504,VARL-D0,varlingam,all,1.2291,214
 504,VARL-D0,varlingam,nber_recession,1.3948,20
 504,VARL-D0,varlingam,nber_expansion,1.2278,194

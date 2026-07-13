@@ -377,10 +377,33 @@ byte-identical), and D0/D1/D2s all sit *above the seed-cloud maximum*
 under any seed (`results/seed_audit.csv`,
 `results/figures/phase_ii_seed.png`).
 
+**Addendum (2026-07-13) — the CORR-HRP control and the decomposition
+reading.** For the final report's master question ("how much of the causal
+graph's gain over the correlation matrix is skeleton vs edge orientation?")
+the like-for-like control is plain correlation-distance HRP (`CORR`,
+`corr_hrp_weights`: distance √(½(1−ρ)), same allocator, graph-blind;
+pre-registered as an optional comparator in §2-E1). Results
+(`phase_ii_corr_hrp_w{252,504}`): **net Sharpe 0.381 / 0.363** — notably,
+plain HRP *beats* the cum-corr HSP baseline V0 (0.371) at w252, i.e. the HSP
+driver/FFNN machinery subtracts value relative to textbook HRP. Against this
+stronger control the decomposition reads: **w252 — skeleton +0.022 (p=0.14),
+orientation +0.009 on top (p=0.47); w504 — skeleton +0.009 (p=0.55),
+orientation +0.023–0.027 on top (p=0.05–0.07)**. All 12 D-vs-CORR contrasts
+are positive (consistent direction) but none is pairwise-significant, and the
+family-wise R1 test (SPA, causal-structure variants vs CORR) gives **p=0.123
+(w252) / 0.094 (w504)** — the causal graph's improvement over the pure
+correlation matrix is directionally consistent at both windows but does not
+survive data-snooping correction. The earlier D0−V0 significance (p<0.001)
+was therefore substantially a statement about V0's machinery, not about the
+correlation matrix per se. Unified battery: n_trials = 84 (+CORR ×2); the
+joint 90% MCS over 22 w252 strategies keeps 21, excluding only V0; report
+macros are now owned by `robust_stats --phase-ii` (the 41-trial default mode
+no longer writes them).
+
 **Artefacts.** `results/phase_ii_matrix.csv`, `phase_ii_contrasts.csv`,
 `robust_stats_phase_ii.csv`, `seed_audit.csv`, `phase_ii_dag_diagnostics.csv`,
 regime tables (extended), figures `results/figures/phase_ii_{heatmap,forest,
-nav,seed,regime}.png`. Compute: the whole phase ran in ~1 afternoon on the
+nav,seed,regime,decomposition}.png`. Compute: the whole phase ran in ~1 afternoon on the
 warm discovery cache (each 215-rebalance D-variant backtest ≈ 40 s; the naïve
 estimate without the cache was ~15 h/run). DAG diagnostics: DYNOTEARS
 asset-graphs average ~625 edges (density 0.064) with DAG depth ~50 of 99 —

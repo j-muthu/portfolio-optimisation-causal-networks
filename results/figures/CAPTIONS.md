@@ -72,6 +72,40 @@ what survives the search-corrected test is causal structure, not the
 driver-selection mechanism. Values from `results/robust_stats.csv`
 (`scripts/robust_stats.py`).*
 
+## Phase-II figure set (`results/figures/phase_ii_*.png`)
+
+**phase_ii_decomposition.png** — *The master-question decomposition (DYNOTEARS,
+net Sharpe). At the 252-day window the causal graph's gain over the plain
+correlation-distance HRP control (CORR, 0.381) is carried by the skeleton
+(D0 +0.022, p=0.14); orientation adds little on top (D1 +0.009, p=0.47). At the
+504-day window the pattern inverts: the skeleton's gain shrinks to +0.009
+(p=0.55) and orientation contributes the larger share (D1 +0.023, p=0.05;
+D2s +0.027, p=0.07). No single step is family-wise significant.*
+
+**phase_ii_heatmap.png** — *Net Sharpe by discovery method × allocator at both
+windows, with the symmetrised control D0 boxed. The DYNOTEARS direction-aware
+cells (D1, D2s) are the only ones strong at both windows; under VARLiNGAM the
+direction effect is absent; GRANGER supports ordering (D2) but not the
+structural covariance (D1/D3).*
+
+**phase_ii_forest.png** — *The fixed-graph direction effect: ΔSharpe of each
+direction-aware allocator vs its own symmetrised control D0, Politis–Romano 95%
+CIs. All five DYNOTEARS contrasts positive at w504 (D1 starred, pairwise
+p=0.049); ≈0 at w252 and under VARLiNGAM.*
+
+**phase_ii_nav.png** — *Cumulative net NAV (w252, 5 bps one-way): the
+correlation-distance HRP control, correlation-HSP (V0), the causal skeleton
+(D0 ≡ V0′), the direction-aware D1 and D2s, and driver-based Causal-HSP (V1).*
+
+**phase_ii_seed.png** — *The FFNN-seed audit: V1's net Sharpe across 20 seeds
+(0.375–0.396; the committed value sits at the 5th percentile of its own seed
+distribution) vs the deterministic, seed-free D-variants, all of which sit above
+the seed-cloud maximum.*
+
+**phase_ii_regime.png** — *Regime-conditional Sharpe excess over V0 (w252): the
+direction-aware edge concentrates in the VIX bottom quintile (calm markets),
+not in stress — the stress hypothesis is rejected.*
+
 ## Corrected interim-report figures (`interim_report/figures_corrected/`)
 
 These are the frozen-EEM corrections of the two submitted interim figures (the
