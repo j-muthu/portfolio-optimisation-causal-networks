@@ -1,25 +1,26 @@
 % ============================================================
-\chapter{A3 and Evaluation: Decomposing the Gain}
+\chapter{A3: Decomposing the Gain}
 \label{chap:evaluation}
 % ============================================================
 
-This chapter evaluates (A3, addressing C3). It proceeds Socratically through
-the questions Q decomposes into: how should the gain be measured at all
-(Section~\ref{sec:method}); does the causal graph improve on the correlation
-matrix in the first place --- requirement R1 --- and what happened to the
-driver route this project began from (Section~\ref{sec:r1}); how does the
-gain split between skeleton and orientation --- the answer to Q ---
-and how robust is that split (Section~\ref{sec:decomposition}); and how much
-of all of it survives rigorous, multiplicity-aware inference
-(Section~\ref{sec:believe-rigour}). Section~\ref{sec:believe} closes with the
-threats to validity.
+This chapter evaluates (A3, addressing C3). Its structure follows the
+logical order in which Q must be answered. Section~\ref{sec:method} fixes
+how the gain is measured. Section~\ref{sec:r1} tests requirement R1 ---
+whether the causal graph improves on the correlation matrix at all --- and
+disposes of the driver route the project began from.
+Section~\ref{sec:decomposition} presents the decomposition of the gain into
+skeleton and orientation --- the answer to Q --- together with its
+robustness to the design's free parameters. Section~\ref{sec:believe-rigour}
+subjects every claim to the multiplicity-aware inference battery, and
+Section~\ref{sec:believe} closes with the threats to validity.
 
 \section{How should the gain be measured?}
 \label{sec:method}
 
 \paragraph{Protocol.} Every configuration runs the identical walk-forward
 backtest: the fixed 99-name universe, monthly rebalancing over 2007--2024
-(215 rebalances), estimation windows of 252 and 504 trading days for both the
+(215 rebalances at the one-year window; the two-year window's longer burn-in
+leaves 203), estimation windows of 252 and 504 trading days for both the
 graph fit and the sample covariance, weights held for 21 trading days,
 transaction costs of 5\,bps per unit of one-way turnover (swept over
 $\{0,5,10,20\}$\,bps). ``Performance'' always means the \emph{out-of-sample,
@@ -70,17 +71,19 @@ Requirement R1 asks whether there is any gain to decompose. The like-for-like
 comparison is the graph-blind \textsc{corr} control against the
 skeleton-only D0 on the same allocator: at the one-year window
 $\textsc{corr}=\rsCorrSharpe$ against $\text{D0}=0.403$, a skeleton gain of
-$+0.022$ ($p=0.14$); adding orientation lifts the best cell to D1's $0.411$,
-a total causal-graph gain of $+0.031$ ($p=0.14$). At the two-year window
+$+0.022$ ($p=0.14$); adding orientation on top lifts the best treatment (D1)
+a further $+0.009$, a total causal-graph gain of $+0.031$ ($p=0.14$;
+Table~\ref{tab:decomp}). At the two-year window
 $\textsc{corr}=\rsCorrSharpeWfive$ and the total gain is $+0.032$--$0.036$
-(D1/D2s, $p=0.12$/$0.08$). Every one of the twelve D-versus-\textsc{corr}
-contrasts is positive --- consistent in direction across allocators, methods
-and windows --- but \emph{none is individually significant}, and the
-family-wise test (Hansen's SPA, all causal-structure strategies against
-\textsc{corr}) gives $p=\rsSpaSkelWtwo$ at one year and $p=\rsSpaSkelWfive$
-at two. R1 is therefore supported directionally but not statistically: the
-causal graph consistently out-performs the correlation matrix by a modest
-margin that data-snooping correction cannot distinguish from a lucky search.
+(D1/D2s, $p=0.12$/$0.084$). All 28 graph-versus-\textsc{corr} contrasts ---
+seven graph-consuming allocators, both discovery methods, both windows ---
+are positive, consistent in direction across the entire grid, but \emph{none
+is individually significant}, and the family-wise test (Hansen's SPA, all
+causal-structure strategies against \textsc{corr}) gives $p=\rsSpaSkelWtwo$
+at one year and $p=\rsSpaSkelWfive$ at two. R1 is therefore supported
+directionally but not statistically: the causal graph consistently
+out-performs the correlation matrix by a modest margin that data-snooping
+correction cannot distinguish from a lucky search.
 
 Two contextual facts sharpen this reading. First, an earlier phase of this
 project reported the same comparison against the HSP baseline V0
@@ -106,19 +109,17 @@ $\alpha\in\{0.4,0.6,0.8\}\times\gamma\in\{0.1,0.3,0.5\}$ grid its weights
 equal open-loop V1's at every rebalance (Figure~\ref{fig:grid}), because the
 utility blend can only re-rank drivers \emph{within} the causally-selected
 set. And even where it could act, it could not learn: the monthly reward
-$R[t]$ is a Sharpe ratio estimated from 21 daily observations, whose sampling
-standard error (${\approx}\,\rsSharpeSE$ for a near-zero true Sharpe) dwarfs
-the realised signal --- across 215 rebalances $R[t]$ has mean
-$\rsRewardMean$ and standard deviation $\rsRewardStd$, a per-update
-signal-to-noise ratio of ${\approx}\,\rsRewardSNR$. \emph{The update
-frequency is the measurement problem}: a monthly loop receives one number a
-month that is ${\sim}95\%$ noise, so no feedback rule at this frequency
-could extract the signal; a redesign would have to raise the update
-frequency (or lengthen the reward window) before touching the learning rule.
-Together with the seed instability quantified in
-Section~\ref{sec:seed-audit}, the driver route is dominated on every axis by
-the deterministic graph route --- which is precisely why Q is about the
-graph.
+$R[t]$ is a Sharpe ratio estimated from 21 daily observations --- across 215
+rebalances it has mean $\rsRewardMean$ and standard deviation
+$\rsRewardStd$, a per-update signal-to-noise ratio of
+${\approx}\,\rsRewardSNR$. \emph{The update frequency is the measurement
+problem}: a monthly loop receives one number a month that is ${\sim}95\%$
+noise, so no feedback rule at this frequency could extract the signal; a
+redesign would have to raise the update frequency (or lengthen the reward
+window) before touching the learning rule. Together with the seed
+instability quantified in Section~\ref{sec:seed-audit}, the driver route is
+dominated on every axis by the deterministic graph route --- which is
+precisely why Q is about the graph.
 
 \begin{figure}[tbp]
   \centering
@@ -147,7 +148,7 @@ graph.
 
 \subsection{The headline split}
 
-Figure~\ref{fig:decomp} is the dissertation's central result;
+Figure~\ref{fig:decomp} is the thesis's central result;
 Table~\ref{tab:decomp} gives the numbers and Figure~\ref{fig:heatmap} the
 full allocator--method matrix. At the \textbf{one-year window} the gain is
 \emph{skeleton-dominated}: the skeleton contributes $+0.022$ ($p=0.14$) and
@@ -158,7 +159,7 @@ contribution collapses to $+0.009$ ($p=0.55$) while orientation contributes
 $+0.023$ (D1, pairwise $p=0.049$) to $+0.027$ (D2s, $p=0.067$) --- and all
 five DYNOTEARS orientation-aware contrasts are positive
 (Figure~\ref{fig:forest}). Family-wise, however, the orientation effect does
-not survive: Hansen's SPA over the ten direction-aware variants against their
+not survive: Hansen's SPA over the direction-aware variants against their
 own skeleton control gives $p=\rsSpaDirWfive$ at two years (and
 $p=\rsSpaDirWtwo$ at one year, where there is no effect to find).
 
@@ -197,9 +198,10 @@ $p=\rsSpaDirWtwo$ at one year, where there is no effect to find).
   \centering
   \includegraphics[width=0.99\textwidth]{figures/phase_ii_heatmap.png}
   \caption{Net Sharpe by discovery method $\times$ allocator at both windows
-    (boxed column: the skeleton control D0). The one-year row is
-    skeleton-strong; the two-year DYNOTEARS row is orientation-strong; the
-    VARLiNGAM rows show no orientation effect at all.}
+    (boxed column: the symmetrised control D0). The one-year panel is
+    skeleton-strong; in the two-year panel the DYNOTEARS row is
+    orientation-strong, while the VARLiNGAM rows show no orientation effect
+    at either window.}
   \label{fig:heatmap}
 \end{figure}
 
@@ -209,8 +211,9 @@ $p=\rsSpaDirWtwo$ at one year, where there is no effect to find).
   \caption{The fixed-graph orientation effect: $\Delta$Sharpe of each
     orientation-aware allocator against the skeleton control D0, with
     $95\%$ block-bootstrap CIs ($\ast$: $p<0.05$). All five DYNOTEARS
-    contrasts are positive at the two-year window; none is at one year, and
-    none is under VARLiNGAM.}
+    contrasts are positive at the two-year window (D1 significant pairwise);
+    at one year, and under VARLiNGAM at both windows, the contrasts scatter
+    around zero and none is significant.}
   \label{fig:forest}
 \end{figure}
 
@@ -228,6 +231,27 @@ window on the allocation, retaining information the long-window sample
 moments blur. On this reading, orientation acts as a regulariser of the
 allocation step rather than a source of extra return, which is exactly what
 the level-vs-robustness pattern shows.
+
+\paragraph{An alternative explanation, and the evidence against it.} The
+contrast $\text{D1}-\text{D0}$ compares the SEM-implied covariance against
+the sample covariance, and $\Sigma_{\mathrm{struct}}$ is also a
+\emph{structured} estimator --- fewer effective parameters, shrinkage-like
+in character --- so a sceptic can read the two-year gain as a generic
+structured-covariance effect rather than a directional one. Two
+observations push back. First, orientation is \emph{constitutive} of the
+estimator, not a decoration on it: the exact total-effect algebra of
+Section~\ref{sec:sem} exists only because the directed graph is acyclic, so
+there is no orientation-free version of $\Sigma_{\mathrm{struct}}$ to
+attribute the gain to. Second, and empirically, the identical construction
+on VARLiNGAM graphs --- equally structured, differently oriented --- yields
+nothing, and its magnitude-degraded GRANGER version collapses (both shown
+in the discovery-method comparison of the next subsection): if generic
+structure were the mechanism, both should have
+worked. The gain therefore tracks the \emph{content} of the DYNOTEARS
+orientations, not the mere presence of structure. A fully dispositive
+control would require a symmetric analogue of $\Sigma_{\mathrm{struct}}$,
+which the acyclicity requirement rules out; that residual is recorded as a
+limitation rather than argued away.
 
 \begin{figure}[tbp]
   \centering
@@ -285,7 +309,8 @@ plausible reading is that in stress, correlations rise toward one and any
 structure --- causal or correlational --- is swamped by the common factor,
 while in calm markets cross-sectional causal heterogeneity is the signal;
 but whatever the mechanism, the hypothesis as stated was wrong, and is
-reported as such.
+reported as such --- an outcome Howard et al.'s stable-regime centrality
+alpha (Section~\ref{sec:howard-theme}) had already hinted at.
 
 \begin{figure}[tbp]
   \centering
@@ -324,9 +349,13 @@ $\rsSpaSkelWfive$ (two years) --- R1 not established family-wise.
 \textbf{(iii)} Orientation-aware variants vs their own skeleton control:
 $p=\rsSpaDirWtwo$/$\rsSpaDirWfive$ --- the orientation effect, suggestive
 pairwise at two years, does not survive its own multiplicity.
-\textbf{(iv)} The Phase-II variants against V0: $p=\rsSpaDvar$. The pattern
-is coherent: every family-wise test that anchors on a \emph{weak} benchmark
-(V0) rejects; every test that anchors on an honest one does not.
+\textbf{(iv)} The Chapter-\ref{chap:sensitivity} allocator family against
+V0: $p=\rsSpaDvar$ --- not significant even against the weak anchor. The
+pattern: the study's sole family-wise rejection, (i), anchors on the weak
+incumbent baseline and is carried by the skeleton-bearing variants; every
+test against an honest control fails to reject. Family-wise, the only
+hypothesis this study can reject is that the incumbent's machinery is
+competitive.
 
 \paragraph{The Model Confidence Set.} The $90\%$ MCS over the
 \rsMcsUniverse\ distinct one-year strategies retains \rsMcsSize\ of them,
@@ -350,8 +379,10 @@ sits at the $\rsSeedPct$th percentile of its own seed distribution --- at
 the unluckiest seed the edge all but vanishes. This quantifies, on this
 pipeline, the concern that neural sensitivity-based results are fragile to
 undisclosed seed choices; and it is the strongest argument for the
-deterministic D-family, every member of which sits \emph{above the seed
-cloud's maximum} and produces byte-identical results on every run.
+deterministic D-family, every member of which except D4 sits \emph{above
+the seed cloud's maximum} --- the headline allocators D0, D1 and D2s
+comfortably so --- and all of which produce byte-identical results on every
+run.
 
 \begin{figure}[tbp]
   \centering
@@ -359,7 +390,8 @@ cloud's maximum} and produces byte-identical results on every run.
   \caption{The seed audit: net Sharpe of the driver route V1 across
     \rsSeedN\ network seeds (one-year window), against the deterministic
     graph-based allocators. The seed range exceeds V1's claimed edge over
-    its baseline; every D-variant sits above the seed-cloud maximum.}
+    its baseline; the graph-based allocators shown sit above the seed-cloud
+    maximum.}
   \label{fig:seed}
 \end{figure}
 
@@ -367,19 +399,20 @@ cloud's maximum} and produces byte-identical results on every run.
 \emph{point estimates} are clear and internally consistent: skeleton-carried
 gain at one year, orientation-carried gain at two, with orientation acting
 as a cross-window stabiliser and D1 topping the study-wide DSR table. Its
-\emph{statistical support} is honest but thin: consistent signs across
-twelve contrasts and two windows, one pairwise-significant cell
-($p=0.049$), and no family-wise survival anywhere. The largest defensible
-claim is conditional: \emph{if} one replaces the correlation matrix with a
-DYNOTEARS graph, the skeleton is what pays at short windows, and keeping the
-orientations costs nothing while materially improving robustness to the
-estimation-window choice.
+\emph{statistical support} is honest but thin: consistent signs across all
+28 graph-versus-correlation contrasts, one pairwise-significant orientation
+cell ($p=0.049$), and no family-wise survival anywhere. The largest
+defensible claim is conditional: \emph{if} one replaces the correlation
+matrix with a DYNOTEARS graph, the skeleton is what pays at short windows,
+and keeping the orientations costs nothing while materially improving
+robustness to the estimation-window choice.
 
 \section{How much should we believe this?}
 \label{sec:believe}
 
 \paragraph{Effect sizes sit near the detection floor.} The decomposition's
-components are $0.01$--$0.03$ Sharpe over 18 years; at this sample length
+components are $0.01$--$0.03$ Sharpe over 18 years, against a full-sample
+Sharpe standard error of ${\approx}\,\rsSharpeSE$; at this sample length
 such effects are at the edge of detectability, so the absence of family-wise
 significance is not evidence of absence --- but equally the presence of one
 $p=0.049$ cell among ten orientation contrasts is exactly what multiplicity

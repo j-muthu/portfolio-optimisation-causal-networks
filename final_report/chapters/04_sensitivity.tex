@@ -6,7 +6,9 @@
 This chapter presents the allocation machinery (A2, addressing C2) that makes
 Q answerable: a family of allocators fed the identical per-window graph, split
 into \emph{controls} that can see only the skeleton and \emph{treatments}
-that can see the orientations. Section~\ref{sec:symm} states the problem;
+that can see the orientations. The family is the construction that discharges
+requirement R2 --- before it exists, ``what is orientation worth?'' is not an
+askable question. Section~\ref{sec:symm} states the problem;
 Section~\ref{sec:sem} derives the structural quantities the treatments
 consume; Sections~\ref{sec:controls}--\ref{sec:d-family} define the
 allocators; Section~\ref{sec:ablation-design} assembles them into the
@@ -20,14 +22,28 @@ Hierarchical allocation (Section~\ref{sec:hrp-theme}) consumes a symmetric,
 non-negative distance matrix; a causal graph is asymmetric by design, and the
 asymmetry is the point. The naive fix --- symmetrise the adjacency, e.g.\
 $\tfrac{1}{2}(|M| + |M^\top|)$ --- discards exactly the orientations Q asks
-about. The challenge is therefore not to shoehorn $M$ into the existing
+about. A principled-looking alternative fails too, instructively: the
+bipartite double cover of the directed graph --- equivalently the Hermitian
+dilation, the symmetric $2N{\times}2N$ block matrix with $M$ and $M^{\top}$
+in its off-diagonal blocks --- embeds the directed matrix \emph{losslessly}
+in a symmetric object, at the price of doubling the node set, so that every
+asset appears once in its source role and once in its sink role.
+Hierarchical allocation then produces weights over $2N$ pseudo-assets, and
+recombining each asset's two role-weights into a single holding re-poses
+precisely the upstream-versus-downstream question the construction was meant
+to absorb: the asymmetry is relocated, not resolved. This dead end was
+investigated and sets the design conclusion for the chapter --- the
+symmetric interface cannot be tricked into carrying orientation; the
+allocation steps themselves must change. The challenge is therefore not to
+shoehorn $M$ into the existing
 interface but to build allocation steps that consume the \emph{directed}
 matrix natively, while changing as little else as possible, so that any
-performance difference is attributable to orientation and nothing else. Two
-observations open the way. First, HRP's dendrogram exists only to produce a
-leaf \emph{ordering} for recursive bisection --- and a DAG carries a natural
-ordering for free. Second, HRP's bisection step consumes cluster
-\emph{variances} from a covariance matrix --- and a DAG implies one.
+performance difference is attributable to orientation and nothing else. The
+two structural observations of Section~\ref{sec:hrp-theme} open the way.
+First, HRP's dendrogram exists only to produce a leaf \emph{ordering} for
+recursive bisection --- and a DAG carries a natural ordering for free.
+Second, HRP's bisection step consumes cluster \emph{variances} from a
+covariance matrix --- and a DAG implies one.
 
 \section{The structural model: total effects and the implied covariance}
 \label{sec:sem}
@@ -104,15 +120,20 @@ is not accidentally identified with one particular symmetrisation.
 \label{sec:d-family}
 
 Five treatments consume the directed matrix, each through a different
-mechanism, so the results chapter can localise \emph{where} any orientation
-value arises. All are long-only, fully invested, deterministic and seed-free;
-all take the identical $(M,\ \text{returns window})$ inputs as the controls.
+mechanism, and the mechanisms are chosen to \emph{separate}: D1 alters only
+the bisection covariance, D2 only the ordering, D2s both, D3 abandons the
+hierarchy altogether, and D4 re-enters through the clustering distance. The
+results chapter can therefore localise not just whether orientation carries
+value but \emph{where}. All five are long-only, fully invested, deterministic
+and seed-free; all take the identical $(M,\ \text{returns window})$ inputs as
+the controls; none has an analogue in the HRP/HSP literature.
 
-\paragraph{D1 --- structural covariance.} Clustering as in D0 (so the
-ordering is held at the skeleton), but recursive bisection allocates on
-$\Sigma_{\mathrm{struct}}$ of Eq.~\eqref{eq:sigma-struct} instead of the
-sample covariance: orientation enters through the allocation step, via the
-shock-propagation asymmetry of $B$.
+\paragraph{D1 --- structural covariance.} Clustering as in D0 --- the
+ordering is deliberately held at the skeleton, so that
+$\text{D1}-\text{D0}$ isolates orientation's effect on the allocation step
+alone --- but recursive bisection allocates on $\Sigma_{\mathrm{struct}}$ of
+Eq.~\eqref{eq:sigma-struct} instead of the sample covariance: orientation
+enters through the shock-propagation asymmetry of $B$.
 
 \paragraph{D2 / D2s --- causal-ordered bisection.}
 \label{sec:d2}
@@ -133,14 +154,14 @@ upstream/downstream direction itself.
 \paragraph{D3 --- structural-shock risk parity.} No hierarchy at all.
 Portfolio variance under the SEM decomposes as
 $w^\top \Sigma_{\mathrm{struct}}\, w =
-\lVert \Sigma_\varepsilon^{1/2} B^\top w \rVert^2$, so equalising risk
-contributions on $\Sigma_{\mathrm{struct}}$ is parity over \emph{structural
-shock origins} --- where risk is injected into the causal system --- rather
-than over correlated returns. Weights are computed by Spinu's cyclical
-coordinate descent \cite{spinu2013erc} (long-only, deterministic,
-convergence asserted to risk-contribution parity within $10^{-8}$). Exact
-per-shock parity generally requires shorting; the long-only solution is the
-practical projection, stated as such.
+\lVert \Sigma_\varepsilon^{1/2} B^\top D_\sigma\, w \rVert^2$, so equalising
+risk contributions on $\Sigma_{\mathrm{struct}}$ is parity over
+\emph{structural shock origins} --- where risk is injected into the causal
+system --- rather than over correlated returns. Weights are computed by
+Spinu's cyclical coordinate descent \cite{spinu2013erc} (long-only,
+deterministic, convergence asserted to risk-contribution parity within
+$10^{-8}$). Exact per-shock parity generally requires shorting; the long-only
+solution is the practical projection, stated as such.
 
 \paragraph{D4 --- co-ancestry clustering.} A halfway house that feeds
 orientation into an \emph{unchanged} symmetric pipeline: rows of the
@@ -164,11 +185,14 @@ covariance-estimation window, allocator internals downstream of the distance/
 covariance/ordering choice --- is shared code. Orientation is therefore the
 sole treatment variable, and the decomposition is two differences with a
 common anchor: $\text{D0}-\textsc{corr}$ (skeleton) and
-$\text{D}^{*}-\text{D0}$ (orientation). The grid --- 7 graph-consuming
-allocators $\times$ \{DYNOTEARS, VARLiNGAM\} $\times$ \{252, 504\}-day
-windows, plus the GRANGER arm, a sparsity sweep and a cost sweep --- was
-specified in a written plan before any treatment cell was run, and no
-allocator was added after results were seen.
+$\text{D}^{*}-\text{D0}$ (orientation). The two rungs telescope ---
+$(\text{D0}-\textsc{corr}) + (\text{D}^{*}-\text{D0}) =
+\text{D}^{*}-\textsc{corr}$ --- so the total causal-graph gain is attributed
+without remainder. The grid --- 7 graph-consuming allocators $\times$
+\{DYNOTEARS, VARLiNGAM\} $\times$ \{252, 504\}-day windows, plus the GRANGER
+arm, a sparsity sweep and a cost sweep --- was specified in a written plan
+before any treatment cell was run, and no allocator was added after results
+were seen.
 
 \paragraph{Verification before results.} Three gates preceded the grid.
 The \emph{unit-test gate}: 60+ tests written first, including the

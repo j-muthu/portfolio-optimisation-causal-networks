@@ -22,7 +22,7 @@ metric helpers of ``pipeline.evaluation.metrics``.
 
 Outputs:
   * ``results/robust_stats.csv``                     — the per-variant table;
-  * ``final_report_lean/_generated/robust_stats.tex`` — \\newcommand macros that
+  * ``final_report/_generated/robust_stats.tex`` — \\newcommand macros that
     the report \\input's, so no number is transcribed by hand.
 
 Run:  python -m scripts.robust_stats
@@ -48,7 +48,7 @@ log = logging.getLogger("robust_stats")
 
 REPO = pathlib.Path(__file__).resolve().parent.parent
 RESULTS = REPO / "results"
-GEN = REPO / "final_report_lean" / "_generated"
+GEN = REPO / "final_report" / "_generated"
 
 # ----------------------------------------------------------------------------
 # The configuration universe (the "trials" whose multiplicity the DSR corrects).

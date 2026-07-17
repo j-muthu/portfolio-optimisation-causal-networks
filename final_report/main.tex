@@ -1,0 +1,180 @@
+\documentclass[12pt, a4paper]{report}
+
+% Custom Computing group formatting
+\usepackage{ccrep}
+
+% Additional packages
+\usepackage{booktabs}
+\usepackage{array}
+\usepackage{enumitem}
+
+% Referencing (Vancouver style, mandated)
+\addbibresource{references.bib}
+
+% Robust-stats macros (PSR/DSR/SPA/MCS, seed audit, measurement problem),
+% generated over the unified trial universe by
+%   python -m scripts.robust_stats --phase-ii
+% The committed file carries the authoritative values.
+\input{_generated/robust_stats}
+
+% ------------------------------------------------------------------
+% MARKING GATES (check before every submission build):
+%  1. Main content (Ch1 to end of Ch6) must be <= 60 pages: the page
+%     limit is an absolute cap on the Communication criterion, which in
+%     turn caps the overall mark.
+%  2. Abstract must fit on one page at these margins.
+%  3. Declarations (originality / ethics / GenAI) must be present and
+%     in the front matter.
+%  4. If _generated/robust_stats.tex is regenerated, re-read the
+%     sentences coupled to specific values: "rejects in exactly one of
+%     four" (Ch5/Ch6) and "p >= \rsSpaSkelWfive" (Ch1).
+% ------------------------------------------------------------------
+
+% Document metadata
+\title{Portfolio Optimisation with Causal Networks}
+\author{Joshua Muthu}
+\cid{06048741}
+\supervisor{Dr.\ Ce Guo and Prof.\ Wayne Luk}
+\secondmarker{Prof.\ Stephen Weston}
+\date{September 2026}
+
+\begin{document}
+
+% --- Front matter (does not count towards the 60-page limit) ---
+\pagenumbering{roman}
+
+\maketitle
+
+\begin{abstract}
+\noindent Hierarchical portfolio allocators cluster assets on a symmetric
+matrix --- in practice the return correlation matrix, which records that two
+assets move together but not which moves the other. Temporal causal discovery
+produces a richer input: a directed acyclic graph over the assets. A DAG
+carries two separable kinds of information, its \emph{skeleton} (which pairs
+are linked) and its \emph{edge orientations} (which way influence flows), and
+a symmetric clustering step can use only the first. This thesis asks a single
+question: \emph{when the correlation matrix in hierarchical portfolio
+allocation is replaced by a discovered causal graph, how much of the
+performance gain is attributable to the graph's skeleton versus its edge
+orientations?} The question presupposes two requirements the thesis must
+establish: \textbf{R1}, that the causal graph improves on the correlation
+matrix at all; and \textbf{R2}, that an allocator can exploit orientation in
+the first place. The allocator family built for R2 is the methodological
+contribution.
+
+The decomposition is made measurable by a fixed-graph ablation. At each of 215
+monthly rebalances over 2007--2024, one DYNOTEARS graph is discovered over the
+${\sim}100$ largest S\&P~500 constituents (VARLiNGAM and ridge-Granger graphs
+serve as comparators), and that same graph feeds allocators differing only in
+what they read from it: a graph-blind correlation-distance HRP control, a
+skeleton allocator that symmetrises the graph before clustering, and five
+orientation-aware allocators. These exploit the DAG's total-effect matrix
+$B = (I - M^{\top})^{-1}$, exact by nilpotency, to build a structural
+covariance for the allocation step, a topological order that replaces the
+clustering dendrogram, an equal-risk allocation across structural shock
+origins, and a clustering distance from shared causal ancestry. Every variant
+is deterministic, seed-free and bit-reproducible. Performance means
+out-of-sample, net-of-cost annualised Sharpe at one- and two-year estimation
+windows, adjudicated by a multiplicity-aware battery --- probabilistic and
+deflated Sharpe, White's Reality Check, Hansen's SPA, the model confidence
+set --- over all \rsNtrials\ configurations evaluated.
+
+The answer is window-dependent, and modest. At the one-year window the gain is
+essentially all skeleton: net Sharpe rises from $\rsCorrSharpe$ at the control
+to $0.403$ for the skeleton ($+0.022$, pairwise $p=0.14$), and orientation
+adds only $+0.009$ more ($\rsDoneSharpe$, $p=0.47$). At the two-year window
+the split inverts: the skeleton's contribution collapses to $+0.009$
+($p=0.55$) while orientation restores $+0.023$--$0.027$ ($p=0.05$--$0.07$).
+Orientation therefore buys cross-window \emph{consistency} rather than level:
+the structural-covariance and causal-ordered allocators are the only variants
+strong at both windows, are robust to transaction costs and graph sparsity,
+and the former attains the highest deflated Sharpe ($\rsDoneDSR$) of all
+\rsNtrials\ configurations. No rung of the decomposition, however, survives
+family-wise correction (Hansen's SPA: skeleton
+$p=\rsSpaSkelWtwo$/$\rsSpaSkelWfive$, orientation
+$p=\rsSpaDirWtwo$/$\rsSpaDirWfive$ at the two windows); the effects are absent
+under VARLiNGAM graphs; and the orientation edge concentrates in calm rather
+than stressed regimes.
+
+Two supporting results sharpen the verdict. The driver-selection route this
+project began from, Hierarchical Sensitivity Parity, is shown to be
+unlearnable at monthly frequency --- its feedback reward has a signal-to-noise
+ratio of ${\approx}\,\rsRewardSNR$ --- and unstable: its neural sensitivity
+step's Sharpe spans $\rsSeedMin$--$\rsSeedMax$ across \rsSeedN\ random seeds,
+a range twice the edge it claims, while the graph-only allocators are
+deterministic and the headline variants exceed every seed. The contribution is
+thus a pre-registered, reproducible decomposition of where a causal graph's
+value lies for hierarchical allocation: mostly in its skeleton at short
+windows, in its orientations only as a consistency effect at long windows, and
+nowhere by enough to clear a family-wise bar.
+\end{abstract}
+
+\chapter*{Declarations}
+
+\section*{Statement of originality}
+This report and the work it describes are my own. The research was conducted
+under the supervision of Dr.\ Ce Guo and Prof.\ Wayne Luk. All external
+sources --- published work, datasets and third-party code --- are cited in
+the text; vendored third-party libraries are identified as such in the
+repository. All numerical results are reproducible from the committed code
+and cached data (Appendix~\ref{app:tables}).
+
+\section*{Ethical considerations}
+No Imperial ethics approval was required: the project uses only publicly
+available market and macroeconomic data and involves no human participants or
+personal data. The work is a retrospective backtest study; it makes no
+investment recommendations, and Chapter~\ref{chap:evaluation} quantifies
+precisely the uncertainty with which its results should be read.
+
+\section*{Use of generative AI}
+Generative AI (Anthropic's Claude) was used in two capacities, both reviewed
+by me as author. \emph{As a coding assistant} during implementation: all
+AI-assisted code was human-reviewed and is covered by the project's test
+suite and by the end-to-end verification gates of
+Section~\ref{sec:ablation-design} --- including a byte-perfect replication
+gate against an independently produced historical result --- so no
+correctness claim rests on unverified generated code. \emph{As a drafting and
+proofreading aid} for the prose of this report: AI-drafted text was checked
+and edited line by line, and, because unverified numerical claims are a known
+failure mode of generated text, every statistic quoted in this report is
+either a macro generated directly from the committed results
+(\texttt{\_generated/robust\_stats.tex}) or traceable to a committed results
+file, as documented in Appendix~\ref{app:tables}. The research question,
+design decisions, mathematics, experiments, analysis and conclusions are my
+own.
+
+\begin{acknowledgements}
+I would like to thank my supervisors, Dr.\ Ce Guo and Prof.\ Wayne Luk, for
+their guidance throughout this project, and Prof.\ Stephen Weston as my second
+marker.
+\end{acknowledgements}
+
+\tableofcontents
+\listoffigures
+\listoftables
+\clearpage
+
+% --- Main content (60-page limit applies from here) ---
+\pagenumbering{arabic}
+
+% The spine: Ch1 states Q + R1/R2 and operationalises every term; Ch2 positions
+% the three core papers against Q; Ch3 = A1 (discover the graph, C1);
+% Ch4 = A2 (graph -> weights: CORR control, D0 skeleton, D1-D4 orientation
+% family, fixed-graph ablation design, compact HSP driver arm, C2);
+% Ch5 = A3 (protocol + battery, R1, the decomposition, what survives rigour,
+% threats, C3); Ch6 answers Q in two lines and lists contributions.
+\input{chapters/01_introduction}
+\input{chapters/02_background}
+\input{chapters/03_discovery}
+\input{chapters/04_sensitivity}
+\input{chapters/05_evaluation}
+\input{chapters/06_conclusion}
+
+% --- Back matter (does not count towards the 60-page limit) ---
+\clearpage
+\printbibliography[heading=bibintoc, title={References}]
+
+\appendix
+\input{chapters/A_appendix}
+
+\end{document}

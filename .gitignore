@@ -31,27 +31,23 @@ results/**/utility.parquet
 *.env.local
 
 old_notes/
-interim_report/interim_report.*
-!interim_report/interim_report.tex
 
-interim_report/interim_report_template.*
-!interim_report/interim_report_template.tex
+# Superseded report folders + old notes, kept locally only.
+archive/
 
 varlingam_docs/
 
 latex_template/*
 
-final_report/*
-
-# final_report_lean: track LaTeX source + figures + the built PDF, but not the
+# final_report: track LaTeX source + figures + generated macros, but not the
 # LaTeX build intermediates.
-final_report_lean/main.aux
-final_report_lean/main.bbl
-final_report_lean/main.bcf
-final_report_lean/main.blg
-final_report_lean/main.fdb_latexmk
-final_report_lean/main.fls
-final_report_lean/main.log
-final_report_lean/main.out
-final_report_lean/main.run.xml
-final_report_lean/main.toc
+final_report/main.aux
+final_report/main.bbl
+final_report/main.bcf
+final_report/main.blg
+final_report/main.fdb_latexmk
+final_report/main.fls
+final_report/main.log
+final_report/main.out
+final_report/main.run.xml
+final_report/main.toc

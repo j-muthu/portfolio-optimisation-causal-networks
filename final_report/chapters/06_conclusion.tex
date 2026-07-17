@@ -6,23 +6,27 @@
 \section{Summary of findings}
 \label{sec:summary}
 
-This dissertation asked one question: when the correlation matrix in
+This thesis asked one question: when the correlation matrix in
 hierarchical portfolio allocation is replaced by a discovered causal graph,
 how much of the performance gain is attributable to the graph's skeleton
 versus its edge orientations? It made the question answerable by building the
-two things it presupposes --- a reproducible rolling discovery pipeline that
+machinery it presupposes --- a reproducible rolling discovery pipeline that
 delivers a byte-identical asset--asset DAG to every allocator (A1), and an
-orientation-aware allocator family with matched skeleton and correlation
-controls (A2) --- and answered it with multiplicity-, distribution- and
-stability-aware inference (A3).
+orientation-aware allocator family with provably orientation-blind skeleton
+and correlation controls (A2, discharging requirement R2) --- and answered
+it under multiplicity-, distribution- and stability-aware inference (A3).
 
-The answer, stated as the decomposition Q demands (net annualised Sharpe,
-2007--2024, 215 monthly rebalances, 5\,bps costs):
+The answer, in two lines: \emph{at one-year estimation windows the gain is
+almost entirely the skeleton's; at two-year windows the skeleton's gain
+evaporates and orientation restores it. Orientation buys robustness to the
+estimation window, not level --- and no step of the decomposition is
+family-wise significant against honest controls.} In detail (net annualised
+Sharpe, 2007--2024, monthly rebalancing, 5\,bps costs):
 
 \begin{enumerate}[itemsep=2pt]
   \item \textbf{At the one-year window the gain is the skeleton's.} Replacing
-        the correlation matrix with the DYNOTEARS graph is worth up to
-        $+0.031$ ($0.411$ vs $\rsCorrSharpe$), of which $+0.022$ comes from
+        the correlation matrix with the DYNOTEARS graph is worth $+0.031$ in
+        total (D1 $-$ \textsc{corr}, $p=0.14$), of which $+0.022$ comes from
         the skeleton ($p=0.14$) and only $+0.009$ from orientation
         ($p=0.47$).
   \item \textbf{At the two-year window the split inverts.} The skeleton's
@@ -35,13 +39,14 @@ The answer, stated as the decomposition Q demands (net annualised Sharpe,
         sparsity threshold, and D1 attains the highest Deflated Sharpe ratio
         of all \rsNtrials\ configurations evaluated ($\rsDoneDSR$).
   \item \textbf{Nothing survives family-wise correction against honest
-        anchors.} Hansen's SPA rejects only where the benchmark is the weak
-        HSP baseline ($p=\rsSpaConsistent$); against the \textsc{corr}
-        control ($p=\rsSpaSkelWtwo$/$\rsSpaSkelWfive$) and against the
-        skeleton control ($p=\rsSpaDirWtwo$/$\rsSpaDirWfive$) the
-        decomposition's steps are directionally consistent but statistically
-        unconfirmed. The $90\%$ Model Confidence Set over \rsMcsUniverse\
-        one-year strategies eliminates only the HSP baseline.
+        anchors.} Of the four pre-specified SPA tests, Hansen's procedure
+        rejects in exactly one --- the causal family against the weak HSP
+        baseline ($p=\rsSpaConsistent$); against the \textsc{corr} control
+        ($p=\rsSpaSkelWtwo$/$\rsSpaSkelWfive$) and against the skeleton
+        control ($p=\rsSpaDirWtwo$/$\rsSpaDirWfive$) the decomposition's
+        steps are directionally consistent but statistically unconfirmed.
+        The $90\%$ Model Confidence Set over \rsMcsUniverse\ one-year
+        strategies eliminates only the HSP baseline.
   \item \textbf{The effect is method- and regime-specific.} Under VARLiNGAM
         graphs orientation adds nothing anywhere; under cheap ridge-Granger
         graphs the topological \emph{ordering} survives but the structural
@@ -55,10 +60,11 @@ The answer, stated as the decomposition Q demands (net annualised Sharpe,
         (reward signal-to-noise ${\approx}\,\rsRewardSNR$ --- the update
         frequency \emph{is} the measurement problem); and its neural
         sensitivity step makes its Sharpe seed-dependent across
-        $[\rsSeedMin,\rsSeedMax]$ over \rsSeedN\ seeds --- a range exceeding
+        $[\rsSeedMin,\rsSeedMax]$ over \rsSeedN\ seeds --- a range twice
         its claimed edge, with the committed value at the $\rsSeedPct$th
-        percentile of its own seed distribution. Every deterministic
-        graph-based allocator beats it under every seed.
+        percentile of its own seed distribution. The graph-based allocators
+        are deterministic, and the headline three (D0, D1, D2s) exceed even
+        its luckiest seed.
 \end{enumerate}
 
 \section{Contributions}
@@ -78,8 +84,8 @@ The answer, stated as the decomposition Q demands (net annualised Sharpe,
   \item \textbf{Empirical:} the decomposition itself (skeleton-carried at
         short windows, orientation-as-robustness at long windows, nothing
         family-wise significant against honest controls), its method- and
-        regime-dependence, and the finding that plain HRP beats the HSP
-        machinery it is usually compared against.
+        regime-dependence, and the finding that textbook HRP beats the HSP
+        machinery built to improve on it.
   \item \textbf{Meta-scientific:} a quantified seed audit substantiating the
         instability critique of neural sensitivity-based allocation; the
         identification of a monthly feedback loop's measurement problem
@@ -109,6 +115,45 @@ shocks' assumed independence is an approximation; and the choice of Q ---
 though not the experiment --- was informed by the first phase's results,
 which the unified \rsNtrials-trial deflation universe only partly corrects.
 
+\section{Broader impact}
+\label{sec:impact}
+
+\paragraph{For investors.} Allocation research is consumed by asset managers
+and pension schemes, so its failures are borne --- diffusely, and years
+later --- by end savers. The characteristic harm in this literature is not a
+malfunctioning system but a convincing backtest of an overfit strategy;
+multiplicity-corrected, family-wise-honest evaluation is therefore not
+methodological decoration but the investor-protection function of research
+method, and this report applies it to its own headline. The same honesty is
+a corrective to what might be called \emph{causal-washing}: a ``causal''
+label invites over-trust, and the finding here is that a causal method's
+value can be modest, window- and method-dependent, and --- at short windows
+--- largely attributable to structure that cheap symmetrisation already
+captures. The label guarantees nothing; the decomposition, not the
+branding, is what carries information.
+
+\paragraph{For the field.} Three of this project's technical choices
+generalise into norms. The seed audit has an uncomfortable reading for
+published neural-pipeline results: an author free to choose among \rsSeedN\
+seeds could have reported $\rsSeedMax$ rather than $\rsSeedMin$ --- an
+entire claimed edge manufactured by one undisclosed decision --- so
+deterministic constructions, or disclosed seed distributions, should be the
+default. The measurement problem generalises to any feedback trading
+system: a reward that is ${\sim}95\%$ noise per update cannot teach,
+whatever the learning rule sitting on top of it, and checking reward
+estimability at the design stage would spare the field many dead ends. And
+the determinism episode of Section~\ref{sec:cache} --- two conclusions
+overturned by a reproducibility fix --- argues that bit-reproducibility
+belongs among publication prerequisites rather than aspirations.
+
+\paragraph{Costs.} The content-keyed cache cut the marginal cost of a
+configuration from ${\sim}15$ hours to ${\sim}40$ seconds, which is what
+made an \rsNtrials-configuration study --- and hence its multiplicity
+correction --- affordable at all. The compute and energy economics of
+caching-first experimental design are a transferable, if unglamorous,
+contribution to sustainable empirical research: rigour and efficiency were
+complements here, not a trade-off.
+
 \section{Future work}
 \label{sec:future}
 
@@ -119,9 +164,10 @@ verified in a reduced-scope probe but whose ${\sim}10\times$ fit cost
 deferred a full backtest) would test whether orientation value is a
 DYNOTEARS artefact. \textbf{(2) Fix the measurement problem, then revisit
 feedback.} The monthly loop failed for a measurement reason, not a learning
-one; a weekly rebalance (or a reward estimated over the full inter-rebalance
-path rather than a 21-day Sharpe) raises the update signal-to-noise by
-design, and only then is a feedback rule worth re-testing. \textbf{(3)}
+one: a higher update frequency would give the learner more reward
+observations to average over, and a longer reward window would raise the
+signal-to-noise of each one. Only after one of these changes is any feedback
+rule worth re-testing. \textbf{(3)}
 \textbf{Signed structural allocation.} The long-only ERC on
 $\Sigma_{\mathrm{struct}}$ is a projection of exact per-shock parity, which
 generally requires shorting; a long--short mandate is the natural home for

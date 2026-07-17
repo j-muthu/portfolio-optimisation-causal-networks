@@ -4,7 +4,10 @@
 % ============================================================
 
 This appendix collects the full tables behind Chapter~\ref{chap:evaluation}
-and the reproducibility notes. The report stands without it.
+and the reproducibility notes. The report stands without it. One convention:
+all $\Delta$Sharpe values quoted in the main text are computed on unrounded
+return series; differencing the three-decimal entries below can therefore
+disagree with a quoted increment by one unit in the third decimal.
 
 \section{The full allocator matrix}
 
@@ -16,7 +19,8 @@ did not materialise for the structural allocators).
 \begin{table}[h]
   \centering
   \caption{Net annualised Sharpe, 2007--2024, by graph source, allocator and
-    window. \textsc{corr} is graph-blind (method-independent).}
+    window; row-wise best in bold. \textsc{corr} is graph-blind
+    (method-independent). ``---'': not in the pre-registered GRANGER scope.}
   \label{tab:matrix-full}
   \begin{tabular}{l l c c c c c c c}
     \toprule
@@ -24,9 +28,9 @@ did not materialise for the structural allocators).
     \midrule
     DYNOTEARS & 252 & 0.403 & 0.398 & \textbf{0.411} & 0.399 & 0.406 & 0.397 & 0.393 \\
     DYNOTEARS & 504 & 0.372 & 0.383 & 0.395 & 0.382 & \textbf{0.399} & 0.387 & 0.387 \\
-    VARLiNGAM & 252 & 0.397 & 0.396 & 0.385 & 0.388 & 0.386 & 0.392 & 0.402 \\
-    VARLiNGAM & 504 & 0.377 & 0.390 & 0.383 & 0.372 & 0.375 & 0.375 & 0.370 \\
-    GRANGER   & 252 & 0.389 & --- & 0.352 & 0.393 & --- & 0.350 & --- \\
+    VARLiNGAM & 252 & 0.397 & 0.396 & 0.385 & 0.388 & 0.386 & 0.392 & \textbf{0.402} \\
+    VARLiNGAM & 504 & 0.377 & \textbf{0.390} & 0.383 & 0.372 & 0.375 & 0.375 & 0.370 \\
+    GRANGER   & 252 & 0.389 & --- & 0.352 & \textbf{0.393} & --- & 0.350 & --- \\
     \midrule
     \multicolumn{2}{l}{Controls / driver route (w252 / w504):} &
     \multicolumn{7}{l}{\textsc{corr} $\rsCorrSharpe/\rsCorrSharpeWfive$;\quad
@@ -56,7 +60,8 @@ did not materialise for the structural allocators).
 \begin{table}[h]
   \centering
   \caption{Transaction-cost sweep (DYNOTEARS): net Sharpe by one-way cost.
-    The orientation increment (D1$-$D0, D2s$-$D0) is cost-invariant.}
+    The orientation increment (D1$-$D0, D2s$-$D0) is cost-invariant.
+    Turnover is mean one-way per rebalance.}
   \label{tab:cost}
   \begin{tabular}{l c c c c c}
     \toprule
@@ -76,14 +81,16 @@ did not materialise for the structural allocators).
 
 \begin{table}[h]
   \centering
-  \caption{Regime-conditional annualised net Sharpe, window 252. The
+  \caption{Regime-conditional annualised net Sharpe, window 252. High-vol
+    and Low-vol are the top and bottom VIX quintiles; NBER columns condition
+    on recession/expansion dates. Column-wise best in bold; the
     orientation-aware edge concentrates in the low-volatility regime.}
   \label{tab:regime-full}
   \begin{tabular}{l c c c c c}
     \toprule
     Variant & All & NBER rec. & NBER exp. & High-vol & Low-vol \\
     \midrule
-    \textsc{corr}     & 0.381 & $-0.589$ & 0.737 & $-1.313$ & 5.564 \\
+    \textsc{corr}     & 0.381 & $-0.589$ & 0.737 & $\mathbf{-1.313}$ & 5.564 \\
     V0 (HSP baseline) & 0.371 & $-0.638$ & 0.731 & $-1.351$ & 5.630 \\
     D0 (skeleton)     & 0.403 & $\mathbf{-0.575}$ & 0.758 & $-1.317$ & 5.744 \\
     D1                & \textbf{0.411} & $-0.577$ & \textbf{0.762} & $-1.347$ & 5.854 \\
@@ -97,7 +104,7 @@ did not materialise for the structural allocators).
 
 \begin{table}[h]
   \centering
-  \caption{E7 seed audit: the committed driver-route configuration (V1,
+  \caption{The seed audit: the committed driver-route configuration (V1,
     window 252, $K{=}17$) re-run under \rsSeedN\ network seeds; only the
     initialisation varies. Committed value $=$ seed 0.}
   \label{tab:seed-full}
@@ -122,12 +129,14 @@ did not materialise for the structural allocators).
 \section{Hyperparameters}
 
 For reproducibility, the operative settings. \emph{Discovery:} DYNOTEARS lag
-$p=1$, $\lambda_W=\lambda_A=0.05$, edge threshold $0.01$; VARLiNGAM with
-lingam pruning disabled (adaptive lasso fails at $d>n$); GRANGER ridge
-$\lambda=10^{-2}$ scaled by window length, density-matched per window to the
-paired DYNOTEARS graph. \emph{Allocators:} single-linkage where clustering is
-used; $\Sigma_{\mathrm{struct}}$ with diagonal shock variances from
-fit-window residuals, nearest-PSD projection and ridge load
+$p=1$, $\lambda_W=\lambda_A=0.05$, fit-time edge threshold $0.01$ (the
+extraction threshold $\tau$ of Section~\ref{sec:asset-graph} defaults to $0$
+on top of this); VARLiNGAM with lingam pruning disabled (adaptive lasso
+fails at $d>n$); GRANGER ridge $\lambda=10^{-2}$ scaled by window length,
+density-matched per window to the paired DYNOTEARS graph.
+\emph{Allocators:} single-linkage where clustering is used;
+$\Sigma_{\mathrm{struct}}$ with diagonal shock variances from fit-window
+residuals, nearest-PSD projection and ridge load
 $10^{-6}\operatorname{tr}(\Sigma)/N$; ERC by cyclical coordinate descent,
 tolerance $10^{-12}$, parity asserted to $10^{-8}$; topological tie-break by
 total downstream influence then name. \emph{Driver route:} $K=17$ (Kneedle,
@@ -135,8 +144,8 @@ total downstream influence then name. \emph{Driver route:} $K=17$ (Kneedle,
 $\{16,32,64\}$ by held-out RMSE; feedback grid
 $\alpha\in\{0.4,0.6,0.8\}\times\gamma\in\{0.1,0.3,0.5\}$.
 \emph{Protocol:} 5\,bps one-way (swept $\{0,5,10,20\}$); windows 252/504;
-holding and step 21 trading days; 215 rebalances 2007-01--2024-11;
-Politis--Romano bootstrap, 2000 resamples, mean block 21.
+holding and step 21 trading days; 215 (w252) / 203 (w504) rebalances,
+2007-01--2024-11; Politis--Romano bootstrap, 2000 resamples, mean block 21.
 
 \section{Reproducibility}
 
@@ -147,11 +156,28 @@ NAVs, verified by the replication gate (D0 vs the prior phase's committed
 bundle: $\Delta$Sharpe $= 0$, max weight difference $= 0.0$ over all 215
 rebalances). The ablation ran on 836 cache-verified graph fits with a 100\%
 hit rate; each backtest regenerates in ${\approx}40$ seconds from the cache.
-Every statistic quoted in the text is either a generated macro
-(\texttt{\_generated/robust\_stats.tex}, rebuilt by
-\texttt{scripts/robust\_stats.py -{}-phase-ii}) or traceable to a committed
-CSV (\texttt{results/phase\_ii\_matrix.csv},
+
+\paragraph{Environment and data access.} Python~3.13 in the repository's
+virtual environment; \texttt{causalnex} and \texttt{lingam} are vendored
+(source-tree imports via \texttt{\_vendored.py}), not pip-installed, so
+their exact versions are pinned by the repository itself. All commands run
+from the repository root, from which \texttt{pipeline} imports as a package.
+Raw market data requires a WRDS/CRSP licence; the fitted graphs and derived
+series are committed to the content-keyed cache, so every result in this
+report regenerates offline without it.
+
+\paragraph{Regeneration order.} An informed reader reproduces the report in
+four steps, each idempotent against the cache: (1) run the unit-test suite
+(60+ tests, including the orientation-blindness and orientation-sensitivity
+properties of Section~\ref{sec:ablation-design}); (2) run the backtest grid,
+which verifies every graph fit as a cache hit --- a miss halts the run
+rather than silently refitting; (3) rebuild the statistics macros with
+\texttt{scripts/robust\_stats.py -{}-phase-ii}; (4) rebuild the figures with
+\texttt{scripts/plot\_phase\_ii\_figures.py} and compile the report.
+\paragraph{Provenance.} Every statistic quoted in the text is either a
+generated macro (\texttt{\_generated/robust\_stats.tex}) or traceable to a
+committed CSV (\texttt{results/phase\_ii\_matrix.csv},
 \texttt{phase\_ii\_contrasts.csv}, \texttt{robust\_stats\_phase\_ii.csv},
-\texttt{seed\_audit.csv}, \texttt{regime\_analysis/}); figures are
-regenerated by \texttt{scripts/plot\_phase\_ii\_figures.py}. No result
-depends on a live network fetch.
+\texttt{seed\_audit.csv}, \texttt{regime\_analysis/}); every figure is
+regenerated by the plotting script above. No result depends on a live
+network fetch.

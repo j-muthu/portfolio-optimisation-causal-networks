@@ -5,9 +5,9 @@
 
 This chapter presents the discovery pipeline (A1, addressing C1) that produces
 the object at the centre of Q: a credible, reproducible asset--asset causal
-graph at every one of the 215 monthly rebalances. Section~\ref{sec:data}
-describes the data; Section~\ref{sec:discovery-run} the rolling discovery, the
-directional prior, and its empirical verification;
+graph at every monthly rebalance of the 2007--2024 backtest.
+Section~\ref{sec:data} describes the data; Section~\ref{sec:discovery-run} the
+rolling discovery, the directional prior, and its empirical verification;
 Section~\ref{sec:asset-graph} the extraction chokepoint through which every
 allocator receives the identical graph, and what those graphs look like;
 Section~\ref{sec:comparators} the two comparator graphs;
@@ -18,16 +18,23 @@ makes the whole programme tractable and bit-reproducible.
 \section{Data layer}
 \label{sec:data}
 
-\paragraph{Universe.} Running the intended experiments on the full S\&P~500
-proved too computationally intensive, and a complete historical S\&P~100
-membership list was not available, so the S\&P~100 is approximated by taking
-the top constituents by market capitalisation from historical S\&P~500
-membership, yielding a fixed 99-asset universe (the union across snapshots)
-over 2007--2024. Prices and point-in-time shares outstanding come from
-WRDS/CRSP, with a small Yahoo Finance fallback for the most recent days.
-Point-in-time CRSP data removes survivorship bias from the price series; the
-top-by-market-cap construction remains an approximation of the official index
-and is noted as a limitation in Section~\ref{sec:limitations}.
+\paragraph{Universe.} The target scale is the S\&P~100: large enough to be
+representative, small enough that discovery at every rebalance remains
+sweepable (fit cost grows steeply with dimension;
+Section~\ref{sec:cache}). Official historical S\&P~100 membership is
+paywalled and cannot be reconstructed from S\&P~500 records --- the index is
+chosen with undisclosed sector-balance discretion --- so the standard
+academic substitute is used: the top names by CRSP market capitalisation
+among historical S\&P~500 members at each rebalance, whose union across
+rebalances gives a fixed 99-asset universe over 2007--2024. Prices and
+point-in-time shares outstanding come from WRDS/CRSP, which includes names
+that later delisted --- essential for an honest 2008--09, when several dozen
+large-cap financials disappeared --- with a thin Yahoo Finance fallback for
+the most recent days. Late-inception names (post-2007 listings and merger
+successors) are retained via a per-date eligibility mask rather than by
+truncating every other series' history. The top-by-market-cap construction
+remains an approximation of the official index and is noted as a limitation
+in Section~\ref{sec:limitations}.
 
 \paragraph{Driver pool.} Discovery runs on the \emph{joint} panel of assets
 and 33 plausibly exogenous macro-financial series from FRED and Yahoo Finance:
@@ -37,26 +44,44 @@ are the selection pool for the driver route (Section~\ref{sec:driver-route}),
 and --- more importantly for Q --- their presence in the joint fit means the
 asset--asset block is estimated \emph{conditional on} the common macro
 environment, absorbing driver-explained co-movement that would otherwise
-masquerade as asset-to-asset edges. Equity baskets such as US sector ETFs are
-excluded from the pool as not credibly exogenous to a US large-cap portfolio.
+masquerade as asset-to-asset edges. Series that fail exogeneity to a US
+large-cap portfolio --- sector ETFs, US index returns, factor portfolios ---
+are excluded from the pool.
 
-\paragraph{Stationarity.} SVAR-based discovery assumes weakly stationary
-inputs, so each series is transformed by type within each window (log-returns
-for prices, first differences for yields, year-on-year changes for level
-macro series), checked with both ADF and KPSS --- complementary because their
-nulls are opposite, so agreement is a stronger signal than either alone.
-Flags are logged rather than used to drop series, the per-type transforms
-being fixed \emph{a priori} on economic grounds.
+\paragraph{Stationarity and transforms.} SVAR-based discovery assumes weakly
+stationary inputs. Each series is transformed \emph{by type}: log-returns for
+price-like series; first differences for yields and spreads, which cross zero,
+so logs are undefined; year-on-year changes for monthly macro levels, which
+also removes seasonality; level pass-through for the already-stationary
+volatility indices. A uniform ``log everything'' rule would break on the
+rates block. The per-type transforms are fixed \emph{a priori} rather than
+chosen by test per window, so each variable means the same thing in every
+rolling window --- a prerequisite for comparing graphs across time.
+Stationarity is then checked with both ADF and KPSS --- complementary because
+their nulls are opposite, so agreement is a stronger signal than either alone
+--- and failures are flagged and logged rather than used to drop series.
 
 \section{Rolling discovery and the directional prior}
 \label{sec:discovery-run}
 
+The primary discovery method is chosen against three requirements, not by
+default: it must scale to the ${\sim}132$-variable joint panel at every
+rebalance of a sweepable grid; it must accept the directional prior of C1
+\emph{natively}, rather than by post-hoc edge deletion; and it must return a
+genuine DAG, because the allocators of Chapter~\ref{chap:sensitivity} rely
+on exact nilpotent total-effect algebra. DYNOTEARS meets all three; the
+comparators of Section~\ref{sec:comparators} each relax one requirement and
+so double as probes of whether the requirement mattered.
+
 At each rebalance date $t$, DYNOTEARS \cite{pamfil2020dynotears} is fit on the
 per-window $z$-scored joint panel $X=[\,D \mid A\,]$ over the lookback window
-(252 or 504 trading days), with lag $p=1$, yielding the contemporaneous matrix
+(252 or 504 trading days), with lag $p=1$ --- lagged structure beyond one
+step is negligible at these horizons (Section~\ref{sec:howard-theme}) ---
+yielding the contemporaneous matrix
 $W$ (acyclicity enforced) and lagged matrix $A_1$ over the joint variable set.
 The convention throughout is $M[i,j]$ = effect of variable $i$ on variable
-$j$.
+$j$; the operative hyperparameters are tabulated in
+Appendix~\ref{app:tables}.
 
 \paragraph{Enforcing the prior.} The directional prior of C1 --- drivers may
 cause assets; individual large-cap stocks do not cause the 10-year Treasury
@@ -70,9 +95,11 @@ projection.
 place if it does real work. Refitting DYNOTEARS with and without the prior on
 six windows spanning distinct regimes (2008, 2011, 2014, 2018Q4, 2020, 2022)
 shows that, unconstrained, the optimiser spends \textbf{35--48\%} of total
-edge mass on economically implausible asset$\to$driver edges, and admitting
-them distorts the legitimate driver$\to$asset block by 52--72\% in $L_1$
-(Figure~\ref{fig:prior}). The prior is consequential, not cosmetic --- it
+edge mass on economically implausible asset$\to$driver edges; admitting them
+distorts the legitimate driver$\to$asset block by 52--72\% in $L_1$ and
+shifts the selected driver set in a meaningful minority of windows (top-$K$
+Jaccard 0.62--1.00, lowest in the 2008 and 2022 stress regimes;
+Figure~\ref{fig:prior}). The prior is consequential, not cosmetic --- it
 cheaply removes a large block of spurious reverse-causation mass --- and,
 because the asset--asset block is estimated jointly, it protects the graph
 that Q's allocators consume.
@@ -95,14 +122,14 @@ that Q's allocators consume.
 
 Q's fixed-graph ablation is only valid if every allocator sees the
 \emph{byte-identical} graph, so extraction is centralised in a single
-chokepoint rather than left to each allocator. Per rebalance it: reads the
+chokepoint rather than left to each allocator. Per rebalance it reads the
 asset--asset block $M$ of the fitted contemporaneous matrix; restricts rows
 \emph{and} columns together to the eligible universe at that date (so
 late-inception names can never desynchronise the graph from the returns
 panel); applies the magnitude threshold $\tau$ (default $0$; swept in the
-sparsity-robustness analysis); verifies acyclicity (a sub-block of a DAG is a
-DAG); and computes the per-asset structural residual variances on the fit
-window --- needed by the structural covariance of
+sparsity-robustness analysis); and verifies acyclicity (a sub-block of a DAG
+is a DAG). It also computes the per-asset structural residual variances on
+the fit window --- needed by the structural covariance of
 Section~\ref{sec:d-family} --- using the window's stored $z$-statistics, so
 the residuals correspond exactly to the data the graph was fitted on.
 
@@ -114,6 +141,22 @@ hub-and-spoke. There is, in other words, substantial orientation structure
 for the treatment allocators to exploit; whatever the evaluation finds, it
 will not be because the graphs were trivially symmetric.
 
+\paragraph{What ``credible'' can mean without ground truth.} An objection
+must be met head-on: no true causal graph of the market is available, so the
+discovered graphs cannot be scored against an answer key. The pipeline is
+therefore validated on everything that \emph{can} be checked: the
+directional prior does real, quantified work (above); the graphs are
+structurally non-degenerate, with genuine depth for the treatments to
+exploit; discovery is deterministic, so the graphs are at least stable
+facts about the data rather than artefacts of a run; disagreement between
+discovery methods is retained as a diagnostic rather than averaged away
+(Section~\ref{sec:comparators}); and, decisively, the graphs are judged by
+the pre-registered downstream ablation of
+Chapters~\ref{chap:sensitivity}--\ref{chap:evaluation} --- a task-based
+test, which is the only economically meaningful one. The report accordingly
+claims that the graphs are \emph{useful and reproducible}, never that they
+are \emph{true}.
+
 \section{Comparator graphs}
 \label{sec:comparators}
 
@@ -122,10 +165,11 @@ unchanged on them. \textbf{VARLiNGAM} \cite{hyvarinen2010varlingam} supplies
 the instantaneous matrix $B_0$, identified through non-Gaussianity rather
 than a score: LiNGAM's causal order makes the asset block a DAG by
 construction, and its identification assumption --- heavy-tailed residuals ---
-is one financial returns satisfy at short windows but progressively lose, by
-aggregation, at longer ones. \textbf{GRANGER} is the deliberately cheap
-comparator: a ridge-regularised VAR(1) on the asset panel, in closed form,
-with $M[i,j] = |{\rm coef}(x_{i,t-1}\!\to\!x_{j,t})|$, thresholded per window
+weakens mechanically at longer windows, the window-fragility
+Chapter~\ref{chap:background} anticipated and Chapter~\ref{chap:evaluation}
+observes. \textbf{GRANGER} is the deliberately cheap comparator: a
+ridge-regularised VAR(1) on the asset panel, in closed form, with
+$M[i,j] = |{\rm coef}(x_{i,t-1}\!\to\!x_{j,t})|$, thresholded per window
 to match the paired DYNOTEARS graph's edge density so the comparison is at
 like-for-like sparsity. It is deterministic and assumption-light, but its
 matrix is lagged rather than contemporaneous and is not guaranteed acyclic;
@@ -173,7 +217,8 @@ with atomic writes) therefore lets every configuration at a given window
 reuse one fit. The effect is decisive for Q: the entire fixed-graph ablation
 --- 28 allocator--method--window cells, plus sparsity, cost and comparator
 sweeps --- ran against 836 cached graph fits with a verified 100\% hit rate
-and zero refits, at ${\approx}40$ seconds per backtest instead of
+and zero refits (a key miss halts the run rather than silently refitting a
+subtly different graph), at ${\approx}40$ seconds per backtest instead of
 ${\approx}15$ hours. The cache is also what \emph{guarantees} the ablation's
 premise: allocators cannot see different graphs, because there is exactly one
 graph per (method, window, data) key.
@@ -187,10 +232,13 @@ run-to-run --- which the non-convex DYNOTEARS optimiser amplified into graph
 changes of ${\approx}0.14$ in $\lVert W\rVert$. The pipeline was, in other
 words, not bit-reproducible, and two previously-drawn conclusions (an
 apparent two-year edge for causal driver selection, and an apparently
-significantly-worse closed loop) did not survive the fix. All numbers in
-this report come from the corrected, deterministic pipeline: two independent
-runs now produce byte-identical windows, weights and NAVs --- verified
-end-to-end by the replication gate of Section~\ref{sec:ablation-design}. A
-result that does not survive a determinism fix was never real; treating
-reproducibility as a prerequisite rather than an afterthought is part of the
-method \cite{lopezdeprado2023causal}.
+significantly-worse closed loop) did not survive the fix. The same fix left
+the VARLiNGAM graphs essentially unchanged --- ICA on VAR residuals is far
+less sensitive to input micro-jitter than non-convex L-BFGS, a small
+robustness result in its own right. All numbers in this report come from the
+corrected, deterministic pipeline: two independent runs now produce
+byte-identical windows, weights and NAVs --- verified end-to-end by the
+replication gate of Section~\ref{sec:ablation-design}. A result that does not
+survive a determinism fix was never real; treating reproducibility as a
+prerequisite rather than an afterthought is part of the method
+\cite{lopezdeprado2023causal}.
