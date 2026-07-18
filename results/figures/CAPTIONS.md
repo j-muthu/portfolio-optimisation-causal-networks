@@ -74,24 +74,28 @@ driver-selection mechanism. Values from `results/robust_stats.csv`
 
 ## Phase-II figure set (`results/figures/phase_ii_*.png`)
 
-**phase_ii_decomposition.png** — *The master-question decomposition (DYNOTEARS,
-net Sharpe). At the 252-day window the causal graph's gain over the plain
-correlation-distance HRP control (CORR, 0.381) is carried by the skeleton
-(D0 +0.022, p=0.14); orientation adds little on top (D1 +0.009, p=0.47). At the
-504-day window the pattern inverts: the skeleton's gain shrinks to +0.009
-(p=0.55) and orientation contributes the larger share (D1 +0.023, p=0.05;
-D2s +0.027, p=0.07). No single step is family-wise significant.*
+**phase_ii_decomposition.png** — *The master-question decomposition across all
+four estimation windows (DYNOTEARS, net Sharpe). The skeleton's addition over
+the correlation-distance HRP control is hump-shaped in the window (−0.003 at
+189d, +0.022 at 252d, +0.018 at 378d, +0.009 at 504d; never significant); the
+orientation addition is positive at every window and U-shaped (+0.021, +0.009,
++0.012, +0.023; pairwise p=0.08/0.47/0.33/0.05), largest exactly where sample
+moments are weakest. No single step is family-wise significant.*
 
-**phase_ii_heatmap.png** — *Net Sharpe by discovery method × allocator at both
-windows, with the symmetrised control D0 boxed. The DYNOTEARS direction-aware
-cells (D1, D2s) are the only ones strong at both windows; under VARLiNGAM the
-direction effect is absent; GRANGER supports ordering (D2) but not the
-structural covariance (D1/D3).*
+**phase_ii_heatmap.png** — *Net Sharpe by discovery method × allocator at all
+four windows, with the symmetrised control D0 boxed and each panel titled with
+its CORR-HRP baseline. The DYNOTEARS orientation-aware cells (D1, D2s) are
+strong at every window — D2s at 378d (0.419) is the study-wide best — while
+the VARLiNGAM rows show no orientation effect anywhere; GRANGER (252d only)
+supports ordering (D2) but not the structural covariance (D1/D3).*
 
 **phase_ii_forest.png** — *The fixed-graph direction effect: ΔSharpe of each
-direction-aware allocator vs its own symmetrised control D0, Politis–Romano 95%
-CIs. All five DYNOTEARS contrasts positive at w504 (D1 starred, pairwise
-p=0.049); ≈0 at w252 and under VARLiNGAM.*
+direction-aware allocator vs its own symmetrised control D0 at all four
+windows, Politis–Romano 95% CIs. 16/20 DYNOTEARS contrasts are positive (D1
+starred at w504, pairwise p=0.049); the VARLiNGAM panel scatters around zero
+(6/20 positive, mean −0.004). The starred D0s cell at w189 (p=0.008) is a
+control-vs-control divergence: at the shortest window the choice of
+symmetrisation matters as much as orientation.*
 
 **phase_ii_nav.png** — *Cumulative net NAV (w252, 5 bps one-way): the
 correlation-distance HRP control, correlation-HSP (V0), the causal skeleton
@@ -105,6 +109,17 @@ the seed-cloud maximum.*
 **phase_ii_regime.png** — *Regime-conditional Sharpe excess over V0 (w252): the
 direction-aware edge concentrates in the VIX bottom quintile (calm markets),
 not in stress — the stress hypothesis is rejected.*
+
+**phase_ii_window_gradient.png** — *The decomposition as a function of
+estimation-window length (DYNOTEARS, net Sharpe). Left: the skeleton addition
+(D0 − CORR) and the orientation addition (D1 − D0) with Politis–Romano 95%
+CIs, plus the VARLiNGAM orientation series (grey), which stays at zero
+throughout. Right: the two additions stacked per window — the total D1 − CORR
+gain is stable (+0.018 to +0.032) while its composition shifts: skeleton
+hump-shaped, orientation U-shaped, the two roughly complementary. Orientation
+contributes most exactly where the sample moments feeding the control are
+weakest (shortest and longest windows), consistent with the
+structure-as-regulariser mechanism.*
 
 ## Corrected interim-report figures (`interim_report/figures_corrected/`)
 
