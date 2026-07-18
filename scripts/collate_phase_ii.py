@@ -35,7 +35,7 @@ RESULTS = THESIS_ROOT / "results"
 N_RESAMPLES = 2000
 METHODS = ("dynotears", "varlingam", "granger")
 ALLOCS = ("D0", "D0s", "D1", "D2", "D2s", "D3", "D4")
-WINDOWS = (252, 504)
+WINDOWS = (189, 252, 378, 504)
 DIRECTION_AWARE = ("D1", "D2", "D2s", "D3", "D4")
 
 PHASE_I = {

@@ -1,4 +1,4 @@
-"""Phase-II figure set (F1–F5) — direction-aware allocation results.
+"""Phase-II figure set (F1–F7) — direction-aware allocation results.
 
 Regenerated entirely from committed artefacts (``results/phase_ii_matrix.csv``,
 ``results/phase_ii_contrasts.csv``, ``results/seed_audit.csv``, the regime
@@ -7,13 +7,19 @@ Saved to ``results/figures/``. House style: Okabe-Ito palette, matching
 ``plot_thesis_figures.py``.
 
 F1 phase_ii_heatmap.png   allocator × method net-Sharpe heat-map, D0 column
-                          boxed (the direction effect at a glance), both windows
+                          boxed (the direction effect at a glance), per window
 F2 phase_ii_forest.png    fixed-graph contrasts D* − D0: ΔSharpe ± 95% CI
 F3 phase_ii_nav.png       cumulative net NAV, w252: V0, D0 (≡V0′), D1, D2s, V1
 F4 phase_ii_seed.png      E7 seed audit: V1 Sharpe across FFNN seeds vs the
                           deterministic D-variants
 F5 phase_ii_regime.png    regime-conditional Sharpe excess over V0 (w252),
                           incl. the best direction-aware allocators
+F6 phase_ii_decomposition.png  CORR → +skeleton → +orientation bars per window
+F7 phase_ii_window_gradient.png  skeleton vs orientation additions as a
+                          function of estimation-window length (the gradient)
+
+Every figure derives its window set from the windows present in the matrix
+CSV, so the same code renders the two-window and four-window grids.
 
 Run order: collate_phase_ii → regime_analysis → this script.
 Run:  python -m scripts.plot_phase_ii_figures
@@ -41,11 +47,19 @@ C = {
     "D1": "#0072B2",        # blue — structural covariance
     "D2s": "#D55E00",       # vermillion — causal-ordered bisection + Σ_struct
     "V1": "#E69F00",        # orange — the HSP machinery route
+    "w189": "#56B4E9",
     "w252": "#0072B2",
+    "w378": "#CC79A7",
     "w504": "#D55E00",
 }
 ALLOC_ORDER = ["D0", "D0s", "D1", "D2", "D2s", "D3", "D4"]
 METHOD_LABEL = {"dynotears": "DYNOTEARS", "varlingam": "VARLiNGAM", "granger": "GRANGER"}
+
+
+def _windows(matrix: pd.DataFrame) -> list[int]:
+    """Windows with at least one DYNOTEARS Phase-II cell, ascending."""
+    m = matrix[matrix.method == "dynotears"]
+    return sorted(int(w) for w in m.window.unique())
 
 
 def _nav(tag: str) -> pd.Series | None:
@@ -62,8 +76,15 @@ def _nav(tag: str) -> pd.Series | None:
 def f1_heatmap(matrix: pd.DataFrame) -> None:
     m = matrix[matrix.method != "phase_i"]
     methods = [x for x in ("dynotears", "varlingam", "granger") if x in set(m.method)]
-    fig, axes = plt.subplots(1, 2, figsize=(11, 3.4), constrained_layout=True)
-    for ax, w in zip(axes, (252, 504)):
+    ws = _windows(matrix)
+    ncol = 2
+    nrow = int(np.ceil(len(ws) / ncol))
+    fig, axes = plt.subplots(nrow, ncol, figsize=(11, 3.0 * nrow),
+                             constrained_layout=True)
+    axes = np.atleast_1d(axes).ravel()
+    for ax in axes[len(ws):]:
+        ax.set_visible(False)
+    for ax, w in zip(axes, ws):
         sub = m[m.window == w].pivot(index="method", columns="allocator", values="sharpe")
         sub = sub.reindex(index=methods, columns=ALLOC_ORDER)
         vals = sub.to_numpy(dtype=float)
@@ -79,11 +100,11 @@ def f1_heatmap(matrix: pd.DataFrame) -> None:
         j0 = ALLOC_ORDER.index("D0")
         ax.add_patch(plt.Rectangle((j0 - 0.5, -0.5), 1, len(methods), fill=False,
                                    edgecolor="black", lw=2))
-        v0 = matrix[(matrix.method == "phase_i") & (matrix.allocator == "V0")
-                    & (matrix.window == w)].sharpe
-        ax.set_title(f"{w}-day window   (V0 baseline: {float(v0.iloc[0]):.3f})",
-                     fontsize=10)
-    fig.colorbar(im, ax=axes, shrink=0.85, label="net Sharpe")
+        corr = matrix[(matrix.method == "phase_i") & (matrix.allocator == "CORR-HRP")
+                      & (matrix.window == w)].sharpe
+        base = f"   (CORR baseline: {float(corr.iloc[0]):.3f})" if len(corr) else ""
+        ax.set_title(f"{w}-day window{base}", fontsize=10)
+    fig.colorbar(im, ax=list(axes[:len(ws)]), shrink=0.85, label="net Sharpe")
     fig.suptitle("Net Sharpe by discovery method × allocator (boxed = symmetrised control D0)",
                  fontsize=11)
     fig.savefig(FIG / "phase_ii_heatmap.png", dpi=200)
@@ -97,13 +118,16 @@ def f2_forest(contrasts: pd.DataFrame) -> None:
     sub = contrasts[contrasts.contrast.str.match(r"D.*-D0$")].copy()
     sub["alloc"] = sub.contrast.str.replace("-D0", "", regex=False)
     methods = [x for x in ("dynotears", "varlingam") if x in set(sub.method)]
-    fig, axes = plt.subplots(1, len(methods), figsize=(10.5, 3.6),
+    ws = sorted(int(w) for w in sub.window.unique())
+    fig, axes = plt.subplots(1, len(methods), figsize=(10.5, 4.2),
                              sharey=True, constrained_layout=True)
     allocs = [a for a in ALLOC_ORDER if a != "D0"]
+    offsets = np.linspace(-0.28, 0.28, len(ws)) if len(ws) > 1 else [0.0]
     for ax, m in zip(np.atleast_1d(axes), methods):
-        for k, w in enumerate((252, 504)):
+        for k, w in enumerate(ws):
             s = sub[(sub.method == m) & (sub.window == w)].set_index("alloc")
-            y = np.arange(len(allocs)) + (0.16 if w == 504 else -0.16)
+            y = np.arange(len(allocs)) + offsets[k]
+            first = True
             for yi, a in zip(y, allocs):
                 if a not in s.index:
                     continue
@@ -111,8 +135,9 @@ def f2_forest(contrasts: pd.DataFrame) -> None:
                 ax.errorbar(row.delta_sharpe, yi,
                             xerr=[[row.delta_sharpe - row.ci_lower],
                                   [row.ci_upper - row.delta_sharpe]],
-                            fmt="o", ms=5, capsize=3, color=C[f"w{w}"],
-                            label=f"w{w}" if yi == y[0] else None)
+                            fmt="o", ms=4.5, capsize=2.5, color=C[f"w{w}"],
+                            label=f"w{w}" if first else None)
+                first = False
                 if row.p_value < 0.05:
                     ax.annotate("*", (row.ci_upper + 0.002, yi - 0.12),
                                 color=C[f"w{w}"], fontsize=13)
@@ -240,20 +265,26 @@ def f6_decomposition(matrix: pd.DataFrame, contrasts: pd.DataFrame) -> None:
         return float(c.delta_sharpe.iloc[0]), float(c.p_value.iloc[0])
 
     bars = [("CORR", "#000000"), ("D0", C["D0"]), ("D1", C["D1"]), ("D2s", C["D2s"])]
+    ws = _windows(matrix)
     all_vals = {w: [sharpe("phase_i", "CORR-HRP", w)] + [
-        sharpe("dynotears", a, w) for a, _ in bars[1:]] for w in (252, 504)}
+        sharpe("dynotears", a, w) for a, _ in bars[1:]] for w in ws}
     lo = min(v for vs in all_vals.values() for v in vs) - 0.006
     hi = max(v for vs in all_vals.values() for v in vs) + 0.007
 
-    fig, axes = plt.subplots(1, 2, figsize=(10.5, 3.9), sharey=True,
-                             constrained_layout=True)
+    ncol = 2 if len(ws) > 2 else len(ws)
+    nrow = int(np.ceil(len(ws) / ncol))
+    fig, axes = plt.subplots(nrow, ncol, figsize=(10.5, 3.7 * nrow),
+                             sharey=True, constrained_layout=True)
+    axes = np.atleast_1d(axes).ravel()
+    for ax in axes[len(ws):]:
+        ax.set_visible(False)
     # The step each bar adds relative to its reference (CORR for D0; D0 for D1/D2s).
     steps = {1: ("D0-CORR", "+ skeleton"), 2: ("D1-D0", "+ orientation"),
              3: ("D2s-D0", "+ orientation")}
-    for ax, w in zip(axes, (252, 504)):
+    for ax, w in zip(axes, ws):
         vals = all_vals[w]
         xs = np.arange(len(bars))
-        ax.bar(xs, vals, 0.62, color=[c for _, c in bars])
+        ax.bar(xs, vals, 0.74, color=[c for _, c in bars])
         ax.axhline(vals[0], color="#000000", lw=0.9, ls=":")
         for x, v in zip(xs, vals):
             ax.annotate(f"{v:.3f}", (x, v + 0.0012), ha="center", fontsize=9)
@@ -263,16 +294,86 @@ def f6_decomposition(matrix: pd.DataFrame, contrasts: pd.DataFrame) -> None:
                     dv, p = d
                     ax.annotate(f"{steps[x][1]}\n{dv:+.3f}\n(p={p:.2f})",
                                 (x, lo + 0.55 * (min(vals) - lo) + 0.004),
-                                ha="center", va="bottom", fontsize=7.8,
+                                ha="center", va="bottom", fontsize=7.4,
                                 color="white", fontweight="bold")
         ax.set_xticks(xs, [b for b, _ in bars])
         ax.set_ylim(lo, hi)
         ax.set_title(f"{w}-day window", fontsize=10)
-    axes[0].set_ylabel("net Sharpe")
+    for k in range(0, len(ws), ncol):
+        axes[k].set_ylabel("net Sharpe")
     fig.suptitle(
         "Decomposing the causal-graph gain over the correlation matrix: "
         "skeleton vs edge orientation (DYNOTEARS)", fontsize=10.5)
     fig.savefig(FIG / "phase_ii_decomposition.png", dpi=200)
+    plt.close(fig)
+
+
+# ============================================================================
+# F7 — skeleton vs orientation additions across estimation horizons
+# ============================================================================
+def f7_window_gradient(contrasts: pd.DataFrame) -> None:
+    """The decomposition as a function of estimation-window length.
+
+    Left: the two additions (skeleton = D0−CORR; orientation = D1−D0, D* fixed
+    to D1 for comparability) with Politis–Romano 95% CIs, DYNOTEARS, plus the
+    VARLiNGAM orientation series as the method-dependence contrast.
+    Right: the same two additions stacked per window, so their relative share
+    of the total D1−CORR gain is read directly.
+    """
+    def series(name: str, method: str):
+        c = contrasts[(contrasts.contrast == name) & (contrasts.method == method)]
+        c = c.sort_values("window")
+        return (c.window.to_numpy(dtype=float), c.delta_sharpe.to_numpy(dtype=float),
+                c.ci_lower.to_numpy(dtype=float), c.ci_upper.to_numpy(dtype=float),
+                c.p_value.to_numpy(dtype=float))
+
+    skel = series("D0-CORR", "dynotears")
+    orient = series("D1-D0", "dynotears")
+    orient_var = series("D1-D0", "varlingam")
+    if len(skel[0]) == 0 or len(orient[0]) == 0:
+        print("F7 skipped: D0-CORR / D1-D0 contrasts not found")
+        return
+
+    fig, (ax, axr) = plt.subplots(1, 2, figsize=(10.5, 3.9),
+                                  constrained_layout=True)
+    for (w, d, lo, hi, _), label, color, marker in (
+            (skel, "skeleton  (D0 − CORR)", C["D0"], "o"),
+            (orient, "orientation  (D1 − D0)", C["D1"], "s")):
+        ax.errorbar(w, d, yerr=[d - lo, hi - d], fmt=f"-{marker}", ms=6,
+                    capsize=3, lw=1.6, color=color, label=label)
+    if len(orient_var[0]):
+        ax.plot(orient_var[0], orient_var[1], "--^", ms=5, lw=1.1,
+                color="#999999", label="orientation, VARLiNGAM")
+    ax.axhline(0, color="grey", lw=1, ls=":")
+    ax.set_xticks(skel[0], [f"{int(x)}" for x in skel[0]])
+    ax.set_xlabel("estimation window (trading days)")
+    ax.set_ylabel("ΔSharpe added")
+    ax.legend(fontsize=8.5)
+    ax.set_title("The two additions vs horizon (95% CI)", fontsize=10)
+
+    # Right panel: stacked additions — the relative split of the total gain.
+    wsx = np.arange(len(skel[0]))
+    width = 0.55
+    axr.bar(wsx, skel[1], width, color=C["D0"], label="skeleton")
+    # Stack orientation on top of the skeleton bar from the skeleton's level
+    # (negative components simply extend below their own base).
+    base = np.where(np.sign(skel[1]) == np.sign(orient[1]), skel[1], 0.0)
+    axr.bar(wsx, orient[1], width, bottom=base, color=C["D1"],
+            label="orientation")
+    total = skel[1] + orient[1]
+    for x, t in zip(wsx, total):
+        axr.annotate(f"total {t:+.3f}", (x, max(t, 0) + 0.0015), ha="center",
+                     fontsize=8)
+    axr.margins(y=0.15)
+    axr.axhline(0, color="grey", lw=1)
+    axr.set_xticks(wsx, [f"w{int(x)}" for x in skel[0]])
+    axr.set_ylabel("ΔSharpe over CORR")
+    axr.legend(fontsize=8.5)
+    axr.set_title("Stacked: total D1 − CORR gain and its split", fontsize=10)
+
+    fig.suptitle("Skeleton vs orientation: relative additions across estimation "
+                 "horizons (DYNOTEARS, net Sharpe)", fontsize=10.5)
+    fig.savefig(FIG / "phase_ii_window_gradient.png", dpi=200)
     plt.close(fig)
 
 
@@ -286,6 +387,7 @@ def main() -> None:
     f4_seed(matrix)
     f5_regime()
     f6_decomposition(matrix, contrasts)
+    f7_window_gradient(contrasts)
     print(f"figures → {FIG}/phase_ii_*.png")
 
 

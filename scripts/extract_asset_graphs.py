@@ -124,7 +124,7 @@ def main(argv: list[str] | None = None) -> None:
     p = argparse.ArgumentParser()
     p.add_argument("--method", choices=["dynotears", "varlingam"], default=None,
                    help="default: both")
-    p.add_argument("--window", type=int, choices=[252, 504], default=None,
+    p.add_argument("--window", type=int, choices=[189, 252, 378, 504], default=None,
                    help="default: both")
     args = p.parse_args(argv)
 

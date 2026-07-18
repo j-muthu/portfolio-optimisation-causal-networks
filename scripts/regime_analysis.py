@@ -78,7 +78,7 @@ VARIANTS = [
     ("VARL-D3",     "varlingam","phase_ii_varlingam_D3_w{w}"),
     ("VARL-D4",     "varlingam","phase_ii_varlingam_D4_w{w}"),
 ]
-WINDOWS = [252, 504]
+WINDOWS = [189, 252, 378, 504]
 
 # Named hand-picked stress windows (to de-hardcode plot_interim_results.py's
 # REGIME_EXCESS_SHARPE fixture with computed per-rebalance excess-Sharpe).

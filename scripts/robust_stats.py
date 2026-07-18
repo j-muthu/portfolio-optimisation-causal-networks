@@ -92,12 +92,15 @@ def _all_trial_tags() -> dict[str, str]:
 # check; drop_duplicate_configs removes it before SPA/MCS.
 PHASE_II_ALLOCS = ("D0", "D0s", "D1", "D2", "D2s", "D3", "D4")
 PHASE_II_METHODS = (("dynotears", "DYNO"), ("varlingam", "VARL"))
+# The Phase-II window grid is wider than Phase I's: the skeleton-vs-orientation
+# decomposition is measured as a function of estimation-window length.
+PHASE_II_WINDOWS = (189, 252, 378, 504)
 
 
 def _phase_ii_tags() -> dict[str, str]:
     """name -> bundle tag for every Phase-II configuration evaluated."""
     tags: dict[str, str] = {}
-    for w in WINDOWS:
+    for w in PHASE_II_WINDOWS:
         # The like-for-like correlation control (graph-blind plain HRP).
         tags[f"CORR-HRP_w{w}"] = f"phase_ii_corr_hrp_w{w}"
         for method, short in PHASE_II_METHODS:
@@ -367,8 +370,12 @@ def main(argv: list[str] | None = None) -> None:
         # ANY direction-aware allocator beat its own symmetrised control D0
         # (≡ V0prime), per window? This is the fixed-graph direction effect
         # with the multiplicity of the whole direction-aware grid priced in.
-        for w in WINDOWS:
+        # At windows without a Phase-I V0prime bundle the benchmark falls back
+        # to DYNO-D0, which replicates V0prime byte-for-byte where both exist.
+        for w in PHASE_II_WINDOWS:
             bench = f"V0prime_w{w}"
+            if bench not in returns.columns:
+                bench = f"DYNO-D0_w{w}"
             cands = [c for c in returns.columns
                      if c.split("_")[0] in {f"{s}-D{v}" for s in ("DYNO", "VARL")
                                             for v in ("1", "2", "2s", "3", "4")}
@@ -380,7 +387,7 @@ def main(argv: list[str] | None = None) -> None:
         # R1 family-wise: does ANY causal-structure strategy beat the plain
         # correlation-distance HRP control, per window? (The skeleton-vs-
         # correlation half of the decomposition, with the full search priced in.)
-        for w in WINDOWS:
+        for w in PHASE_II_WINDOWS:
             bench = f"CORR-HRP_w{w}"
             cands = [c for c in returns.columns
                      if (c.startswith(("DYNO-", "VARL-")) or c == f"V0prime_w{w}")
@@ -465,22 +472,42 @@ def main(argv: list[str] | None = None) -> None:
         "rsVoneVarPSR":  _fmt(cell("V1-VARLiNGAM_w252", "psr_vs_zero")),
         "rsVoneVarDSR":  _fmt(cell("V1-VARLiNGAM_w252", "dsr")),
         # the correlation control and the leading direction-aware allocators
-        "rsCorrSharpe":      _fmt(cell("CORR-HRP_w252", "sharpe_ann")),
-        "rsCorrSharpeWfive": _fmt(cell("CORR-HRP_w504", "sharpe_ann")),
-        "rsCorrPSR":         _fmt(cell("CORR-HRP_w252", "psr_vs_zero")),
-        "rsCorrDSR":         _fmt(cell("CORR-HRP_w252", "dsr")),
-        "rsDoneSharpe":  _fmt(cell("DYNO-D1_w252", "sharpe_ann")),
+        # (window suffixes by leading digit: Wone=189, Wtwo=252, Wthree=378,
+        # Wfive=504; the unsuffixed forms are the w252 headline cells)
+        "rsCorrSharpe":       _fmt(cell("CORR-HRP_w252", "sharpe_ann")),
+        "rsCorrSharpeWone":   _fmt(cell("CORR-HRP_w189", "sharpe_ann")),
+        "rsCorrSharpeWthree": _fmt(cell("CORR-HRP_w378", "sharpe_ann")),
+        "rsCorrSharpeWfive":  _fmt(cell("CORR-HRP_w504", "sharpe_ann")),
+        "rsCorrPSR":          _fmt(cell("CORR-HRP_w252", "psr_vs_zero")),
+        "rsCorrDSR":          _fmt(cell("CORR-HRP_w252", "dsr")),
+        "rsDoneSharpe":       _fmt(cell("DYNO-D1_w252", "sharpe_ann")),
+        "rsDoneSharpeWone":   _fmt(cell("DYNO-D1_w189", "sharpe_ann")),
+        "rsDoneSharpeWthree": _fmt(cell("DYNO-D1_w378", "sharpe_ann")),
+        "rsDoneSharpeWfive":  _fmt(cell("DYNO-D1_w504", "sharpe_ann")),
         "rsDonePSR":     _fmt(cell("DYNO-D1_w252", "psr_vs_zero")),
         "rsDoneDSR":     _fmt(cell("DYNO-D1_w252", "dsr")),
-        "rsDtwosSharpe": _fmt(cell("DYNO-D2s_w252", "sharpe_ann")),
+        "rsDtwosSharpe":       _fmt(cell("DYNO-D2s_w252", "sharpe_ann")),
+        "rsDtwosSharpeWone":   _fmt(cell("DYNO-D2s_w189", "sharpe_ann")),
+        "rsDtwosSharpeWthree": _fmt(cell("DYNO-D2s_w378", "sharpe_ann")),
+        "rsDtwosSharpeWfive":  _fmt(cell("DYNO-D2s_w504", "sharpe_ann")),
         "rsDtwosDSR":    _fmt(cell("DYNO-D2s_w252", "dsr")),
+        "rsDtwosDSRWthree": _fmt(cell("DYNO-D2s_w378", "dsr")),
+        "rsDoneDSRWthree":  _fmt(cell("DYNO-D1_w378", "dsr")),
+        "rsDzeroSharpe":       _fmt(cell("DYNO-D0_w252", "sharpe_ann")),
+        "rsDzeroSharpeWone":   _fmt(cell("DYNO-D0_w189", "sharpe_ann")),
+        "rsDzeroSharpeWthree": _fmt(cell("DYNO-D0_w378", "sharpe_ann")),
+        "rsDzeroSharpeWfive":  _fmt(cell("DYNO-D0_w504", "sharpe_ann")),
         # data-snooping battery
         "rsSpaRC":         _fmt(spa["rc_lower"]),
         "rsSpaConsistent": _fmt(spa["spa_consistent"]),
         "rsSpaDvar":       _fmt(spa_phase_ii["spa_consistent"]) if spa_phase_ii else "--",
+        "rsSpaDirWone":    _fmt(spa_direction[189]["spa_consistent"]) if 189 in spa_direction else "--",
         "rsSpaDirWtwo":    _fmt(spa_direction[252]["spa_consistent"]) if 252 in spa_direction else "--",
+        "rsSpaDirWthree":  _fmt(spa_direction[378]["spa_consistent"]) if 378 in spa_direction else "--",
         "rsSpaDirWfive":   _fmt(spa_direction[504]["spa_consistent"]) if 504 in spa_direction else "--",
+        "rsSpaSkelWone":   _fmt(spa_skeleton[189]["spa_consistent"]) if 189 in spa_skeleton else "--",
         "rsSpaSkelWtwo":   _fmt(spa_skeleton[252]["spa_consistent"]) if 252 in spa_skeleton else "--",
+        "rsSpaSkelWthree": _fmt(spa_skeleton[378]["spa_consistent"]) if 378 in spa_skeleton else "--",
         "rsSpaSkelWfive":  _fmt(spa_skeleton[504]["spa_consistent"]) if 504 in spa_skeleton else "--",
         "rsMcsSize":       str(len(mcs_in)),
         "rsMcsUniverse":   str(len(mcs_universe)),
