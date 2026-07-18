@@ -16,44 +16,51 @@ orientation-aware allocator family with provably orientation-blind skeleton
 and correlation controls (A2, discharging requirement R2) --- and answered
 it under multiplicity-, distribution- and stability-aware inference (A3).
 
-The answer, in two lines: \emph{at one-year estimation windows the gain is
-almost entirely the skeleton's; at two-year windows the skeleton's gain
-evaporates and orientation restores it. Orientation buys robustness to the
-estimation window, not level --- and no step of the decomposition is
-family-wise significant against honest controls.} In detail (net annualised
-Sharpe, 2007--2024, monthly rebalancing, 5\,bps costs):
+The answer, in two lines: \emph{the causal graph's gain over the
+correlation matrix is stable across estimation horizons, but its source
+shifts --- the skeleton pays only near the conventional one-year window,
+while orientation pays at every horizon, most where sample moments are
+weakest. Orientation buys robustness to the estimation horizon, not level
+--- and no step of the decomposition is family-wise significant against
+honest controls.} In detail (net annualised Sharpe, 2007--2024, monthly
+rebalancing, 5\,bps costs, windows of 189/252/378/504 trading days):
 
 \begin{enumerate}[itemsep=2pt]
-  \item \textbf{At the one-year window the gain is the skeleton's.} Replacing
-        the correlation matrix with the DYNOTEARS graph is worth $+0.031$ in
-        total (D1 $-$ \textsc{corr}, $p=0.14$), of which $+0.022$ comes from
-        the skeleton ($p=0.14$) and only $+0.009$ from orientation
-        ($p=0.47$).
-  \item \textbf{At the two-year window the split inverts.} The skeleton's
-        contribution collapses to $+0.009$; orientation restores
-        $+0.023$--$0.027$ (pairwise $p=0.05$--$0.07$, all five DYNOTEARS
-        orientation contrasts positive). Orientation buys \emph{robustness to
-        the estimation window}, not level: D1 ($0.411/0.395$) and D2s
-        ($0.406/0.399$) are the only allocators strong at both windows, the
-        increment is invariant to costs up to 20\,bps and to the graph's
-        sparsity threshold, and D1 attains the highest Deflated Sharpe ratio
-        of all \rsNtrials\ configurations evaluated ($\rsDoneDSR$).
+  \item \textbf{The total gain is stable across horizons.} Replacing the
+        correlation matrix with the DYNOTEARS graph is worth $+0.018$ to
+        $+0.032$ (D1 $-$ \textsc{corr}; $p=0.43$--$0.12$) at every window,
+        rising to $+0.036$ for D2s at two years; 52 of 56
+        graph-versus-control cells are positive.
+  \item \textbf{Its composition shifts with the window.} The skeleton's
+        rung is hump-shaped --- $-0.003$, $+0.022$, $+0.018$, $+0.009$
+        across the four windows --- while orientation's is positive
+        everywhere and U-shaped: $+0.021$, $+0.009$, $+0.012$, $+0.023$
+        (pairwise $p=0.08$/$0.47$/$0.33$/$0.049$), largest exactly where
+        the sample moments are weakest. Orientation buys \emph{robustness
+        to the estimation horizon}, not level: D1 ($0.395$--$0.415$) and
+        D2s ($0.399$--$0.419$) are strong at every window while the
+        skeleton-only allocator spans $0.372$--$0.403$, the increment is
+        invariant to costs up to 20\,bps and to the graph's sparsity
+        threshold, and D2s and D1 at the 18-month window attain the two
+        highest Deflated Sharpe ratios of all \rsNtrials\ configurations
+        evaluated ($\rsDtwosDSRWthree$, $\rsDoneDSRWthree$).
   \item \textbf{Nothing survives family-wise correction against honest
-        anchors.} Of the four pre-specified SPA tests, Hansen's procedure
-        rejects in exactly one --- the causal family against the weak HSP
-        baseline ($p=\rsSpaConsistent$); against the \textsc{corr} control
-        ($p=\rsSpaSkelWtwo$/$\rsSpaSkelWfive$) and against the skeleton
-        control ($p=\rsSpaDirWtwo$/$\rsSpaDirWfive$) the decomposition's
-        steps are directionally consistent but statistically unconfirmed.
-        The $90\%$ Model Confidence Set over \rsMcsUniverse\ one-year
-        strategies eliminates only the HSP baseline.
+        anchors.} Of the ten SPA runs across four families, Hansen's
+        procedure rejects in exactly one --- the causal family against the
+        weak HSP baseline ($p=\rsSpaConsistent$); against the \textsc{corr}
+        control ($p=\rsSpaSkelWone$--$\rsSpaSkelWfive$ across windows) and
+        against the skeleton control
+        ($p=\rsSpaDirWfive$--$\rsSpaDirWtwo$) the decomposition's steps are
+        directionally consistent but statistically unconfirmed. The $90\%$
+        Model Confidence Set over \rsMcsUniverse\ one-year strategies
+        eliminates only the HSP baseline.
   \item \textbf{The effect is method- and regime-specific.} Under VARLiNGAM
-        graphs orientation adds nothing anywhere; under cheap ridge-Granger
-        graphs the topological \emph{ordering} survives but the structural
-        covariance collapses --- edge magnitudes, not just directions, are
-        what expensive discovery buys. The orientation edge concentrates in
-        calm (bottom-VIX-quintile) regimes; the stress hypothesis is
-        rejected.
+        graphs orientation adds nothing at any of the four windows; under
+        cheap ridge-Granger graphs the topological \emph{ordering} survives
+        but the structural covariance collapses --- edge magnitudes, not
+        just directions, are what expensive discovery buys. The orientation
+        edge concentrates in calm (bottom-VIX-quintile) regimes; the stress
+        hypothesis is rejected.
   \item \textbf{The incumbent driver route is dominated.} HSP-style driver
         selection is $K$-fragile; its monthly feedback loop is exactly inert
         across the full hyperparameter grid, and could not learn anyway
@@ -81,8 +88,10 @@ Sharpe, 2007--2024, monthly rebalancing, 5\,bps costs):
         controls. To my knowledge, both the family and the decomposition are
         new; the closest prior work \cite{howard2025causal} never sets
         weights from its graphs.
-  \item \textbf{Empirical:} the decomposition itself (skeleton-carried at
-        short windows, orientation-as-robustness at long windows, nothing
+  \item \textbf{Empirical:} the decomposition itself, traced across four
+        estimation horizons (a stable total; skeleton hump-shaped and
+        peaking at the one-year convention; orientation positive at every
+        horizon and largest where sample moments are weakest; nothing
         family-wise significant against honest controls), its method- and
         regime-dependence, and the finding that textbook HRP beats the HSP
         machinery built to improve on it.
@@ -91,9 +100,11 @@ Sharpe, 2007--2024, monthly rebalancing, 5\,bps costs):
         identification of a monthly feedback loop's measurement problem
         (one ${\sim}95\%$-noise observation per update); and a
         bit-reproducible pipeline --- including a data-determinism defect
-        whose fix overturned two previously-drawn conclusions --- with every
-        experiment pre-registered, cache-verified, and gated on a
-        byte-perfect replication of the prior phase's result.
+        whose fix overturned two previously-drawn conclusions --- with the
+        allocator grid fixed before any treatment ran, every later
+        extension disclosed as such, all cells cache-verified, and the
+        harness gated on a byte-perfect replication of the prior phase's
+        result.
 \end{itemize}
 
 \section{Limitations}
@@ -111,9 +122,15 @@ drawdown; transfer to richer universes is untested. \textbf{(iv)} The
 universe approximates the S\&P~100 by market-cap ranking and a fixed
 snapshot union, with mild residual survivorship effects. \textbf{(v)} The
 asset-block SEM marginalises over the macro drivers, so the structural
-shocks' assumed independence is an approximation; and the choice of Q ---
-though not the experiment --- was informed by the first phase's results,
-which the unified \rsNtrials-trial deflation universe only partly corrects.
+shocks' assumed independence is an approximation. \textbf{(vi)} The choice
+of Q --- though not the experiment --- was informed by the first phase's
+results, and the window grid was widened from two horizons to four after
+the two-window results were seen; both are disclosed, and the unified
+\rsNtrials-trial deflation universe prices in every configuration the
+search ever touched, but a deflation correction is not a substitute for
+out-of-sample replication. \textbf{(vii)} At the shortest window the two
+orientation-blind controls themselves disagree (D0s $-$ D0 $= +0.025$,
+$p=0.008$), so the nine-month rungs carry extra estimator uncertainty.
 
 \section{Broader impact}
 \label{sec:impact}
@@ -127,10 +144,10 @@ methodological decoration but the investor-protection function of research
 method, and this report applies it to its own headline. The same honesty is
 a corrective to what might be called \emph{causal-washing}: a ``causal''
 label invites over-trust, and the finding here is that a causal method's
-value can be modest, window- and method-dependent, and --- at short windows
---- largely attributable to structure that cheap symmetrisation already
-captures. The label guarantees nothing; the decomposition, not the
-branding, is what carries information.
+value can be modest, window- and method-dependent, and --- at the
+conventional one-year window --- largely attributable to structure that
+cheap symmetrisation already captures. The label guarantees nothing; the
+decomposition, not the branding, is what carries information.
 
 \paragraph{For the field.} Three of this project's technical choices
 generalise into norms. The seed audit has an uncomfortable reading for

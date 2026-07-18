@@ -188,24 +188,35 @@ common anchor: $\text{D0}-\textsc{corr}$ (skeleton) and
 $\text{D}^{*}-\text{D0}$ (orientation). The two rungs telescope ---
 $(\text{D0}-\textsc{corr}) + (\text{D}^{*}-\text{D0}) =
 \text{D}^{*}-\textsc{corr}$ --- so the total causal-graph gain is attributed
-without remainder. The grid --- 7 graph-consuming allocators $\times$
-\{DYNOTEARS, VARLiNGAM\} $\times$ \{252, 504\}-day windows, plus the GRANGER
-arm, a sparsity sweep and a cost sweep --- was specified in a written plan
-before any treatment cell was run, and no allocator was added after results
-were seen.
+without remainder. The full grid is 7 graph-consuming allocators $\times$
+\{DYNOTEARS, VARLiNGAM\} $\times$ \{189, 252, 378, 504\}-day windows, plus
+the GRANGER arm, a sparsity sweep and a cost sweep. The window axis is a
+design variable in its own right: the sample moments every allocator
+consumes degrade in opposite directions as the window shrinks (estimation
+noise) or grows (staleness across regimes), so tracing the decomposition
+over horizons from nine months to two years tests \emph{where} each kind of
+graph information earns its keep. The allocator family and its contrasts
+were specified in a written plan before any treatment cell was run, and no
+allocator was added after results were seen; the window grid, by contrast,
+grew from two conventional horizons to four during the study
+(Section~\ref{sec:believe} accounts for this), with every cell reported and
+priced into the deflation universe. At the shortest window the discovery fit
+operates with $n=189$ observations against $d=132$ variables --- valid
+($n>d$) but thin, a caveat carried through to the results.
 
 \paragraph{Verification before results.} Three gates preceded the grid.
 The \emph{unit-test gate}: 60+ tests written first, including the
 orientation-blindness of the controls, the orientation-sensitivity of every
 treatment, total-effect and structural-covariance identities against
 hand-computed cases, ERC parity, and topological-order properties on random
-DAGs. The \emph{cache gate}: all 836 (method, window) graph fits verified as
-cache hits --- zero refits --- so no allocator can have seen a different
+DAGs. The \emph{cache gate}: all 1,684 (method, window) graph fits verified
+as cache hits --- zero refits --- so no allocator can have seen a different
 graph. The \emph{replication gate}: D0 run through the new harness reproduces
 the committed first-phase V0$'$ bundle with $\Delta\text{Sharpe}=0$ and
 maximum per-rebalance weight difference $0.0$ across all 215 rebalances ---
 byte-perfect, establishing both that the new machinery is faithful and that
-the pipeline is deterministic end-to-end.
+the pipeline is deterministic end-to-end (re-verified on the extended grid:
+a repeated 378-day cell reproduces its NAV path byte-for-byte).
 
 \begin{table}[t]
   \centering

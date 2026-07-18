@@ -400,14 +400,83 @@ joint 90% MCS over 22 w252 strategies keeps 21, excluding only V0; report
 macros are now owned by `robust_stats --phase-ii` (the 41-trial default mode
 no longer writes them).
 
+**The window sweep (2026-07-18) — the decomposition as a function of
+estimation horizon.** The two-window decomposition above inverts between
+w252 and w504, and two points fit any story; the window grid was therefore
+extended to **{189, 252, 378, 504}** trading days (added after the two-window
+results were seen — every cell is reported and priced into the deflation
+universe; the "fixed before results" claim remains scoped to *allocators*,
+which is still true). Full grid: CORR + 7 allocators × {DYNOTEARS, VARLiNGAM}
+at every window. Discovery populated fresh for the new windows (~209 fits at
+w378, 215 at w189, ≈ 4 min/fit; VARLiNGAM ≈ 32 s/fit; one overnight run),
+100% cache-hit gates passed, determinism re-verified (repeated D2s w378
+byte-identical).
+
+Net Sharpe (DYNOTEARS / CORR anchor per window):
+
+| | w189 | w252 | w378 | w504 |
+|---|---|---|---|---|
+| CORR-HRP | 0.389 | 0.381 | 0.385 | 0.363 |
+| D0 (skeleton) | 0.387 | 0.403 | 0.402 | 0.372 |
+| D1 (Σ_struct) | 0.408 | 0.411 | 0.415 | 0.395 |
+| D2s (topo + Σ_struct) | 0.408 | 0.406 | **0.419** | 0.399 |
+
+Decomposition (DYNOTEARS; Δ Sharpe, Politis–Romano p):
+
+| component | w189 | w252 | w378 | w504 |
+|---|---|---|---|---|
+| skeleton (D0−CORR) | −0.003 (0.82) | +0.022 (0.14) | +0.018 (0.23) | +0.009 (0.55) |
+| orientation (D1−D0) | +0.021 (0.08) | +0.009 (0.47) | +0.012 (0.33) | +0.023 (0.049) |
+| total (D1−CORR) | +0.018 (0.43) | +0.031 (0.14) | +0.030 (0.16) | +0.032 (0.12) |
+
+**The four-point reading (supersedes the two-window "inversion" story):**
+
+1. **The total is stable; its composition is not.** D1−CORR sits at
+   +0.018…+0.032 at every horizon (D2s−CORR rises monotonically to +0.036);
+   52/56 graph cells beat CORR (27/28 under DYNOTEARS — the only exception
+   being the w189 skeleton).
+2. **Orientation is positive at all four windows and U-shaped** (+0.021,
+   +0.009, +0.012, +0.023) — largest at the *extremes*, smallest at the
+   one-year convention. 16/20 DYNOTEARS orientation contrasts positive.
+3. **The skeleton is hump-shaped** (−0.003, +0.022, +0.018, +0.009) — it
+   pays only near the conventional windows and vanishes at both ends.
+4. **The two are roughly complementary**, which upgrades the mechanism
+   reading: Σ_struct substitutes for *sample-moment quality* — the sample
+   covariance is noisiest at 189d (n ≈ 1.9× assets) and stalest at 504d, and
+   that is exactly where orientation contributes most; at 252d, where the
+   sample moments are best-tuned, it adds least. "Orientation as regulariser"
+   now rests on four points, not a two-point flip.
+5. **The VARLiNGAM null holds at all four windows** (orientation contrasts
+   6/20 positive, mean −0.004) — method-dependence confirmed on the full
+   grid.
+6. **Control-family caveat at w189:** D0s−D0 = +0.025 (p=0.008) — the two
+   orientation-blind symmetrisations diverge significantly at the shortest
+   window, so there the *choice of symmetrisation* matters as much as
+   orientation. Reported as a caveat on the w189 column.
+
+**Battery (n_trials = 114).** SPA ladders across windows — skeleton family vs
+CORR: p = 0.197/0.123/0.124/0.094; orientation vs D0: p =
+0.171/0.369/0.301/0.147 (benchmarks at the new windows use DYNO-D0, the
+byte-exact V0′ replica). Both ladders are closest to rejection exactly where
+their component's point estimate peaks; nothing survives family-wise, as
+before. **The study-wide DSR leader is now DYNO-D2s w378 (DSR 0.946)** with
+DYNO-D1 w378 second — orientation-aware cells at the new mid-window top the
+whole 114-trial table. The w252 MCS is unchanged (22 → 21, excludes only V0).
+DAG diagnostics at the new windows: DYNOTEARS density stays ~6.3–6.7%
+(depth ~50) at both; VARLiNGAM w189 is an outlier at **32% density**
+(unpruned B0 in the thin n=189, d=132 regime) — its graphs there are
+near-saturated and its w189 cells should be read accordingly.
+
 **Artefacts.** `results/phase_ii_matrix.csv`, `phase_ii_contrasts.csv`,
 `robust_stats_phase_ii.csv`, `seed_audit.csv`, `phase_ii_dag_diagnostics.csv`,
 regime tables (extended), figures `results/figures/phase_ii_{heatmap,forest,
-nav,seed,regime,decomposition}.png`. Compute: the whole phase ran in ~1 afternoon on the
-warm discovery cache (each 215-rebalance D-variant backtest ≈ 40 s; the naïve
-estimate without the cache was ~15 h/run). DAG diagnostics: DYNOTEARS
-asset-graphs average ~625 edges (density 0.064) with DAG depth ~50 of 99 —
-deep directed chains, so the ablation had real direction to work with.
+nav,seed,regime,decomposition,window_gradient}.png`. Compute: the original
+two-window phase ran in ~1 afternoon on the warm discovery cache (each
+215-rebalance D-variant backtest ≈ 40 s vs ~15 h naïve); the window sweep
+added one overnight populate for the two new windows. DAG diagnostics:
+DYNOTEARS asset-graphs average ~625 edges (density 0.064) with DAG depth ~50
+of 99 — deep directed chains, so the ablation had real direction to work
+with.
 
 ---
 

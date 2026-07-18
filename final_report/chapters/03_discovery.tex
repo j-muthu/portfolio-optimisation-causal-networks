@@ -133,13 +133,18 @@ the fit window --- needed by the structural covariance of
 Section~\ref{sec:d-family} --- using the window's stored $z$-statistics, so
 the residuals correspond exactly to the data the graph was fitted on.
 
-\paragraph{What the graphs look like.} The DAGs are far from degenerate. At
-the one-year window the DYNOTEARS asset graphs average ${\sim}625$ directed
-edges (density $6.4\%$ of possible ordered pairs) with a longest directed path
-of ${\approx}50$ nodes out of 99 --- deep chains of influence, not a shallow
-hub-and-spoke. There is, in other words, substantial orientation structure
-for the treatment allocators to exploit; whatever the evaluation finds, it
-will not be because the graphs were trivially symmetric.
+\paragraph{What the graphs look like.} The DAGs are far from degenerate,
+and stably so across estimation horizons: at every window from 189 to 504
+days the DYNOTEARS asset graphs average ${\sim}615$--$655$ directed edges
+(density $6.3$--$6.7\%$ of possible ordered pairs) with a longest directed
+path of ${\approx}50$ nodes out of 99 --- deep chains of influence, not a
+shallow hub-and-spoke. There is, in other words, substantial orientation
+structure for the treatment allocators to exploit; whatever the evaluation
+finds, it will not be because the graphs were trivially symmetric. (The
+same diagnostic flags a comparator limitation: VARLiNGAM's unpruned $B_0$
+saturates to $32\%$ density at the 189-day window --- $n=189$ observations
+against $d=132$ variables --- where DYNOTEARS' $\ell_1$ objective holds
+density steady.)
 
 \paragraph{What ``credible'' can mean without ground truth.} An objection
 must be met head-on: no true causal graph of the market is available, so the
@@ -151,7 +156,7 @@ exploit; discovery is deterministic, so the graphs are at least stable
 facts about the data rather than artefacts of a run; disagreement between
 discovery methods is retained as a diagnostic rather than averaged away
 (Section~\ref{sec:comparators}); and, decisively, the graphs are judged by
-the pre-registered downstream ablation of
+the controlled downstream ablation of
 Chapters~\ref{chap:sensitivity}--\ref{chap:evaluation} --- a task-based
 test, which is the only economically meaningful one. The report accordingly
 claims that the graphs are \emph{useful and reproducible}, never that they
@@ -215,11 +220,12 @@ hyperparameters --- not on anything downstream. A content-keyed disk cache
 (keyed by the exact window bytes, column set, method and hyperparameters,
 with atomic writes) therefore lets every configuration at a given window
 reuse one fit. The effect is decisive for Q: the entire fixed-graph ablation
---- 28 allocator--method--window cells, plus sparsity, cost and comparator
-sweeps --- ran against 836 cached graph fits with a verified 100\% hit rate
-and zero refits (a key miss halts the run rather than silently refitting a
-subtly different graph), at ${\approx}40$ seconds per backtest instead of
-${\approx}15$ hours. The cache is also what \emph{guarantees} the ablation's
+--- 56 allocator--method--window cells, plus sparsity, cost and comparator
+sweeps --- ran against 1{,}684 cached graph fits with a verified 100\% hit
+rate and zero refits (a key miss halts the run rather than silently
+refitting a subtly different graph), at ${\approx}40$ seconds per backtest
+instead of ${\approx}15$ hours; extending the window grid from two to four
+horizons cost one overnight populate run rather than weeks. The cache is also what \emph{guarantees} the ablation's
 premise: allocators cannot see different graphs, because there is exactly one
 graph per (method, window, data) key.
 

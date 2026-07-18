@@ -68,9 +68,9 @@ has not yet set portfolio weights from them, it says where in the graph
 allocative value actually resides. And for research practice in a field
 with a documented backtest-overfitting problem
 \cite{bailey2014deflated,lopezdeprado2023causal}, the project demonstrates
-that an effect of this size can be measured with a pre-registered design,
-a deterministic pipeline and multiplicity-corrected inference --- and
-reported honestly when it does not clear the bar.
+that an effect of this size can be measured with a controlled ablation
+design, a deterministic pipeline and multiplicity-corrected inference ---
+and reported honestly when it does not clear the bar.
 
 \section{The scientific question}
 \label{sec:question}
@@ -93,8 +93,8 @@ whole study:
     bisection with inverse-cluster-variance splits determines the weights ---
     long-only, fully invested, on the ${\sim}100$ largest S\&P~500
     constituents (a fixed 99-name universe), rebalanced monthly over
-    2007--2024 (215 rebalances at the one-year estimation window; the
-    two-year window's longer burn-in leaves 203).
+    2007--2024 (215 rebalances at windows up to one year; the 18-month and
+    two-year windows' longer burn-ins leave 209 and 203).
   \item \emph{The correlation matrix}: the graph-blind control \textsc{corr}
     is textbook HRP --- distance $\sqrt{\tfrac{1}{2}(1-\rho_{ij})}$ on the
     lookback window's sample correlation \cite{lopezdeprado2016hrp}.
@@ -102,7 +102,9 @@ whole study:
     block of a DYNOTEARS fit on the joint driver--asset panel at each
     rebalance (primary), with VARLiNGAM \cite{hyvarinen2010varlingam} and a
     ridge-regularised Granger-causal graph \cite{granger1969investigating} as
-    comparators; one- and two-year estimation windows (252/504 trading days).
+    comparators; four estimation windows --- 189, 252, 378 and 504 trading
+    days (nine months to two years) --- so the decomposition is measured as
+    a function of estimation horizon, not at a single conventional window.
   \item \emph{Performance gain}: out-of-sample (walk-forward), net-of-cost
     (5\,bps per unit one-way turnover, swept over $\{0,5,10,20\}$\,bps),
     annualised Sharpe ratio of daily portfolio returns --- supplemented,
@@ -182,8 +184,8 @@ against Q.
 \end{enumerate}
 
 \begin{enumerate}[label=\textbf{A\arabic*}, itemsep=2pt, topsep=3pt]
-  \item \emph{A reproducible rolling causal-discovery pipeline} (addresses
-    C1; Chapter~\ref{chap:discovery}): DYNOTEARS with the directional prior
+  \item \emph{A reproducible rolling pipeline for causal discovery}
+    (addresses C1; Chapter~\ref{chap:discovery}): DYNOTEARS with the directional prior
     enforced natively and empirically verified to matter; a content-keyed
     discovery cache that makes the full ablation grid tractable
     (${\sim}700\times$ fan-out speedup); a data-determinism defect found and
@@ -218,25 +220,31 @@ where the answer is ``little'' or ``nothing''. Full detail is in
 Chapter~\ref{chap:evaluation}.
 
 \begin{itemize}[itemsep=2pt, topsep=3pt]
-  \item \textbf{The decomposition (the answer to Q).} At the one-year window
-    the gain is skeleton-dominated: net Sharpe rises from $\rsCorrSharpe$ at
-    the correlation control to $0.403$ under the skeleton alone ($+0.022$,
-    pairwise $p=0.14$), and the best orientation-aware allocator adds only
-    $+0.009$ more ($\rsDoneSharpe$, $p=0.47$). At the two-year window the
-    split \emph{inverts}: $+0.009$ from the skeleton ($p=0.55$),
-    $+0.023$--$0.027$ from orientation (pairwise $p=0.05$--$0.07$). No rung
-    survives family-wise correction (Hansen's SPA:
-    $p \geq \rsSpaSkelWfive$ across the four skeleton/orientation
+  \item \textbf{The decomposition (the answer to Q).} The graph's total gain
+    over the correlation control is stable across horizons ($+0.018$ to
+    $+0.032$ net Sharpe; $52$ of $56$ graph cells above the control) but its
+    composition shifts with the window. The skeleton's rung is hump-shaped
+    --- $-0.003$, $+0.022$, $+0.018$, $+0.009$ at the 189-, 252-, 378- and
+    504-day windows (pairwise $p \geq 0.14$ throughout) --- while the
+    orientation rung is positive at \emph{every} window and U-shaped:
+    $+0.021$, $+0.009$, $+0.012$, $+0.023$ (pairwise $p = 0.08$ and $0.05$
+    at the two extremes). No rung survives family-wise correction (Hansen's
+    SPA: $p \geq \rsSpaSkelWfive$ across the eight skeleton/orientation
     $\times$ window tests).
-  \item \textbf{What orientation buys is consistency, not level.} The
-    structural-covariance allocator D1 ($0.411/0.395$ at the two windows) and
-    causal-ordered D2s ($0.406/0.399$) are the only variants strong at both;
-    the skeleton-only allocator collapses from $0.403$ to $0.372$ at two
-    years. The orientation edge is invariant to transaction costs up to
-    20\,bps and to the graph's sparsity threshold, and D1 attains the highest
-    Deflated Sharpe of all \rsNtrials\ configurations ($\rsDoneDSR$). It is,
-    however, method-dependent --- absent under VARLiNGAM graphs --- and
-    concentrates in calm (bottom-VIX-quintile) regimes rather than stress.
+  \item \textbf{What orientation buys is robustness, not level.} The
+    orientation-aware allocators are strong at every window --- D1 spans
+    $0.395$--$0.415$ and D2s $0.399$--$0.419$ across the four horizons,
+    versus the skeleton-only allocator's $0.372$--$0.403$ --- and their edge
+    over the skeleton is largest exactly where the sample moments feeding
+    the control are weakest (the nine-month and two-year windows), which
+    reads as causal structure substituting for sample-moment quality. The
+    edge is invariant to transaction costs up to 20\,bps and to the graph's
+    sparsity threshold, and D2s and D1 at the 18-month window attain the two
+    highest Deflated Sharpes of all \rsNtrials\ configurations
+    ($\rsDtwosDSRWthree$, $\rsDoneDSRWthree$). It is, however,
+    method-dependent --- absent under VARLiNGAM graphs at all four windows
+    --- and concentrates in calm (bottom-VIX-quintile) regimes rather than
+    stress.
   \item \textbf{The incumbent driver route is dominated.} The HSP-style
     driver-selection pipeline is $K$-fragile; its monthly feedback loop is
     exactly inert across a $3{\times}3$ hyperparameter grid, because its
@@ -259,11 +267,12 @@ Chapter~\ref{chap:evaluation}.
 \end{itemize}
 
 The honest one-line summary: \emph{the causal graph's value to hierarchical
-allocation lies mostly in its skeleton at short estimation windows; its
-orientations add a modest consistency effect at long windows; and neither
-component's contribution survives family-wise data-snooping correction.}
-Establishing that decomposition, with its uncertainty stated, is the
-contribution.
+allocation is stable across estimation horizons, but its source shifts ---
+the skeleton pays only near the conventional one-year window, the
+orientations pay at every horizon and most where sample moments are weakest;
+and neither component's contribution survives family-wise data-snooping
+correction.} Establishing that decomposition, with its uncertainty stated,
+is the contribution.
 
 \section{Report structure}
 \label{sec:structure}

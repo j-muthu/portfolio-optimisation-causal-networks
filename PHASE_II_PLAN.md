@@ -51,6 +51,23 @@ allocator is the identical Phase-I code path. §3's `asset_graph.py`,
 `directed.py`, `topological.py`, `granger.py` and all five test files exist as
 specified; `run_phase_ii.py` is a thin launcher over `run_shakedown`.
 
+## RESULT ADDENDUM (2026-07-18) — the window sweep
+
+The window grid was extended beyond this plan's {252, 504} to
+**{189, 252, 378, 504}** (CORR + 7 allocators × {DYNO, VARLiNGAM} at every
+window; discovery populated fresh for the new windows, gates 100%,
+determinism re-verified). *Timing honesty:* the two extra windows were added
+on 2026-07-17–18, after the two-window results were known — a widening of a
+design axis, not of the allocator family; every cell is reported and the
+deflation universe grew accordingly (84 → 114 trials). Headline: the total
+causal-graph gain over CORR-HRP is stable across horizons (+0.018…+0.032)
+while its composition shifts — skeleton hump-shaped (peaks at w252),
+orientation U-shaped and positive at all four windows (largest where sample
+moments are weakest); the w252→w504 "inversion" of this plan's two-window
+result is the middle of that pattern, not a flip. VARLiNGAM orientation null
+at all four windows; DYNO-D2s w378 now tops the study-wide DSR table (0.946).
+Full numbers in FINDINGS.md §1d ("The window sweep").
+
 ---
 
 ## 0. Context: why this phase exists
