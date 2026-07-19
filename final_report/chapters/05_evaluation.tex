@@ -324,14 +324,18 @@ residuals Gaussianise over longer windows, and, at the nine-month window,
 with its unpruned $B_0$ saturating in the thin-sample regime (density
 $32\%$ against DYNOTEARS' stable $6$--$7\%$; Section~\ref{sec:asset-graph}),
 so its short-window graphs carry little usable orientation signal either.
-Under the cheap GRANGER graphs the split is informative: causal-ordered
-bisection survives (D2 $=0.393$ vs DYNOTEARS' $0.399$) but
-the structural-covariance allocators collapse (D1 $=0.352$, D3 $=0.350$)
---- a ridge-VAR coefficient matrix supports an \emph{ordering} but its
-magnitudes cannot support shock propagation. Expensive discovery earns its
-cost only for the allocators that consume edge weights, and the
-best-allocator gap (GRANGER $-$ DYNOTEARS at D1: $-0.060$, $p=0.12$)
-favours DYNOTEARS without reaching significance.
+The magnitude-degraded GRANGER control then localises \emph{where inside
+the orientation} the value sits: causal-ordered bisection survives on its
+graphs (D2 $=0.393$ vs DYNOTEARS' $0.399$) while the structural-covariance
+allocators collapse (D1 $=0.352$, D3 $=0.350$; gap at D1 $-0.060$,
+$p=0.12$). A ridge-VAR coefficient matrix carries a serviceable
+\emph{ordering} but not structural effect sizes, so the dissociation says
+the orientation rung's value does not lie in merely knowing which way the
+arrows point --- an ordering survives even a one-lag ridge regression ---
+but in edge magnitudes trustworthy enough to propagate shocks, the
+ingredient only the jointly-optimised DYNOTEARS fit supplies. This is a
+refinement of the answer to Q, not a separate benchmark: ``orientation''
+pays through its weighted, propagatable form.
 
 \paragraph{The controls disagree at the shortest window.} At 189 days the
 two orientation-blind symmetrisations diverge: D0s beats D0 by $+0.025$

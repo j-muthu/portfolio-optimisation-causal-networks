@@ -100,11 +100,14 @@ whole study:
     lookback window's sample correlation \cite{lopezdeprado2016hrp}.
   \item \emph{A discovered causal graph}: the contemporaneous asset--asset
     block of a DYNOTEARS fit on the joint driver--asset panel at each
-    rebalance (primary), with VARLiNGAM \cite{hyvarinen2010varlingam} and a
-    ridge-regularised Granger-causal graph \cite{granger1969investigating} as
-    comparators; four estimation windows --- 189, 252, 378 and 504 trading
-    days (nine months to two years) --- so the decomposition is measured as
-    a function of estimation horizon, not at a single conventional window.
+    rebalance (primary), with two controls on its orientation content ---
+    VARLiNGAM \cite{hyvarinen2010varlingam}, the same construction with
+    differently-identified orientations, and a ridge-regularised Granger
+    graph \cite{granger1969investigating}, which preserves a directional
+    ordering but degrades the edge magnitudes; four estimation windows ---
+    189, 252, 378 and 504 trading days (nine months to two years) --- so
+    the decomposition is measured as a function of estimation horizon, not
+    at a single conventional window.
   \item \emph{Performance gain}: out-of-sample (walk-forward), net-of-cost
     (5\,bps per unit one-way turnover, swept over $\{0,5,10,20\}$\,bps),
     annualised Sharpe ratio of daily portfolio returns --- supplemented,

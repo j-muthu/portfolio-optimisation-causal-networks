@@ -162,25 +162,33 @@ test, which is the only economically meaningful one. The report accordingly
 claims that the graphs are \emph{useful and reproducible}, never that they
 are \emph{true}.
 
-\section{Comparator graphs}
+\section{Controls on the orientation content}
 \label{sec:comparators}
 
-Two further graph sources feed the same chokepoint, so every allocator runs
-unchanged on them. \textbf{VARLiNGAM} \cite{hyvarinen2010varlingam} supplies
-the instantaneous matrix $B_0$, identified through non-Gaussianity rather
-than a score: LiNGAM's causal order makes the asset block a DAG by
-construction, and its identification assumption --- heavy-tailed residuals ---
-weakens mechanically at longer windows, the window-fragility
-Chapter~\ref{chap:background} anticipated and Chapter~\ref{chap:evaluation}
-observes. \textbf{GRANGER} is the deliberately cheap comparator: a
-ridge-regularised VAR(1) on the asset panel, in closed form, with
+Because Q hinges on what the \emph{orientations} contribute, the design
+carries two further graph sources that perturb exactly that ingredient;
+both feed the same chokepoint, so every allocator runs unchanged on them.
+\textbf{VARLiNGAM} \cite{hyvarinen2010varlingam} supplies
+\emph{differently-identified} orientations: its instantaneous matrix $B_0$
+is identified through non-Gaussianity rather than a score, LiNGAM's causal
+order makes the asset block a DAG by construction, and its identification
+assumption --- heavy-tailed residuals --- weakens mechanically at longer
+windows, the window-fragility Chapter~\ref{chap:background} anticipated and
+Chapter~\ref{chap:evaluation} observes. \textbf{GRANGER} supplies
+\emph{magnitude-degraded} orientations: a ridge-regularised VAR(1) on the
+asset panel, in closed form, with
 $M[i,j] = |{\rm coef}(x_{i,t-1}\!\to\!x_{j,t})|$, thresholded per window
 to match the paired DYNOTEARS graph's edge density so the comparison is at
-like-for-like sparsity. It is deterministic and assumption-light, but its
-matrix is lagged rather than contemporaneous and is not guaranteed acyclic;
-the allocators handle this honestly (truncated-Neumann total effects; minimal
-feedback-arc removal before topological ordering). If GRANGER allocates as
-well as DYNOTEARS, expensive discovery is not where the value lies. (A
+like-for-like sparsity. Its lagged, shrunken coefficients still order the
+assets directionally, but they are not structural effect sizes --- and it
+is not guaranteed acyclic, which the allocators handle honestly
+(truncated-Neumann total effects; minimal feedback-arc removal before
+topological ordering). The two controls therefore split ``orientation''
+into its parts: if an effect needs DYNOTEARS' specific arrows, VARLiNGAM
+should not reproduce it; if it needs trustworthy edge \emph{magnitudes}
+rather than arrows alone, GRANGER's ordering should survive where its
+shock propagation fails --- which is precisely the dissociation
+Section~\ref{sec:decomposition} observes. (A
 non-linear extension, NTS-NOTEARS \cite{sun2023ntsnotears}, was probed at
 reduced scale: its prior-knowledge mechanism drives the asset$\to$driver
 block to exactly zero and its discovered structure agrees with DYNOTEARS only

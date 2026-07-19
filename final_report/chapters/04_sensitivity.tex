@@ -64,7 +64,7 @@ exactly --- no spectral-radius assumption. $B_{ij} = \partial x_i / \partial
 \varepsilon_j$ aggregates the influence of a unit shock at asset $j$ on asset
 $i$ over \emph{all} directed paths; it is the Leontief inverse of
 input--output economics, and its asymmetry is where orientation enters
-allocation natively. (For the non-DAG GRANGER comparator, $B$ is approximated
+allocation natively. (For the non-DAG GRANGER control, $B$ is approximated
 by the truncated series with a spectral-radius guard --- a documented
 approximation.)
 
@@ -190,7 +190,8 @@ $(\text{D0}-\textsc{corr}) + (\text{D}^{*}-\text{D0}) =
 \text{D}^{*}-\textsc{corr}$ --- so the total causal-graph gain is attributed
 without remainder. The full grid is 7 graph-consuming allocators $\times$
 \{DYNOTEARS, VARLiNGAM\} $\times$ \{189, 252, 378, 504\}-day windows, plus
-the GRANGER arm, a sparsity sweep and a cost sweep. The window axis is a
+the magnitude-degraded GRANGER control arm, a sparsity sweep and a cost
+sweep. The window axis is a
 design variable in its own right: the sample moments every allocator
 consumes degrade in opposite directions as the window shrinks (estimation
 noise) or grows (staleness across regimes), so tracing the decomposition

@@ -186,11 +186,13 @@ serves as the robustness comparator --- its identification rests on an
 assumption (heavy-tailed residuals) that financial returns satisfy at short
 windows but progressively lose at longer ones as aggregation pulls residuals
 toward Gaussianity, a mechanism the results repeatedly exhibit.
-\textbf{(iii) Cheap directed baselines exist.} A ridge-regularised VAR(1)
-coefficient matrix is a Granger-causal \cite{granger1969investigating}
-directed graph obtainable in closed form; it is deterministic,
-assumption-light, and serves as the ``is expensive discovery even needed?''
-comparator. (A non-linear extension, NTS-NOTEARS \cite{sun2023ntsnotears},
+\textbf{(iii) A directed graph without trustworthy magnitudes exists in
+closed form.} A ridge-regularised VAR(1) coefficient matrix is a
+Granger-causal \cite{granger1969investigating} directed graph: it carries a
+defensible directional \emph{ordering}, but its shrunken one-lag
+coefficients are not structural effect sizes. That combination makes it a
+natural control for dissociating what ``orientation'' contains --- the
+arrows themselves versus magnitudes fit to propagate shocks. (A non-linear extension, NTS-NOTEARS \cite{sun2023ntsnotears},
 was probed at reduced scale and left as future work: its prior-knowledge
 mechanism transfers, but a full backtest costs ${\sim}10\times$ DYNOTEARS.)
 

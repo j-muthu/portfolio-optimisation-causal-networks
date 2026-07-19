@@ -12,15 +12,18 @@ disagree with a quoted increment by one unit in the third decimal.
 \section{The full allocator matrix}
 
 Table~\ref{tab:matrix-full} gives every cell of the fixed-graph ablation
-(net annualised Sharpe) plus the supporting arms. The GRANGER row is
-one-year only (its two-year arm was conditional on a one-year signal that
-did not materialise for the structural allocators).
+(net annualised Sharpe) plus the supporting arms. The GRANGER control's
+scope is deliberately narrow --- one representative allocator per way of
+consuming the graph (skeleton D0, magnitudes D1/D3, ordering D2), at the
+one-year window --- since its role is to dissociate ordering from
+magnitudes, not to serve as a third full arm.
 
 \begin{table}[h]
   \centering
   \caption{Net annualised Sharpe, 2007--2024, by graph source, allocator and
     window; row-wise best in bold. \textsc{corr} is graph-blind
-    (method-independent). ``---'': not in the pre-registered GRANGER scope.}
+    (method-independent). ``---'': outside the GRANGER control's
+    representative-allocator scope.}
   \label{tab:matrix-full}
   \small
   \setlength{\tabcolsep}{4.5pt}
