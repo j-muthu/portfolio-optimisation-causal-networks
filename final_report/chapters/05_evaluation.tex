@@ -257,7 +257,7 @@ is estimated from barely $1.9$ observations per asset (noise), at 504 days
 it averages across regimes it should distinguish (staleness), and at the
 one-year sweet spot --- where the estimation literature puts the
 noise--staleness optimum, and where the skeleton's own contribution peaks
---- orientation adds least. $\Sigma_{\mathrm{struct}}$, built from the
+--- orientation adds least. $\Sigma_{\mathrm{SEM}}$, built from the
 contemporaneous graph and its shock variances, substitutes causal structure
 for sample-moment quality at both ends of that trade-off. On this reading,
 orientation acts as a regulariser of the allocation step rather than a
@@ -268,14 +268,14 @@ measured.
 
 \paragraph{An alternative explanation, and the evidence against it.} The
 contrast $\skelsem{}-\skelsamp{}$ compares the SEM-implied covariance against
-the sample covariance, and $\Sigma_{\mathrm{struct}}$ is also a
+the sample covariance, and $\Sigma_{\mathrm{SEM}}$ is also a
 \emph{structured} estimator --- fewer effective parameters, shrinkage-like
 in character --- so a sceptic can read the two-year gain as a generic
 structured-covariance effect rather than a directional one. Two
 observations push back. First, orientation is \emph{constitutive} of the
 estimator, not a decoration on it: the exact total-effect algebra of
 Section~\ref{sec:sem} exists only because the directed graph is acyclic, so
-there is no orientation-free version of $\Sigma_{\mathrm{struct}}$ to
+there is no orientation-free version of $\Sigma_{\mathrm{SEM}}$ to
 attribute the gain to. Second, and empirically, the identical construction
 on VARLiNGAM graphs --- equally structured, differently oriented --- yields
 nothing, and its magnitude-degraded GRANGER version collapses (both shown
@@ -283,7 +283,7 @@ in the discovery-method comparison of the next subsection): if generic
 structure were the mechanism, both should have
 worked. The gain therefore tracks the \emph{content} of the DYNOTEARS
 orientations, not the mere presence of structure. A fully dispositive
-control would require a symmetric analogue of $\Sigma_{\mathrm{struct}}$,
+control would require a symmetric analogue of $\Sigma_{\mathrm{SEM}}$,
 which the acyclicity requirement rules out; that residual is recorded as a
 limitation rather than argued away.
 
@@ -325,7 +325,7 @@ $32\%$ against DYNOTEARS' stable $6$--$7\%$; Section~\ref{sec:asset-graph}),
 so its short-window graphs carry little usable orientation signal either.
 The magnitude-degraded GRANGER control then localises \emph{where inside
 the orientation} the value sits: causal-ordered bisection survives on its
-graphs (\orientsamp{} $=0.393$ vs DYNOTEARS' $0.399$) while the structural-covariance
+graphs (\orientsamp{} $=0.393$ vs DYNOTEARS' $0.399$) while the SEM-covariance
 allocator collapses (\skelsem{} $=0.352$; gap $-0.060$,
 $p=0.12$). A ridge-VAR coefficient matrix carries a serviceable
 \emph{ordering} but not structural effect sizes, so the dissociation says

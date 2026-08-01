@@ -44,8 +44,8 @@ FIG = RESULTS / "figures"
 C = {
     "V0": "#999999",
     "D0": "#009E73",        # = V0' green
-    "D1": "#0072B2",        # blue — structural covariance
-    "D2s": "#D55E00",       # vermillion — causal-ordered bisection + Σ_struct
+    "D1": "#0072B2",        # blue — SEM-implied covariance
+    "D2s": "#D55E00",       # vermillion — causal-ordered bisection + Σ_SEM
     "V1": "#E69F00",        # orange — the HSP machinery route
     "w189": "#56B4E9",
     "w252": "#0072B2",

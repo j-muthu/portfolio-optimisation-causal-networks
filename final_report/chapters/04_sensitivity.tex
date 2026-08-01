@@ -72,22 +72,26 @@ The SEM implies a covariance. With $\Sigma_\varepsilon =
 \operatorname{diag}(\sigma^2_{\varepsilon,i})$ --- diagonality is the SEM's
 own independent-shocks assumption, and estimating a dense
 $\Sigma_\varepsilon$ would smuggle sample correlation back into a treatment
-meant to isolate the graph --- the \emph{structural covariance} in return
+meant to isolate the graph --- the \emph{SEM-implied covariance} in return
 units is
 \begin{equation}
-  \Sigma_{\mathrm{struct}}
+  \Sigma_{\mathrm{SEM}}
   \;=\; D_\sigma \big( B\, \Sigma_\varepsilon\, B^\top \big) D_\sigma ,
-  \label{eq:sigma-struct}
+  \label{eq:sigma-sem}
 \end{equation}
 where the shock variances are estimated from the fit window's structural
 residuals $E = X_z (I - M)$, and $D_\sigma$ de-standardises from the
-$z$-scored units the graph was fitted in back to return units. The
+$z$-scored units the graph was fitted in back to return units. The name is
+worth being precise about: $\Sigma_{\mathrm{SEM}}$ is the covariance of the
+\emph{observables} that the structural model implies --- SEM's $\Sigma(\theta)$,
+the reduced form in SVAR terms --- whereas the structural shocks' own
+covariance is the diagonal $\Sigma_\varepsilon$ above. The
 de-standardisation is not optional: recursive bisection compares cluster
 variances, and omitting $D_\sigma$ would silently equalise asset
 volatilities. Two caveats are stated rather than hidden: the asset-block SEM
 marginalises over the drivers, so $\varepsilon$ absorbs driver-explained
 variance and its diagonality is an approximation; and
-$\Sigma_{\mathrm{struct}}$ is nearest-PSD projected and lightly ridge-loaded
+$\Sigma_{\mathrm{SEM}}$ is nearest-PSD projected and lightly ridge-loaded
 so dense stress-window graphs cannot produce a singular input.
 
 \section{The controls: correlation and skeleton}
@@ -143,7 +147,7 @@ enumerates the family completely (Table~\ref{tab:crossing}).
   \label{tab:crossing}
   \begin{tabular}{l l l}
     \toprule
-    Ordering from & splits on sample cov. & splits on $\Sigma_{\mathrm{struct}}$ \\
+    Ordering from & splits on sample cov. & splits on $\Sigma_{\mathrm{SEM}}$ \\
     \midrule
     clustering on the skeleton & \skelsamp{} (control) & \skelsem{} \\
     topological sort           & \orientsamp{}           & \orientsem{} \\
@@ -163,11 +167,11 @@ fully invested, deterministic and seed-free; all take the identical
 $(M,\ \text{returns window})$ inputs as the controls; none has an analogue in
 the HRP/HSP literature.
 
-\paragraph{\skelsem{} --- structural covariance.} Clustering as in \skelsamp{} --- the
+\paragraph{\skelsem{} --- SEM-implied covariance.} Clustering as in \skelsamp{} --- the
 ordering is deliberately held at the skeleton, so that
 $\skelsem{}-\skelsamp{}$ isolates orientation's effect on the allocation step
-alone --- but recursive bisection allocates on $\Sigma_{\mathrm{struct}}$ of
-Eq.~\eqref{eq:sigma-struct} instead of the sample covariance: orientation
+alone --- but recursive bisection allocates on $\Sigma_{\mathrm{SEM}}$ of
+Eq.~\eqref{eq:sigma-sem} instead of the sample covariance: orientation
 enters through the shock-propagation asymmetry of $B$.
 
 \paragraph{\orientsamp{} / \orientsem{} --- causal-ordered bisection.}
@@ -178,7 +182,7 @@ natively: assets are sorted upstream$\to$downstream by a topological sort of
 $M$ (ties broken deterministically by total downstream influence
 $\sum_r |B_{ri}|$, then name), and the \emph{existing} recursive bisection
 runs on that order --- with the sample covariance (\orientsamp{}) or with
-$\Sigma_{\mathrm{struct}}$ (\orientsem{}). This is the most direct answer to the
+$\Sigma_{\mathrm{SEM}}$ (\orientsem{}). This is the most direct answer to the
 observation that one cannot cluster on an asymmetric matrix: do not cluster.
 One subtlety, discovered by the ablation's own tests, is worth recording:
 recursive bisection is \emph{mirror-invariant} (reversing the leaf order
@@ -221,7 +225,7 @@ operates with $n=189$ observations against $d=132$ variables --- valid
 \paragraph{Verification before results.} Three gates preceded the grid.
 The \emph{unit-test gate}: 60+ tests written first, including the
 orientation-blindness of the controls, the orientation-sensitivity of every
-treatment, total-effect and structural-covariance identities against
+treatment, total-effect and SEM-covariance identities against
 hand-computed cases, ERC parity, and topological-order properties on random
 DAGs. The \emph{cache gate}: all 1,684 (method, window) graph fits verified
 as cache hits --- zero refits --- so no allocator can have seen a different
@@ -244,9 +248,9 @@ a repeated 378-day cell reproduces its NAV path byte-for-byte).
     \HRP{} & correlation distance & sample & no (graph-blind) \\
     \skelsamp{}            & graph embedding      & sample & no (provably) \\
     \skelalt{}           & $\tfrac{1}{2}(|M|{+}|M^\top|)$ & sample & no \\
-    \skelsem{}            & graph embedding      & $\Sigma_{\mathrm{struct}}$ & allocation step \\
+    \skelsem{}            & graph embedding      & $\Sigma_{\mathrm{SEM}}$ & allocation step \\
     \orientsamp{}            & topological order    & sample & ordering step \\
-    \orientsem{}           & topological order    & $\Sigma_{\mathrm{struct}}$ & both steps \\
+    \orientsem{}           & topological order    & $\Sigma_{\mathrm{SEM}}$ & both steps \\
     \midrule
     V0/V1/V2      & driver sensitivities & sample & via driver selection \\
     \bottomrule
