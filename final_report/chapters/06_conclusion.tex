@@ -28,8 +28,8 @@ rebalancing, 5\,bps costs, windows of 189/252/378/504 trading days):
 \begin{enumerate}[itemsep=2pt]
   \item \textbf{The total gain is stable across horizons.} Replacing the
         correlation matrix with the DYNOTEARS graph is worth $+0.018$ to
-        $+0.032$ (D1 $-$ \textsc{corr}; $p=0.43$--$0.12$) at every window,
-        rising to $+0.036$ for D2s at two years; 36 of 40
+        $+0.032$ (\skelsem{} $-$ \HRP{}; $p=0.43$--$0.12$) at every window,
+        rising to $+0.036$ for \orientsem{} at two years; 36 of 40
         graph-versus-control cells are positive.
   \item \textbf{Its composition shifts with the window.} The skeleton's
         rung is hump-shaped --- $-0.003$, $+0.022$, $+0.018$, $+0.009$
@@ -37,17 +37,17 @@ rebalancing, 5\,bps costs, windows of 189/252/378/504 trading days):
         everywhere and U-shaped: $+0.021$, $+0.009$, $+0.012$, $+0.023$
         (pairwise $p=0.08$/$0.47$/$0.33$/$0.049$), largest exactly where
         the sample moments are weakest. Orientation buys \emph{robustness
-        to the estimation horizon}, not level: D1 ($0.395$--$0.415$) and
-        D2s ($0.399$--$0.419$) are strong at every window while the
+        to the estimation horizon}, not level: \skelsem{} ($0.395$--$0.415$) and
+        \orientsem{} ($0.399$--$0.419$) are strong at every window while the
         skeleton-only allocator spans $0.372$--$0.403$, the increment is
         invariant to costs up to 20\,bps and to the graph's sparsity
-        threshold, and D2s and D1 at the 18-month window attain the two
+        threshold, and \orientsem{} and \skelsem{} at the 18-month window attain the two
         highest Deflated Sharpe ratios of all \rsNtrials\ configurations
         evaluated ($\rsDtwosDSRWthree$, $\rsDoneDSRWthree$).
   \item \textbf{Nothing survives family-wise correction against honest
         anchors.} Of the ten SPA runs across four families, Hansen's
         procedure rejects in exactly one --- the causal family against the
-        weak HSP baseline ($p=\rsSpaConsistent$); against the \textsc{corr}
+        weak HSP baseline ($p=\rsSpaConsistent$); against the \HRP{}
         control ($p=\rsSpaSkelWone$--$\rsSpaSkelWfive$ across windows) and
         against the skeleton control
         ($p=\rsSpaDirWfive$--$\rsSpaDirWtwo$) the decomposition's steps are
@@ -70,7 +70,7 @@ rebalancing, 5\,bps costs, windows of 189/252/378/504 trading days):
         $[\rsSeedMin,\rsSeedMax]$ over \rsSeedN\ seeds --- a range twice
         its claimed edge, with the committed value at the $\rsSeedPct$th
         percentile of its own seed distribution. The graph-based allocators
-        are deterministic, and the headline three (D0, D1, D2s) exceed even
+        are deterministic, and the headline three (\skelsamp{}, \skelsem{}, \orientsem{}) exceed even
         its luckiest seed.
 \end{enumerate}
 
@@ -128,7 +128,7 @@ the two-window results were seen; both are disclosed, and the unified
 \rsNtrials-trial deflation universe prices in every configuration the
 search ever touched, but a deflation correction is not a substitute for
 out-of-sample replication. \textbf{(vii)} At the shortest window the two
-orientation-blind controls themselves disagree (D0s $-$ D0 $= +0.025$,
+orientation-blind controls themselves disagree (\skelalt{} $-$ \skelsamp{} $= +0.025$,
 $p=0.008$), so the nine-month rungs carry extra estimator uncertainty.
 
 \section{Broader impact}

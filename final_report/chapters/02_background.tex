@@ -199,7 +199,7 @@ mechanism transfers, but a full backtest costs ${\sim}10\times$ DYNOTEARS.)
 \section{Research gap}
 \label{sec:gap}
 
-Table~\ref{tab:gap} positions the work; the \textsc{corr} control of
+Table~\ref{tab:gap} positions the work; the \HRP{} control of
 Section~\ref{sec:question} is exactly the HRP row. Reading across the
 columns: HRP fixes the allocator but is blind to direction at the interface;
 HSP re-routes information through driver sensitivities yet selects those
@@ -215,14 +215,14 @@ Chapters~\ref{chap:sensitivity}--\ref{chap:evaluation} deliver.
   \centering
   \small
   \caption{Positioning against the closest related approaches. The HRP row is
-  the graph-blind \textsc{corr} control of this study.}
+  the graph-blind \HRP{} control of this study.}
   \label{tab:gap}
   \begin{tabular}{l l c c c c}
     \toprule
     Approach & Clusters on & Causal & Weights & Asymmetric & Skeleton vs \\
              &             & discovery? & from graph? & allocation? & orientation? \\
     \midrule
-    HRP \cite{lopezdeprado2016hrp} ($\equiv$ \textsc{corr}) & correlation & no & n/a & no & n/a \\
+    HRP \cite{lopezdeprado2016hrp} ($\equiv$ \HRP{}) & correlation & no & n/a & no & n/a \\
     HSP \cite{rodriguez2023hsp}            & driver sens.\    & no  & no  & no & no \\
     Howard et al.\ \cite{howard2025causal} & (no allocation)  & yes & no  & no & no \\
     \textbf{This work}                     & \textbf{causal graph} & \textbf{yes} & \textbf{yes} & \textbf{yes} & \textbf{yes} \\

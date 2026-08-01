@@ -95,9 +95,10 @@ whole study:
     constituents (a fixed 99-name universe), rebalanced monthly over
     2007--2024 (215 rebalances at windows up to one year; the 18-month and
     two-year windows' longer burn-ins leave 209 and 203).
-  \item \emph{The correlation matrix}: the graph-blind control \textsc{corr}
-    is textbook HRP --- distance $\sqrt{\tfrac{1}{2}(1-\rho_{ij})}$ on the
-    lookback window's sample correlation \cite{lopezdeprado2016hrp}.
+  \item \emph{The correlation matrix}: the graph-blind control \HRP{} is
+    López de Prado's original construction --- distance
+    $\sqrt{\tfrac{1}{2}(1-\rho_{ij})}$ on the lookback window's sample
+    correlation \cite{lopezdeprado2016hrp}.
   \item \emph{A discovered causal graph}: the contemporaneous asset--asset
     block of a DYNOTEARS fit on the joint driver--asset panel at each
     rebalance (primary), with two controls on its orientation content ---
@@ -119,8 +120,8 @@ whole study:
     configurations evaluated in the project.
   \item \emph{Skeleton versus orientations}: a \emph{fixed-graph ablation}.
     The identical per-window graph $M$ feeds allocators that differ only in
-    what they read from it: D0 symmetrises $M$ before clustering (skeleton
-    only), while three orientation-aware allocators (D1, D2, D2s;
+    what they read from it: \skelsamp{} symmetrises $M$ before clustering (skeleton
+    only), while three orientation-aware allocators (\skelsem{}, \orientsamp{}, \orientsem{};
     Chapter~\ref{chap:sensitivity}) consume the directed matrix itself ---
     one for each way a graph can enter HRP's two steps.
 \end{itemize}
@@ -129,8 +130,8 @@ whole study:
 \begin{enumerate}[label=\textbf{R\arabic*}, itemsep=1pt, topsep=3pt]
   \item \emph{The causal graph must improve on the correlation matrix at all}
     --- otherwise there is no gain to decompose. Tested like-for-like: the
-    same HRP machinery fed the symmetrised graph (D0) versus the sample
-    correlation (\textsc{corr}), in Section~\ref{sec:r1}.
+    same HRP machinery fed the symmetrised graph (\skelsamp{}) versus the sample
+    correlation (\HRP{}), in Section~\ref{sec:r1}.
   \item \emph{An allocator must be able to exploit orientation} --- symmetric
     clustering cannot, so the orientation-aware family of
     Chapter~\ref{chap:sensitivity} is built for the purpose: unit-verified to
@@ -141,9 +142,9 @@ whole study:
 
 \noindent Granted both, Q reduces to two contrasts with a shared anchor,
 answered in order in Chapter~\ref{chap:evaluation}: the \emph{skeleton rung},
-$\text{D0}-\textsc{corr}$ --- what is it worth to know which pairs are
+$\skelsamp{}-\HRP{}$ --- what is it worth to know which pairs are
 genuinely linked? --- and the \emph{orientation rung},
-$\text{D}^{*}-\text{D0}$ for the orientation-aware variants $\text{D}^{*}$
+$\orientany{}-\skelsamp{}$ for the orientation-aware variants $\orientany{}$
 --- holding the graph fixed, what is it worth to also know which way each
 link points? The two rungs sum to the total causal-graph gain, so nothing is
 left unattributed. What counts as success is therefore any precisely
@@ -235,14 +236,14 @@ Chapter~\ref{chap:evaluation}.
     SPA: $p \geq \rsSpaSkelWfive$ across the eight skeleton/orientation
     $\times$ window tests).
   \item \textbf{What orientation buys is robustness, not level.} The
-    orientation-aware allocators are strong at every window --- D1 spans
-    $0.395$--$0.415$ and D2s $0.399$--$0.419$ across the four horizons,
+    orientation-aware allocators are strong at every window --- \skelsem{} spans
+    $0.395$--$0.415$ and \orientsem{} $0.399$--$0.419$ across the four horizons,
     versus the skeleton-only allocator's $0.372$--$0.403$ --- and their edge
     over the skeleton is largest exactly where the sample moments feeding
     the control are weakest (the nine-month and two-year windows), which
     reads as causal structure substituting for sample-moment quality. The
     edge is invariant to transaction costs up to 20\,bps and to the graph's
-    sparsity threshold, and D2s and D1 at the 18-month window attain the two
+    sparsity threshold, and \orientsem{} and \skelsem{} at the 18-month window attain the two
     highest Deflated Sharpes of all \rsNtrials\ configurations
     ($\rsDtwosDSRWthree$, $\rsDoneDSRWthree$). It is, however,
     method-dependent --- absent under VARLiNGAM graphs at all four windows
@@ -255,7 +256,7 @@ Chapter~\ref{chap:evaluation}.
     sensitivity step makes its Sharpe seed-dependent
     ($\rsSeedMin$--$\rsSeedMax$ over \rsSeedN\ seeds --- a range twice the
     $+0.010$ edge it claims over its own baseline). The headline graph-based
-    allocators (D0, D1, D2s) are deterministic and exceed its best seed, and
+    allocators (\skelsamp{}, \skelsem{}, \orientsem{}) are deterministic and exceed its best seed, and
     the 90\% Model Confidence Set over all trials excludes exactly one
     configuration: the correlation-selection baseline of the framework's
     published form.

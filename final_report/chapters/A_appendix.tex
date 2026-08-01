@@ -14,14 +14,14 @@ disagree with a quoted increment by one unit in the third decimal.
 Table~\ref{tab:matrix-full} gives every cell of the fixed-graph ablation
 (net annualised Sharpe) plus the supporting arms. The GRANGER control's
 scope is deliberately narrow --- one representative allocator per way of
-consuming the graph (skeleton D0, magnitudes D1, ordering D2), at the
+consuming the graph (skeleton \skelsamp{}, magnitudes \skelsem{}, ordering \orientsamp{}), at the
 one-year window --- since its role is to dissociate ordering from
 magnitudes, not to serve as a third full arm.
 
 \begin{table}[h]
   \centering
   \caption{Net annualised Sharpe, 2007--2024, by graph source, allocator and
-    window; row-wise best in bold. \textsc{corr} is graph-blind
+    window; row-wise best in bold. \HRP{} is graph-blind
     (method-independent). ``---'': outside the GRANGER control's
     representative-allocator scope.}
   \label{tab:matrix-full}
@@ -29,7 +29,7 @@ magnitudes, not to serve as a third full arm.
   \setlength{\tabcolsep}{4.5pt}
   \begin{tabular}{l l c c c c c}
     \toprule
-    Graph & Win & D0 & D0s & D1 & D2 & D2s \\
+    Graph & Win & \skelsamp{} & \skelalt{} & \skelsem{} & \orientsamp{} & \orientsem{} \\
     \midrule
     DYNOTEARS & 189 & 0.387 & \textbf{0.411} & 0.408 & 0.392 & 0.408 \\
     DYNOTEARS & 252 & 0.403 & 0.398 & \textbf{0.411} & 0.399 & 0.406 \\
@@ -41,7 +41,7 @@ magnitudes, not to serve as a third full arm.
     VARLiNGAM & 504 & 0.377 & \textbf{0.390} & 0.383 & 0.372 & 0.375 \\
     GRANGER   & 252 & 0.389 & --- & 0.352 & \textbf{0.393} & --- \\
     \midrule
-    \multicolumn{2}{l}{\textsc{corr} control (w189/252/378/504):} &
+    \multicolumn{2}{l}{\HRP{} control (w189/252/378/504):} &
     \multicolumn{5}{l}{$\rsCorrSharpeWone$ / $\rsCorrSharpe$ /
       $\rsCorrSharpeWthree$ / $\rsCorrSharpeWfive$.} \\
     \multicolumn{2}{l}{Driver route (w252 / w504):} &
@@ -62,8 +62,8 @@ magnitudes, not to serve as a third full arm.
     \toprule
     Allocator & $\tau=0$ & $\tau=0.01$ & $\tau=0.05$ & $\tau=0.10$ \\
     \midrule
-    D0 (skeleton) & 0.403 & 0.403 & 0.393 & 0.394 \\
-    D2            & 0.399 & 0.399 & 0.403 & 0.402 \\
+    \skelsamp{} (skeleton) & 0.403 & 0.403 & 0.393 & 0.394 \\
+    \orientsamp{}            & 0.399 & 0.399 & 0.403 & 0.402 \\
     \bottomrule
   \end{tabular}
 \end{table}
@@ -71,19 +71,19 @@ magnitudes, not to serve as a third full arm.
 \begin{table}[h]
   \centering
   \caption{Transaction-cost sweep (DYNOTEARS): net Sharpe by one-way cost.
-    The orientation increment (D1$-$D0, D2s$-$D0) is cost-invariant.
+    The orientation increment (\skelsem{}$-$\skelsamp{}, \orientsem{}$-$\skelsamp{}) is cost-invariant.
     Turnover is mean one-way per rebalance.}
   \label{tab:cost}
   \begin{tabular}{l c c c c c}
     \toprule
     Allocator (window) & 0\,bps & 5\,bps & 10\,bps & 20\,bps & turnover \\
     \midrule
-    D0 (252)  & 0.407 & 0.403 & 0.399 & 0.391 & 0.112 \\
-    D1 (252)  & 0.415 & 0.411 & 0.408 & 0.400 & 0.102 \\
-    D2s (252) & 0.411 & 0.406 & 0.401 & 0.391 & 0.140 \\
-    D0 (504)  & 0.376 & 0.372 & 0.368 & 0.361 & --- \\
-    D1 (504)  & 0.398 & 0.395 & 0.392 & 0.387 & --- \\
-    D2s (504) & 0.403 & 0.399 & 0.395 & 0.386 & --- \\
+    \skelsamp{} (252)  & 0.407 & 0.403 & 0.399 & 0.391 & 0.112 \\
+    \skelsem{} (252)  & 0.415 & 0.411 & 0.408 & 0.400 & 0.102 \\
+    \orientsem{} (252) & 0.411 & 0.406 & 0.401 & 0.391 & 0.140 \\
+    \skelsamp{} (504)  & 0.376 & 0.372 & 0.368 & 0.361 & --- \\
+    \skelsem{} (504)  & 0.398 & 0.395 & 0.392 & 0.387 & --- \\
+    \orientsem{} (504) & 0.403 & 0.399 & 0.395 & 0.386 & --- \\
     \bottomrule
   \end{tabular}
 \end{table}
@@ -101,11 +101,11 @@ magnitudes, not to serve as a third full arm.
     \toprule
     Variant & All & NBER rec. & NBER exp. & High-vol & Low-vol \\
     \midrule
-    \textsc{corr}     & 0.381 & $-0.589$ & 0.737 & $\mathbf{-1.313}$ & 5.564 \\
+    \HRP{}     & 0.381 & $-0.589$ & 0.737 & $\mathbf{-1.313}$ & 5.564 \\
     V0 (HSP baseline) & 0.371 & $-0.638$ & 0.731 & $-1.351$ & 5.630 \\
-    D0 (skeleton)     & 0.403 & $\mathbf{-0.575}$ & 0.758 & $-1.317$ & 5.744 \\
-    D1                & \textbf{0.411} & $-0.577$ & \textbf{0.762} & $-1.347$ & 5.854 \\
-    D2s               & 0.406 & $-0.606$ & 0.761 & $-1.361$ & \textbf{5.876} \\
+    \skelsamp{} (skeleton)     & 0.403 & $\mathbf{-0.575}$ & 0.758 & $-1.317$ & 5.744 \\
+    \skelsem{}                & \textbf{0.411} & $-0.577$ & \textbf{0.762} & $-1.347$ & 5.854 \\
+    \orientsem{}               & 0.406 & $-0.606$ & 0.761 & $-1.361$ & \textbf{5.876} \\
     V1 (driver route) & 0.381 & $-0.616$ & 0.740 & $-1.342$ & 5.642 \\
     \bottomrule
   \end{tabular}
@@ -165,7 +165,7 @@ Politis--Romano bootstrap, 2000 resamples, mean block 21.
 All results derive from committed code and cached data and are
 bit-reproducible: after the data-determinism fix of Section~\ref{sec:cache},
 two independent end-to-end runs produce byte-identical graphs, weights and
-NAVs, verified by the replication gate (D0 vs the prior phase's committed
+NAVs, verified by the replication gate (\skelsamp{} vs the prior phase's committed
 bundle: $\Delta$Sharpe $= 0$, max weight difference $= 0.0$ over all 215
 rebalances; re-verified on the four-window grid by a byte-identical repeat
 of a 378-day cell). The ablation ran on 1{,}684 cache-verified graph fits

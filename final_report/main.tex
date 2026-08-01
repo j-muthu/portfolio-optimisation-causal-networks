@@ -8,6 +8,29 @@
 \usepackage{array}
 \usepackage{enumitem}
 
+% ------------------------------------------------------------------
+% Allocator names. The stem is where the ordering comes from, the
+% suffix is what recursive bisection splits on, so each name names a
+% cell of the crossing in Table~\ref{tab:crossing}. These are display
+% names only: the code, caches and CSVs keep their own tags, and the
+% mapping is mirrored in scripts/plot_phase_ii_figures.py (DISPLAY) --
+% keep the two in step.
+%   \HRP        <- CORR-HRP   textbook correlation HRP (graph-blind anchor)
+%   \skelsamp   <- D0         skeleton ordering, sample covariance
+%   \skelalt    <- D0s        second symmetrisation of the skeleton
+%   \skelsem    <- D1         skeleton ordering, Sigma_SEM
+%   \orientsamp <- D2         topological ordering, sample covariance
+%   \orientsem  <- D2s        topological ordering, Sigma_SEM
+% NB \HRP is the *allocator*; plain "HRP" in prose is the algorithm.
+% ------------------------------------------------------------------
+\newcommand{\HRP}{\textsc{hrp}}
+\newcommand{\skelsamp}{\textsc{skel-samp}}
+\newcommand{\skelalt}{\textsc{skel-alt-samp}}
+\newcommand{\skelsem}{\textsc{skel-sem}}
+\newcommand{\orientsamp}{\textsc{orient-samp}}
+\newcommand{\orientsem}{\textsc{orient-sem}}
+\newcommand{\orientany}{\textsc{orient-*}}
+
 % Referencing (Vancouver style, mandated)
 \addbibresource{references.bib}
 
@@ -154,7 +177,7 @@ marker.
 
 % The spine: Ch1 states Q + R1/R2 and operationalises every term; Ch2 positions
 % the three core papers against Q; Ch3 = A1 (discover the graph, C1);
-% Ch4 = A2 (graph -> weights: CORR control, D0 skeleton, D1/D2/D2s orientation
+% Ch4 = A2 (graph -> weights: CORR control, \skelsamp{} skeleton, \skelsem{}/\orientsamp{}/\orientsem{} orientation
 % family, fixed-graph ablation design, compact HSP driver arm, C2);
 % Ch5 = A3 (protocol + battery, R1, the decomposition, what survives rigour,
 % threats, C3); Ch6 answers Q in two lines and lists contributions.
