@@ -120,8 +120,9 @@ whole study:
   \item \emph{Skeleton versus orientations}: a \emph{fixed-graph ablation}.
     The identical per-window graph $M$ feeds allocators that differ only in
     what they read from it: D0 symmetrises $M$ before clustering (skeleton
-    only), while five orientation-aware allocators (D1, D2, D2s, D3, D4;
-    Chapter~\ref{chap:sensitivity}) consume the directed matrix itself.
+    only), while three orientation-aware allocators (D1, D2, D2s;
+    Chapter~\ref{chap:sensitivity}) consume the directed matrix itself ---
+    one for each way a graph can enter HRP's two steps.
 \end{itemize}
 
 \noindent Q presupposes two requirements, each tested in its own right:
@@ -197,12 +198,11 @@ against Q.
   \item \emph{The orientation-aware allocator family and the fixed-graph
     ablation} (addresses C2; Chapter~\ref{chap:sensitivity}) --- the core
     methodological novelty: a structural (SEM-implied) covariance that
-    propagates shocks through all directed paths of the DAG;
+    propagates shocks through all directed paths of the DAG; and
     \emph{causal-ordered bisection}, which replaces the clustering dendrogram
-    with the DAG's topological order; structural-shock risk parity; and
-    co-ancestry clustering --- each deterministic, seed-free, and evaluated
-    against matched skeleton-only and correlation controls on the identical
-    graphs.
+    with the DAG's topological order --- each deterministic, seed-free, and
+    evaluated against matched skeleton-only and correlation controls on the
+    identical graphs.
   \item \emph{A multiplicity-, distribution- and stability-aware evaluation}
     (addresses C3; Chapter~\ref{chap:evaluation}): stationary-block-bootstrap
     contrasts for every pre-registered comparison; the
@@ -225,7 +225,7 @@ Chapter~\ref{chap:evaluation}.
 \begin{itemize}[itemsep=2pt, topsep=3pt]
   \item \textbf{The decomposition (the answer to Q).} The graph's total gain
     over the correlation control is stable across horizons ($+0.018$ to
-    $+0.032$ net Sharpe; $52$ of $56$ graph cells above the control) but its
+    $+0.032$ net Sharpe; $36$ of $40$ graph cells above the control) but its
     composition shifts with the window. The skeleton's rung is hump-shaped
     --- $-0.003$, $+0.022$, $+0.018$, $+0.009$ at the 189-, 252-, 378- and
     504-day windows (pairwise $p \geq 0.14$ throughout) --- while the

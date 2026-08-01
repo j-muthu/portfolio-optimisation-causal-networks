@@ -74,9 +74,9 @@ earns $\rsCorrSharpeWone$, $\rsCorrSharpe$, $\rsCorrSharpeWthree$ and
 $\rsCorrSharpeWfive$ at the 189-, 252-, 378- and 504-day windows; the best
 graph treatment (D1) delivers a total causal-graph gain over it of $+0.018$,
 $+0.031$, $+0.030$ and $+0.032$ respectively ($p=0.43$--$0.12$;
-Table~\ref{tab:decomp}), with D2s reaching $+0.036$ at two years. Of the 56
-graph-versus-\textsc{corr} cells --- seven graph-consuming allocators, both
-discovery methods, four windows --- 52 are above the control (27 of 28 under
+Table~\ref{tab:decomp}), with D2s reaching $+0.036$ at two years. Of the 40
+graph-versus-\textsc{corr} cells --- five graph-consuming allocators, both
+discovery methods, four windows --- 36 are above the control (19 of 20 under
 DYNOTEARS; the single exception is the skeleton-only allocator at the
 nine-month window), a direction-consistency far beyond what independent
 noise would produce, but \emph{no cell is individually significant}, and the
@@ -163,7 +163,7 @@ never individually significant ($p \geq 0.14$). Third, the
 \emph{orientation} rung is positive at every window and U-shaped: $+0.021$
 ($p=0.08$), $+0.009$ ($p=0.47$), $+0.012$ ($p=0.33$), $+0.023$ ($p=0.049$)
 --- largest at the two extremes, smallest exactly where the skeleton peaks,
-with 16 of the 20 DYNOTEARS orientation contrasts positive across the grid
+with 11 of the 12 DYNOTEARS orientation contrasts positive across the grid
 (Figure~\ref{fig:forest}). The two components are roughly complementary,
 which is why the total is flat while its composition shifts. Family-wise,
 however, the orientation effect does not survive at any horizon: Hansen's
@@ -236,9 +236,9 @@ extremes, where the point estimates peak, but never past it.
   \includegraphics[width=0.99\textwidth]{figures/phase_ii_forest.png}
   \caption{The fixed-graph orientation effect: $\Delta$Sharpe of each
     orientation-aware allocator against the skeleton control D0 at all four
-    windows, with $95\%$ block-bootstrap CIs ($\ast$: $p<0.05$). Sixteen of
-    twenty DYNOTEARS contrasts are positive (D1 starred at two years); the
-    VARLiNGAM contrasts scatter around zero (6/20 positive). The starred
+    windows, with $95\%$ block-bootstrap CIs ($\ast$: $p<0.05$). Eleven of
+    twelve DYNOTEARS contrasts are positive (D1 starred at two years); the
+    VARLiNGAM contrasts scatter around zero (4/12 positive). The starred
     D0s cell at the nine-month window is a control-versus-control
     divergence, discussed in the text.}
   \label{fig:forest}
@@ -301,20 +301,19 @@ limitation rather than argued away.
 \subsection{Is the split robust to the design knobs?}
 
 \paragraph{Sparsity ($\tau$).} Thresholding the graph at
-$\tau\in\{0,0.01,0.05,0.10\}$ leaves the treatments flat-to-better (D2:
-$0.399\to0.402$; D3: $0.397\to0.407$ at the heaviest threshold) while the
+$\tau\in\{0,0.01,0.05,0.10\}$ leaves the treatment flat-to-better (D2:
+$0.399\to0.402$ at the heaviest threshold) while the
 skeleton control drifts down ($0.403\to0.394$) --- the orientation-aware
 allocators are not artefacts of the regularisation knob.
 
 \paragraph{Costs and turnover.} The orientation increment is
 cost-invariant: D1$-$D0 at two years moves from $+0.022$ to $+0.025$ as
 costs rise from 0 to 20\,bps, because D1's turnover ($0.102$ one-way per
-rebalance) is \emph{below} the control's ($0.112$); D3's is lower still
-($0.066$). Orientation does not win by trading less, and is not eroded by
-trading more.
+rebalance) is \emph{below} the control's ($0.112$). Orientation does not win
+by trading less, and is not eroded by trading more.
 
 \paragraph{Discovery method.} Under VARLiNGAM graphs the orientation effect
-is absent at all four windows (6 of 20 contrasts positive, mean $-0.004$;
+is absent at all four windows (4 of 12 contrasts positive, mean $-0.005$;
 Figure~\ref{fig:forest}, right, and the grey series of
 Figure~\ref{fig:gradient}). The decomposition is therefore
 \emph{method-dependent}: DYNOTEARS' jointly-optimised, acyclicity-constrained
@@ -327,7 +326,7 @@ so its short-window graphs carry little usable orientation signal either.
 The magnitude-degraded GRANGER control then localises \emph{where inside
 the orientation} the value sits: causal-ordered bisection survives on its
 graphs (D2 $=0.393$ vs DYNOTEARS' $0.399$) while the structural-covariance
-allocators collapse (D1 $=0.352$, D3 $=0.350$; gap at D1 $-0.060$,
+allocator collapses (D1 $=0.352$; gap $-0.060$,
 $p=0.12$). A ridge-VAR coefficient matrix carries a serviceable
 \emph{ordering} but not structural effect sizes, so the dissociation says
 the orientation rung's value does not lie in merely knowing which way the
@@ -410,7 +409,9 @@ $\rsSpaSkelWtwo$, $\rsSpaSkelWthree$, $\rsSpaSkelWfive$ --- tightening
 monotonically with the horizon but never rejecting; R1 is not established
 family-wise. \textbf{(iii)} Orientation-aware variants vs their own
 skeleton control, per window: $p=\rsSpaDirWone$, $\rsSpaDirWtwo$,
-$\rsSpaDirWthree$, $\rsSpaDirWfive$ --- closest to rejection at the two
+$\rsSpaDirWthree$, $\rsSpaDirWfive$ (computed over the full set of
+direction-aware configurations evaluated, so the correction is conservative)
+--- closest to rejection at the two
 extremes, exactly where the pairwise orientation effect peaks, but the
 effect does not survive its own multiplicity anywhere. \textbf{(iv)} The
 Chapter-\ref{chap:sensitivity} allocator family against V0: $p=\rsSpaDvar$
@@ -443,10 +444,9 @@ sits at the $\rsSeedPct$th percentile of its own seed distribution --- at
 the unluckiest seed the edge all but vanishes. This quantifies, on this
 pipeline, the concern that neural sensitivity-based results are fragile to
 undisclosed seed choices; and it is the strongest argument for the
-deterministic D-family, every member of which except D4 sits \emph{above
-the seed cloud's maximum} --- the headline allocators D0, D1 and D2s
-comfortably so --- and all of which produce byte-identical results on every
-run.
+deterministic D-family, every member of which sits \emph{above the seed
+cloud's maximum} --- the headline allocators D0, D1 and D2s comfortably so
+--- and all of which produce byte-identical results on every run.
 
 \begin{figure}[tbp]
   \centering
@@ -465,8 +465,8 @@ gain whose composition shifts with the horizon --- skeleton hump-shaped and
 peaking at the one-year convention, orientation positive at every window
 and largest at the extremes --- with the orientation-aware allocators
 topping the study-wide DSR table. Its \emph{statistical support} is honest
-but thin: 52 of 56 graph-versus-correlation cells positive, one
-pairwise-significant orientation cell among twenty ($p=0.049$), one
+but thin: 36 of 40 graph-versus-correlation cells positive, one
+pairwise-significant orientation cell among twelve ($p=0.049$), one
 suggestive one ($p=0.08$), and no family-wise survival in any of the ten
 SPA runs. The largest defensible claim is conditional: \emph{if} one
 replaces the correlation matrix with a DYNOTEARS graph, the skeleton pays
@@ -482,7 +482,7 @@ components are $0.01$--$0.03$ Sharpe over 18 years, against a full-sample
 Sharpe standard error of ${\approx}\,\rsSharpeSE$; at this sample length
 such effects are at the edge of detectability, so the absence of family-wise
 significance is not evidence of absence --- but equally the presence of one
-$p=0.049$ cell among twenty orientation contrasts is exactly what
+$p=0.049$ cell among twelve orientation contrasts is close to what
 multiplicity predicts under the null, which is why it is not claimed as a
 discovery. The U-shape earns its standing not from any single cell but from
 the sign-consistency of the orientation rung across all four windows and

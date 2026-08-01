@@ -14,7 +14,7 @@ disagree with a quoted increment by one unit in the third decimal.
 Table~\ref{tab:matrix-full} gives every cell of the fixed-graph ablation
 (net annualised Sharpe) plus the supporting arms. The GRANGER control's
 scope is deliberately narrow --- one representative allocator per way of
-consuming the graph (skeleton D0, magnitudes D1/D3, ordering D2), at the
+consuming the graph (skeleton D0, magnitudes D1, ordering D2), at the
 one-year window --- since its role is to dissociate ordering from
 magnitudes, not to serve as a third full arm.
 
@@ -27,25 +27,25 @@ magnitudes, not to serve as a third full arm.
   \label{tab:matrix-full}
   \small
   \setlength{\tabcolsep}{4.5pt}
-  \begin{tabular}{l l c c c c c c c}
+  \begin{tabular}{l l c c c c c}
     \toprule
-    Graph & Win & D0 & D0s & D1 & D2 & D2s & D3 & D4 \\
+    Graph & Win & D0 & D0s & D1 & D2 & D2s \\
     \midrule
-    DYNOTEARS & 189 & 0.387 & \textbf{0.411} & 0.408 & 0.392 & 0.408 & 0.400 & 0.403 \\
-    DYNOTEARS & 252 & 0.403 & 0.398 & \textbf{0.411} & 0.399 & 0.406 & 0.397 & 0.393 \\
-    DYNOTEARS & 378 & 0.402 & 0.409 & 0.415 & 0.405 & \textbf{0.419} & 0.400 & 0.406 \\
-    DYNOTEARS & 504 & 0.372 & 0.383 & 0.395 & 0.382 & \textbf{0.399} & 0.387 & 0.387 \\
-    VARLiNGAM & 189 & 0.393 & 0.388 & 0.364 & 0.387 & 0.394 & \textbf{0.400} & 0.391 \\
-    VARLiNGAM & 252 & 0.397 & 0.396 & 0.385 & 0.388 & 0.386 & 0.392 & \textbf{0.402} \\
-    VARLiNGAM & 378 & 0.399 & 0.392 & \textbf{0.407} & 0.398 & 0.399 & 0.394 & 0.397 \\
-    VARLiNGAM & 504 & 0.377 & \textbf{0.390} & 0.383 & 0.372 & 0.375 & 0.375 & 0.370 \\
-    GRANGER   & 252 & 0.389 & --- & 0.352 & \textbf{0.393} & --- & 0.350 & --- \\
+    DYNOTEARS & 189 & 0.387 & \textbf{0.411} & 0.408 & 0.392 & 0.408 \\
+    DYNOTEARS & 252 & 0.403 & 0.398 & \textbf{0.411} & 0.399 & 0.406 \\
+    DYNOTEARS & 378 & 0.402 & 0.409 & 0.415 & 0.405 & \textbf{0.419} \\
+    DYNOTEARS & 504 & 0.372 & 0.383 & 0.395 & 0.382 & \textbf{0.399} \\
+    VARLiNGAM & 189 & 0.393 & 0.388 & 0.364 & 0.387 & \textbf{0.394} \\
+    VARLiNGAM & 252 & \textbf{0.397} & 0.396 & 0.385 & 0.388 & 0.386 \\
+    VARLiNGAM & 378 & 0.399 & 0.392 & \textbf{0.407} & 0.398 & 0.399 \\
+    VARLiNGAM & 504 & 0.377 & \textbf{0.390} & 0.383 & 0.372 & 0.375 \\
+    GRANGER   & 252 & 0.389 & --- & 0.352 & \textbf{0.393} & --- \\
     \midrule
     \multicolumn{2}{l}{\textsc{corr} control (w189/252/378/504):} &
-    \multicolumn{7}{l}{$\rsCorrSharpeWone$ / $\rsCorrSharpe$ /
+    \multicolumn{5}{l}{$\rsCorrSharpeWone$ / $\rsCorrSharpe$ /
       $\rsCorrSharpeWthree$ / $\rsCorrSharpeWfive$.} \\
     \multicolumn{2}{l}{Driver route (w252 / w504):} &
-    \multicolumn{7}{l}{V0 $0.371/0.370$;\quad V1 $0.381/0.372$;\quad
+    \multicolumn{5}{l}{V0 $0.371/0.370$;\quad V1 $0.381/0.372$;\quad
       V1-VAR $0.399/0.357$.} \\
     \bottomrule
   \end{tabular}
@@ -64,7 +64,6 @@ magnitudes, not to serve as a third full arm.
     \midrule
     D0 (skeleton) & 0.403 & 0.403 & 0.393 & 0.394 \\
     D2            & 0.399 & 0.399 & 0.403 & 0.402 \\
-    D3            & 0.397 & 0.397 & 0.401 & 0.407 \\
     \bottomrule
   \end{tabular}
 \end{table}
@@ -149,8 +148,7 @@ density-matched per window to the paired DYNOTEARS graph.
 \emph{Allocators:} single-linkage where clustering is used;
 $\Sigma_{\mathrm{struct}}$ with diagonal shock variances from fit-window
 residuals, nearest-PSD projection and ridge load
-$10^{-6}\operatorname{tr}(\Sigma)/N$; ERC by cyclical coordinate descent,
-tolerance $10^{-12}$, parity asserted to $10^{-8}$; topological tie-break by
+$10^{-6}\operatorname{tr}(\Sigma)/N$; topological tie-break by
 total downstream influence then name. \emph{Driver route:} $K=17$ (Kneedle,
 2006 burn-in); sensitivity networks searched depth $\{1,2\}\times$ width
 $\{16,32,64\}$ by held-out RMSE; feedback grid

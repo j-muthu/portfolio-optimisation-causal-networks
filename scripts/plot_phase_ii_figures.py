@@ -52,7 +52,10 @@ C = {
     "w378": "#CC79A7",
     "w504": "#D55E00",
 }
-ALLOC_ORDER = ["D0", "D0s", "D1", "D2", "D2s", "D3", "D4"]
+# The reported family: the 2x2 crossing {ordering source} x {bisection
+# covariance} plus the second-symmetrisation control D0s. D3/D4 were run but
+# fall outside the crossing and are not reported.
+ALLOC_ORDER = ["D0", "D0s", "D1", "D2", "D2s"]
 METHOD_LABEL = {"dynotears": "DYNOTEARS", "varlingam": "VARLiNGAM", "granger": "GRANGER"}
 
 
@@ -145,7 +148,10 @@ def f2_forest(contrasts: pd.DataFrame) -> None:
         ax.set_yticks(range(len(allocs)), allocs)
         ax.set_title(METHOD_LABEL[m], fontsize=10)
         ax.set_xlabel("ΔSharpe vs symmetrised control D0")
-        ax.legend(loc="lower right", fontsize=8)
+        # Upper left: the lower-right corner holds the D0s/w189 significance
+        # star, which the legend would otherwise cover.
+        ax.margins(y=0.14)
+        ax.legend(loc="upper left", fontsize=8, framealpha=0.9)
     fig.suptitle("The direction effect, graph held fixed (Politis–Romano 95% CI; * p<0.05)",
                  fontsize=11)
     fig.savefig(FIG / "phase_ii_forest.png", dpi=200)

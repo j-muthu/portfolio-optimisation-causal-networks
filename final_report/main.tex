@@ -65,7 +65,7 @@ orientations?}
 A fixed-graph ablation answers it. At each of 215 monthly rebalances over
 2007--2024 on the ${\sim}100$ largest S\&P~500 constituents, one DYNOTEARS
 graph (VARLiNGAM and ridge-Granger as comparators) feeds a graph-blind
-correlation-distance HRP control, a skeleton-only allocator, and five
+correlation-distance HRP control, a skeleton-only allocator, and three
 orientation-aware allocators built on the DAG's total-effect matrix --- all
 deterministic and bit-reproducible. Performance means out-of-sample,
 net-of-cost annualised Sharpe at four estimation horizons (nine months to
@@ -74,19 +74,24 @@ PSR/DSR/Reality-Check/SPA/MCS battery over all \rsNtrials\ configurations
 evaluated.
 
 The answer: the graph's total gain over the control is stable across
-horizons ($+0.018$ to $+0.032$ net Sharpe; $52/56$ cells positive) but its
-\emph{composition} shifts. The skeleton's rung is
-hump-shaped ($-0.003$, $+0.022$, $+0.018$, $+0.009$ across the four
-windows), peaking at one year; the orientation rung is
-positive at \emph{every} horizon and U-shaped ($+0.021$, $+0.009$,
-$+0.012$, $+0.023$; pairwise $p \leq 0.08$ at the extremes), largest where
-sample moments are weakest. Orientation thus acts as a \emph{regulariser},
-substituting causal structure for sample-moment quality; the
-orientation-aware allocators attain the study's two highest deflated
-Sharpes ($\rsDtwosDSRWthree$, $\rsDoneDSRWthree$). No rung survives
+horizons but never individually significant --- the best orientation-aware
+allocator earns $+0.018$ to $+0.032$ net Sharpe over the control at every
+window ($p=0.43$--$0.12$), and 36 of the 40 graph-versus-control cells
+(all allocator arms, both discovery methods, four windows) are positive
+--- but its \emph{composition} shifts. In point
+estimates across the four windows, the skeleton's rung is largest near the
+one-year convention ($-0.003$, $+0.022$, $+0.018$, $+0.009$), while the
+orientation rung is positive at \emph{every} horizon and largest at the
+extremes ($+0.021$, $+0.009$, $+0.012$, $+0.023$), where sample moments are
+weakest. Orientation thus acts as a \emph{regulariser}, substituting causal
+structure for sample-moment quality; the orientation-aware allocators
+attain the study's two highest deflated Sharpes ($\rsDtwosDSRWthree$,
+$\rsDoneDSRWthree$). The support for this composition is directional rather
+than inferential: one of twelve orientation contrasts reaches $p<0.05$
+uncorrected --- close to what multiplicity alone predicts --- no rung survives
 family-wise correction (SPA: skeleton
 $p=\rsSpaSkelWfive$--$\rsSpaSkelWone$, orientation
-$p=\rsSpaDirWfive$--$\rsSpaDirWtwo$) and the effect is absent under
+$p=\rsSpaDirWfive$--$\rsSpaDirWtwo$), and the effect is absent under
 VARLiNGAM.
 
 Two supporting results sharpen the verdict: the incumbent HSP driver route
@@ -149,7 +154,7 @@ marker.
 
 % The spine: Ch1 states Q + R1/R2 and operationalises every term; Ch2 positions
 % the three core papers against Q; Ch3 = A1 (discover the graph, C1);
-% Ch4 = A2 (graph -> weights: CORR control, D0 skeleton, D1-D4 orientation
+% Ch4 = A2 (graph -> weights: CORR control, D0 skeleton, D1/D2/D2s orientation
 % family, fixed-graph ablation design, compact HSP driver arm, C2);
 % Ch5 = A3 (protocol + battery, R1, the decomposition, what survives rigour,
 % threats, C3); Ch6 answers Q in two lines and lists contributions.

@@ -29,7 +29,7 @@ rebalancing, 5\,bps costs, windows of 189/252/378/504 trading days):
   \item \textbf{The total gain is stable across horizons.} Replacing the
         correlation matrix with the DYNOTEARS graph is worth $+0.018$ to
         $+0.032$ (D1 $-$ \textsc{corr}; $p=0.43$--$0.12$) at every window,
-        rising to $+0.036$ for D2s at two years; 52 of 56
+        rising to $+0.036$ for D2s at two years; 36 of 40
         graph-versus-control cells are positive.
   \item \textbf{Its composition shifts with the window.} The skeleton's
         rung is hump-shaped --- $-0.003$, $+0.022$, $+0.018$, $+0.009$
@@ -80,9 +80,8 @@ rebalancing, 5\,bps costs, windows of 189/252/378/504 trading days):
 \begin{itemize}[itemsep=2pt]
   \item \textbf{Methodological:} the orientation-aware allocator family ---
         structural (SEM-implied, de-standardised, residual-calibrated)
-        covariance allocation; causal-ordered bisection, which replaces the
-        clustering dendrogram with the DAG's topological order;
-        structural-shock risk parity; co-ancestry clustering --- together
+        covariance allocation; and causal-ordered bisection, which replaces
+        the clustering dendrogram with the DAG's topological order --- together
         with the fixed-graph ablation design that makes skeleton and
         orientation separately measurable, with provably orientation-blind
         controls. To my knowledge, both the family and the decomposition are
@@ -185,10 +184,12 @@ one: a higher update frequency would give the learner more reward
 observations to average over, and a longer reward window would raise the
 signal-to-noise of each one. Only after one of these changes is any feedback
 rule worth re-testing. \textbf{(3)}
-\textbf{Signed structural allocation.} The long-only ERC on
-$\Sigma_{\mathrm{struct}}$ is a projection of exact per-shock parity, which
-generally requires shorting; a long--short mandate is the natural home for
-structural-shock parity. \textbf{(4) Richer universes}, where cross-asset
+\textbf{Signed structural allocation.} Equalising risk contributions over
+\emph{structural shock origins} --- where risk enters the causal system ---
+rather than over correlated returns is the natural next use of
+$\Sigma_{\mathrm{struct}}$; but exact per-shock parity generally requires
+shorting, so a long--short mandate, not the long-only setting studied here,
+is its natural home. \textbf{(4) Richer universes}, where cross-asset
 causal chains are plausibly longer-lived than among 99 co-moving large-caps
 --- multi-asset-class portfolios are where the skeleton/orientation split
 could genuinely differ. \textbf{(5) Orientation-aware risk attribution.} The

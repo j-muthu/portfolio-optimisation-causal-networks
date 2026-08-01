@@ -112,21 +112,56 @@ asset-only Causal-HRP variant of the project's first phase (there called
 V0$'$), which is what allows the new harness to be validated against a
 committed historical result (Section~\ref{sec:ablation-design}).
 
-\paragraph{D0s --- a second symmetrisation.} The same, but with the
-$\tfrac{1}{2}(|M|+|M^\top|)$ distance --- included so that ``the skeleton''
-is not accidentally identified with one particular symmetrisation.
+\paragraph{D0s --- a second symmetrisation.} Hierarchical clustering demands
+a symmetric distance and $M$ is not symmetric, so building a skeleton control
+at all requires choosing a symmetrisation --- and the choice is not unique. If
+the skeleton rung depended on which one was made, it would be a fact about the
+recipe rather than about the skeleton. D0s is the control on that control: the
+same pipeline, but with the $\tfrac{1}{2}(|M|+|M^\top|)$ distance, so that two
+assets are close when a strong link joins \emph{them} rather than when their
+edge profiles \emph{match}. Both are orientation-blind; they are two different
+ways of being so, and comparing them tests whether ``the skeleton'' has been
+accidentally identified with one particular symmetrisation.
 
 \section{The orientation-aware family}
 \label{sec:d-family}
 
-Five treatments consume the directed matrix, each through a different
-mechanism, and the mechanisms are chosen to \emph{separate}: D1 alters only
-the bisection covariance, D2 only the ordering, D2s both, D3 abandons the
-hierarchy altogether, and D4 re-enters through the clustering distance. The
-results chapter can therefore localise not just whether orientation carries
-value but \emph{where}. All five are long-only, fully invested, deterministic
-and seed-free; all take the identical $(M,\ \text{returns window})$ inputs as
-the controls; none has an analogue in the HRP/HSP literature.
+Section~\ref{sec:symm} left hierarchical allocation with exactly two moving
+parts, and that fact bounds the design space. The clustering step exists only
+to emit an \emph{ordering}; the allocation step consumes only a
+\emph{covariance}. Nothing else crosses between them --- recursive bisection
+receives the ordering and the covariance and no third object, and it splits
+the ordered list by position rather than by the dendrogram's own branches. A
+causal graph therefore has exactly two doors into HRP, and crossing them
+enumerates the family completely (Table~\ref{tab:crossing}).
+
+\begin{table}[h]
+  \centering
+  \caption{The two doors, crossed. The row is where the ordering comes from,
+    the column is what recursive bisection splits on; D0 is the control with
+    both doors shut to orientation.}
+  \label{tab:crossing}
+  \begin{tabular}{l l l}
+    \toprule
+    Ordering from & splits on sample cov. & splits on $\Sigma_{\mathrm{struct}}$ \\
+    \midrule
+    clustering on the skeleton & D0 (control) & D1 \\
+    topological sort           & D2           & D2s \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+Two points about the rows. The first row keeps the clustering step and feeds
+it a graph-derived distance; the second \emph{deletes} the clustering step
+outright, because a DAG already carries an ordering and needs no dendrogram
+to produce one. The door is therefore ``where the ordering comes from'', not
+``what the clustering step reads''. And each treatment differs from the
+control in exactly one respect --- D1 in the covariance alone, D2 in the
+ordering alone, D2s in both --- so the results chapter can localise not just
+whether orientation carries value but \emph{where}. All three are long-only,
+fully invested, deterministic and seed-free; all take the identical
+$(M,\ \text{returns window})$ inputs as the controls; none has an analogue in
+the HRP/HSP literature.
 
 \paragraph{D1 --- structural covariance.} Clustering as in D0 --- the
 ordering is deliberately held at the skeleton, so that
@@ -151,26 +186,6 @@ reproduces the identical partition tree), so D2 responds to orientation
 through the \emph{partition structure} the order induces, not through the
 upstream/downstream direction itself.
 
-\paragraph{D3 --- structural-shock risk parity.} No hierarchy at all.
-Portfolio variance under the SEM decomposes as
-$w^\top \Sigma_{\mathrm{struct}}\, w =
-\lVert \Sigma_\varepsilon^{1/2} B^\top D_\sigma\, w \rVert^2$, so equalising
-risk contributions on $\Sigma_{\mathrm{struct}}$ is parity over
-\emph{structural shock origins} --- where risk is injected into the causal
-system --- rather than over correlated returns. Weights are computed by
-Spinu's cyclical coordinate descent \cite{spinu2013erc} (long-only,
-deterministic, convergence asserted to risk-contribution parity within
-$10^{-8}$). Exact per-shock parity generally requires shorting; the long-only
-solution is the practical projection, stated as such.
-
-\paragraph{D4 --- co-ancestry clustering.} A halfway house that feeds
-orientation into an \emph{unchanged} symmetric pipeline: rows of the
-(row-normalised) total-effect matrix are shock-inheritance profiles, the
-similarity $S = \tilde{B}\tilde{B}^\top$ makes two assets close iff they
-inherit shocks from the same upstream sources --- even with no direct edge
---- and the distance $\sqrt{2(1-S_{ij})}$ enters standard HRP with sample
-covariance.
-
 \section{The fixed-graph ablation}
 \label{sec:ablation-design}
 
@@ -178,9 +193,7 @@ The experimental design is what turns the family into an answer to Q.
 
 \paragraph{Design.} At every rebalance the chokepoint
 (Section~\ref{sec:asset-graph}) hands the \emph{byte-identical} graph $M$ to
-all eight allocators
-$\{\textsc{corr},\text{D0},\text{D0s},\text{D1},\text{D2},\text{D2s},
-\text{D3},\text{D4}\}$; everything else --- universe, calendar, costs,
+every allocator in Table~\ref{tab:variants}; everything else --- universe, calendar, costs,
 covariance-estimation window, allocator internals downstream of the distance/
 covariance/ordering choice --- is shared code. Orientation is therefore the
 sole treatment variable, and the decomposition is two differences with a
@@ -188,7 +201,7 @@ common anchor: $\text{D0}-\textsc{corr}$ (skeleton) and
 $\text{D}^{*}-\text{D0}$ (orientation). The two rungs telescope ---
 $(\text{D0}-\textsc{corr}) + (\text{D}^{*}-\text{D0}) =
 \text{D}^{*}-\textsc{corr}$ --- so the total causal-graph gain is attributed
-without remainder. The full grid is 7 graph-consuming allocators $\times$
+without remainder. The reported grid is five graph-consuming allocators $\times$
 \{DYNOTEARS, VARLiNGAM\} $\times$ \{189, 252, 378, 504\}-day windows, plus
 the magnitude-degraded GRANGER control arm, a sparsity sweep and a cost
 sweep. The window axis is a
@@ -234,8 +247,6 @@ a repeated 378-day cell reproduces its NAV path byte-for-byte).
     D1            & graph embedding      & $\Sigma_{\mathrm{struct}}$ & allocation step \\
     D2            & topological order    & sample & ordering step \\
     D2s           & topological order    & $\Sigma_{\mathrm{struct}}$ & both steps \\
-    D3            & (none: shock-space ERC) & $\Sigma_{\mathrm{struct}}$ & shock propagation \\
-    D4            & co-ancestry distance & sample & distance construction \\
     \midrule
     V0/V1/V2      & driver sensitivities & sample & via driver selection \\
     \bottomrule
