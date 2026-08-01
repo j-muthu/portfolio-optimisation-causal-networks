@@ -49,13 +49,14 @@
 %  3. Declarations (originality / ethics / GenAI) must be present and
 %     in the front matter.
 %  4. If _generated/robust_stats.tex is regenerated, re-read the
-%     sentences coupled to specific values: "rejects in exactly one ---
-%     one of ten runs" (Ch5) / "rejects in exactly one" (Ch6),
-%     "p >= \rsSpaSkelWfive across the eight ... tests" (Ch1, requires
-%     rsSpaSkelWfive to remain the minimum of the eight skel/dir p's),
-%     and the SPA p-value ranges written as macro pairs (abstract, Ch6),
-%     which assume Wfive <= Wone (skeleton) and Wfive <= Wtwo
-%     (orientation).
+%     sentences coupled to specific values: "four of the ten runs reject"
+%     (Ch5 5.4 pattern sentence) / "rejects in four" (Ch6 finding 3) ---
+%     both assume exactly {(i), SkelWthree, SkelWfive, DirWfive} < 0.05
+%     and everything else >= 0.05; "p >= \rsSpaSkelWthree across the
+%     eight ... tests" (Ch1, requires SkelWthree to remain the minimum of
+%     the eight skel/dir p's); and the marginal-range macro pair
+%     \rsSpaSkelWthree--\rsSpaDirWfive (Ch5 x2, Ch6), which assumes
+%     SkelWthree <= DirWfive.
 % ------------------------------------------------------------------
 
 % Document metadata
@@ -79,52 +80,46 @@ matrix --- usually the return correlation matrix, blind to which asset
 moves which. Temporal causal discovery
 yields a richer input: a directed acyclic graph, carrying a \emph{skeleton}
 (which pairs are linked) and \emph{edge orientations} (which way influence
-flows); symmetric clustering keeps only the first. The thesis asks one
-question: \emph{when the correlation matrix in hierarchical portfolio
+flows); symmetric clustering keeps only the first. The thesis asks:
+\emph{when the correlation matrix in hierarchical portfolio
 allocation is replaced by a discovered causal graph, how much of the
 performance gain is attributable to the graph's skeleton versus its edge
 orientations?}
 
-A fixed-graph ablation answers it. At each of 215 monthly rebalances over
-2007--2024 on the ${\sim}100$ largest S\&P~500 constituents, one DYNOTEARS
+A fixed-graph ablation answers it. At 215 monthly rebalances over
+2007--2024 on the ${\sim}100$ largest S\&P~500 names, one DYNOTEARS
 graph (VARLiNGAM and ridge-Granger as comparators) feeds a graph-blind
-correlation-distance HRP control, a skeleton-only allocator, and three
-orientation-aware allocators built on the DAG's total-effect matrix --- all
-deterministic and bit-reproducible. Performance means out-of-sample,
+HRP control, a skeleton-only allocator, and three
+orientation-aware allocators that consume the DAG natively. Performance means out-of-sample,
 net-of-cost annualised Sharpe at four estimation horizons (nine months to
 two years), adjudicated by a
-PSR/DSR/Reality-Check/SPA/MCS battery over all \rsNtrials\ configurations
-evaluated.
+PSR/DSR/Reality-Check/SPA/MCS battery over all \rsNtrials\ configurations.
 
-The answer: the graph's total gain over the control is stable across
-horizons but never individually significant --- the best orientation-aware
-allocator earns $+0.018$ to $+0.032$ net Sharpe over the control at every
-window ($p=0.43$--$0.12$), and 36 of the 40 graph-versus-control cells
-(all allocator arms, both discovery methods, four windows) are positive
---- but its \emph{composition} shifts. In point
-estimates across the four windows, the skeleton's rung is largest near the
-one-year convention ($-0.003$, $+0.022$, $+0.018$, $+0.009$), while the
+The answer: the graph's total gain over the control is stable but never
+individually significant --- $+0.018$ to $+0.032$ net Sharpe for the best
+orientation-aware allocator at every window ($p=0.43$--$0.12$) --- but its
+\emph{composition} shifts. Across the four
+windows, the skeleton's rung is hump-shaped and largest near the
+one-year convention, while the
 orientation rung is positive at \emph{every} horizon and largest at the
-extremes ($+0.021$, $+0.009$, $+0.012$, $+0.023$), where sample moments are
-weakest. Orientation thus acts as a \emph{regulariser}, substituting causal
-structure for sample-moment quality; the orientation-aware allocators
-attain the study's two highest deflated Sharpes ($\rsDtwosDSRWthree$,
-$\rsDoneDSRWthree$). The support for this composition is directional rather
-than inferential: one of twelve orientation contrasts reaches $p<0.05$
-uncorrected --- close to what multiplicity alone predicts --- no rung survives
-family-wise correction (SPA: skeleton
-$p=\rsSpaSkelWfive$--$\rsSpaSkelWone$, orientation
-$p=\rsSpaDirWfive$--$\rsSpaDirWtwo$), and the effect is absent under
-VARLiNGAM.
+extremes, where sample moments are weakest. Orientation thus acts as a \emph{regulariser} --- substituting
+causal structure for sample-moment quality --- and attains the study's two
+highest deflated Sharpes. The support tracks that composition: one of
+twelve pairwise orientation contrasts reaches $p<0.05$ --- roughly what
+multiplicity predicts --- and Hansen's SPA rejects only where the
+point estimates peak: the graph family over the control at the two longest
+horizons ($p=\rsSpaSkelWthree$, $\rsSpaSkelWfive$) and orientation over
+the skeleton at two years ($p=\rsSpaDirWfive$), marginally; the effect
+vanishes under VARLiNGAM.
 
-Two supporting results sharpen the verdict: the incumbent HSP driver route
-has an unlearnable monthly reward (signal-to-noise
-${\approx}\,\rsRewardSNR$) and is seed-unstable (Sharpe
-$\rsSeedMin$--$\rsSeedMax$ over \rsSeedN\ seeds --- twice its claimed
-edge); the graph route is deterministic and exceeds its best seed. The
-contribution is a controlled, reproducible decomposition of where a causal
-graph's value lies: in the skeleton only near the one-year convention, in
-the orientations at every horizon, and nowhere past a family-wise bar.
+Two supporting results: the HSP driver route's monthly reward is
+unlearnable (${\sim}95\%$ noise) and its Sharpe seed-unstable over
+\rsSeedN\ seeds; the graph route is deterministic and beats its best
+seed. The
+contribution is a controlled, reproducible decomposition of where the
+graph's value lies: in the skeleton near the one-year convention, and in
+the orientations at every horizon --- past the family-wise bar only at
+the longest.
 \end{abstract}
 
 \chapter*{Declarations}

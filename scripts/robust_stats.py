@@ -91,6 +91,13 @@ def _all_trial_tags() -> dict[str, str]:
 # V0prime byte-for-byte under DYNOTEARS — that is the designed replication
 # check; drop_duplicate_configs removes it before SPA/MCS.
 PHASE_II_ALLOCS = ("D0", "D0s", "D1", "D2", "D2s", "D3", "D4")
+# The allocators the report defines (the 2x2 crossing + the second
+# symmetrisation control). SPA/MCS comparison sets are restricted to these so
+# every family-wise test adjudicates exactly the reported family.
+# PHASE_II_ALLOCS above stays wider: it loads every evaluated bundle so the
+# DSR deflation universe keeps pricing the full search (all trials evaluated,
+# including the exploratory D3/D4 arms).
+REPORTED_ALLOCS = ("D0", "D0s", "D1", "D2", "D2s")
 PHASE_II_METHODS = (("dynotears", "DYNO"), ("varlingam", "VARL"))
 # The Phase-II window grid is wider than Phase I's: the skeleton-vs-orientation
 # decomposition is measured as a function of estimation-window length.
@@ -360,7 +367,11 @@ def main(argv: list[str] | None = None) -> None:
     if args.phase_ii:
         d252 = [c for c in returns.columns
                 if c.startswith(("DYNO-", "VARL-", "GRAN-", "CORR-")) and c.endswith("_w252")
-                and "_tau" not in c]
+                and "_tau" not in c
+                # Only the reported family: exploratory D3/D4 arms (incl. the
+                # GRANGER D3 cell) stay in the deflation universe but not in
+                # the family-wise comparison sets.
+                and not any(f"-{a}_" in c for a in ("D3", "D4"))]
         d252 = drop_duplicate_configs(returns, mcs_universe + d252)
         d_only = [c for c in d252 if c not in mcs_universe]
         if d_only:
@@ -369,7 +380,8 @@ def main(argv: list[str] | None = None) -> None:
         # The family-wise adjudication of the Phase-II question itself: does
         # ANY direction-aware allocator beat its own symmetrised control D0
         # (≡ V0prime), per window? This is the fixed-graph direction effect
-        # with the multiplicity of the whole direction-aware grid priced in.
+        # with the multiplicity of the reported direction-aware family
+        # (D1/D2/D2s, both methods) priced in.
         # At windows without a Phase-I V0prime bundle the benchmark falls back
         # to DYNO-D0, which replicates V0prime byte-for-byte where both exist.
         for w in PHASE_II_WINDOWS:
@@ -378,19 +390,21 @@ def main(argv: list[str] | None = None) -> None:
                 bench = f"DYNO-D0_w{w}"
             cands = [c for c in returns.columns
                      if c.split("_")[0] in {f"{s}-D{v}" for s in ("DYNO", "VARL")
-                                            for v in ("1", "2", "2s", "3", "4")}
+                                            for v in ("1", "2", "2s")}
                      and c.endswith(f"_w{w}") and "_tau" not in c]
             cands = [c for c in drop_duplicate_configs(returns, [bench] + cands)
                      if c != bench]
             if bench in returns.columns and cands:
                 spa_direction[w] = run_spa(returns, benchmark=bench, candidates=cands)
-        # R1 family-wise: does ANY causal-structure strategy beat the plain
-        # correlation-distance HRP control, per window? (The skeleton-vs-
-        # correlation half of the decomposition, with the full search priced in.)
+        # R1 family-wise: does ANY causal-structure strategy of the reported
+        # family beat the plain correlation-distance HRP control, per window?
+        # (The skeleton-vs-correlation half of the decomposition.)
         for w in PHASE_II_WINDOWS:
             bench = f"CORR-HRP_w{w}"
             cands = [c for c in returns.columns
-                     if (c.startswith(("DYNO-", "VARL-")) or c == f"V0prime_w{w}")
+                     if (c.startswith(tuple(f"{s}-{a}_" for s in ("DYNO", "VARL")
+                                            for a in REPORTED_ALLOCS))
+                         or c == f"V0prime_w{w}")
                      and c.endswith(f"_w{w}") and "_tau" not in c]
             cands = [c for c in drop_duplicate_configs(returns, [bench] + cands)
                      if c != bench]

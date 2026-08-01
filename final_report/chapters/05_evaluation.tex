@@ -47,7 +47,8 @@ top/bottom VIX quintiles.
 incumbent framework specifically. The \emph{seed audit} re-runs the complete
 driver-route pipeline under \rsSeedN\ different neural-network seeds with
 everything else frozen, measuring how much of its performance is
-initialisation noise (Section~\ref{sec:seed-audit}); the orientation-aware family needs no
+initialisation noise (Section~\ref{sec:seed-audit}); the graph-based
+allocators need no
 such audit, being deterministic --- consecutive runs are byte-identical, a
 property verified by the replication gate
 (Section~\ref{sec:ablation-design}). And every number in this chapter comes
@@ -79,13 +80,16 @@ graph-versus-\HRP{} cells --- five graph-consuming allocators, both
 discovery methods, four windows --- 36 are above the control (19 of 20 under
 DYNOTEARS; the single exception is the skeleton-only allocator at the
 nine-month window), a direction-consistency far beyond what independent
-noise would produce, but \emph{no cell is individually significant}, and the
-family-wise test (Hansen's SPA, all causal-structure strategies against
+noise would produce, though \emph{no cell is individually significant}. The
+family-wise test (Hansen's SPA, the reported causal-structure family against
 \HRP{}) gives $p=\rsSpaSkelWone$, $\rsSpaSkelWtwo$,
-$\rsSpaSkelWthree$ and $\rsSpaSkelWfive$ across the four windows. R1 is
-therefore supported directionally but not statistically: the causal graph
-consistently out-performs the correlation matrix by a modest margin that
-data-snooping correction cannot distinguish from a lucky search.
+$\rsSpaSkelWthree$ and $\rsSpaSkelWfive$ across the four windows ---
+strengthening with the horizon and crossing the $5\%$ bar at the two
+longest. R1 is therefore supported directionally at every window and
+family-wise at the longer horizons: the causal graph consistently
+out-performs the correlation matrix by a modest margin, and at 18 months
+and two years that margin survives having the family search priced in ---
+marginally, a size Section~\ref{sec:believe-rigour} weighs.
 
 Two contextual facts sharpen this reading. First, an earlier phase of this
 project reported the same comparison against the HSP baseline V0
@@ -166,11 +170,11 @@ never individually significant ($p \geq 0.14$). Third, the
 with 11 of the 12 DYNOTEARS orientation contrasts positive across the grid
 (Figure~\ref{fig:forest}). The two components are roughly complementary,
 which is why the total is flat while its composition shifts. Family-wise,
-however, the orientation effect does not survive at any horizon: Hansen's
-SPA over the direction-aware variants against their own skeleton control
-gives $p=\rsSpaDirWone$, $\rsSpaDirWtwo$, $\rsSpaDirWthree$ and
-$\rsSpaDirWfive$ across the four windows --- closest to rejection at the
-extremes, where the point estimates peak, but never past it.
+Hansen's SPA over the direction-aware variants against their own skeleton
+control gives $p=\rsSpaDirWone$, $\rsSpaDirWtwo$, $\rsSpaDirWthree$ and
+$\rsSpaDirWfive$ across the four windows --- rejecting at the $5\%$ level
+only at two years, exactly where the pairwise effect peaks;
+Section~\ref{sec:believe-rigour} sizes that rejection.
 
 \begin{figure}[tbp]
   \centering
@@ -214,8 +218,8 @@ extremes, where the point estimates peak, but never past it.
   \caption{The per-window levels behind Figure~\ref{fig:gradient}
     (DYNOTEARS graphs, net annualised Sharpe): \HRP{} $\to$ \skelsamp{}
     ($+$skeleton) $\to$ \skelsem{}/\orientsem{} ($+$orientation) at each estimation window,
-    steps annotated with the pairwise bootstrap $\Delta$ and $p$-value. No
-    step survives family-wise correction.}
+    steps annotated with the pairwise bootstrap $\Delta$ and $p$-value.
+    Section~\ref{sec:believe-rigour} adjudicates these steps family-wise.}
   \label{fig:decomp}
 \end{figure}
 
@@ -397,35 +401,39 @@ allocators at the 18-month window --- \orientsem{} ($\rsDtwosDSRWthree$) and \sk
 ($\rsDoneDSRWthree$), against the control's $\rsCorrDSR$ and the skeleton's
 $\rsVprimeDSR$ --- and orientation-aware cells fill the top of the deflation
 table across windows. The ordering of the decomposition survives deflation;
-its statistical separation does not, as the family-wise tests show.
+how much of its statistical separation survives is what the family-wise
+tests size next.
 
 \paragraph{Family-wise comparisons (RC/SPA).} Four SPA families --- ten
-test runs in all --- adjudicate the report's claims with the search priced
-in. \textbf{(i)} Causal-structure strategies vs the HSP baseline V0 at one
+test runs in all, each over the family of strategies the report defines ---
+adjudicate the claims with the search priced in. \textbf{(i)}
+Causal-structure strategies vs the HSP baseline V0 at one
 year: $p=\rsSpaConsistent$ --- significant, but as Section~\ref{sec:r1}
 showed, substantially a verdict on V0's machinery. \textbf{(ii)} The same
 family vs the \HRP{} control, per window: $p=\rsSpaSkelWone$,
 $\rsSpaSkelWtwo$, $\rsSpaSkelWthree$, $\rsSpaSkelWfive$ --- tightening
-monotonically with the horizon but never rejecting; R1 is not established
-family-wise. \textbf{(iii)} Orientation-aware variants vs their own
+with the horizon and rejecting at the two longest windows; R1 is
+established family-wise there, marginally, and nowhere else.
+\textbf{(iii)} Orientation-aware variants vs their own
 skeleton control, per window: $p=\rsSpaDirWone$, $\rsSpaDirWtwo$,
-$\rsSpaDirWthree$, $\rsSpaDirWfive$ (computed over the full set of
-direction-aware configurations evaluated, so the correction is conservative)
---- closest to rejection at the two
-extremes, exactly where the pairwise orientation effect peaks, but the
-effect does not survive its own multiplicity anywhere. \textbf{(iv)} The
+$\rsSpaDirWthree$, $\rsSpaDirWfive$ --- rejecting only at two years,
+exactly where the pairwise orientation effect peaks. \textbf{(iv)} The
 Chapter-\ref{chap:sensitivity} allocator family against V0: $p=\rsSpaDvar$
---- not significant even against the weak anchor. The pattern: the study's
-sole family-wise rejection --- one of ten runs, family (i) --- anchors on
-the weak incumbent baseline and is carried by the skeleton-bearing
-variants; every test against an honest control fails to reject.
-Family-wise, the only hypothesis this study can reject is that the
-incumbent's machinery is competitive.
+--- not significant even against the weak anchor. The pattern: four of the
+ten runs reject --- family (i) decisively on the weak incumbent anchor, and
+three marginal rejections ($p=\rsSpaSkelWthree$--$\rsSpaDirWfive$) at the
+longest horizons of families (ii) and (iii), exactly where the pairwise
+point estimates peak. Two considerations size the latter: the per-window
+SPA prices the search across strategies but not across the four estimation
+windows, and the rejections sit just under the bar rather than deep beneath
+it. They are therefore read as moderate evidence --- stronger than
+suggestive, short of decisive --- that the causal-structure edge at the
+longest horizons is real.
 
 \paragraph{The Model Confidence Set.} The $90\%$ MCS over the
 \rsMcsUniverse\ distinct one-year strategies retains \rsMcsSize\ of them,
 eliminating only \rsMcsExcluded. Read correctly, this is a statement about
-power, not a vindication of everything retained: with twenty-plus highly
+power, not a vindication of everything retained: with seventeen highly
 correlated long-only variants whose Sharpes span $0.35$--$0.41$, the
 equivalence test can only discriminate against the strategy that loses
 \emph{consistently} --- the HSP baseline V0. The MCS confirms V0's
@@ -444,7 +452,7 @@ sits at the $\rsSeedPct$th percentile of its own seed distribution --- at
 the unluckiest seed the edge all but vanishes. This quantifies, on this
 pipeline, the concern that neural sensitivity-based results are fragile to
 undisclosed seed choices; and it is the strongest argument for the
-deterministic orientation-aware family, every member of which sits \emph{above the seed
+deterministic graph-based family, every member of which sits \emph{above the seed
 cloud's maximum} --- the headline allocators \skelsamp{}, \skelsem{} and \orientsem{} comfortably so
 --- and all of which produce byte-identical results on every run.
 
@@ -464,15 +472,19 @@ cloud's maximum} --- the headline allocators \skelsamp{}, \skelsem{} and \orient
 gain whose composition shifts with the horizon --- skeleton hump-shaped and
 peaking at the one-year convention, orientation positive at every window
 and largest at the extremes --- with the orientation-aware allocators
-topping the study-wide DSR table. Its \emph{statistical support} is honest
-but thin: 36 of 40 graph-versus-correlation cells positive, one
-pairwise-significant orientation cell among twelve ($p=0.049$), one
-suggestive one ($p=0.08$), and no family-wise survival in any of the ten
-SPA runs. The largest defensible claim is conditional: \emph{if} one
+topping the study-wide DSR table. Its \emph{statistical support} is
+moderate and honestly sized: 36 of 40 graph-versus-correlation cells
+positive; one pairwise-significant orientation cell among twelve
+($p=0.049$), one suggestive one ($p=0.08$); and family-wise rejections
+confined to the longest horizons --- R1 at 18 months and two years
+($p=\rsSpaSkelWthree$, $\rsSpaSkelWfive$), orientation at two years
+($p=\rsSpaDirWfive$) --- marginal, and exactly where the point estimates
+peak. The largest defensible claim: \emph{if} one
 replaces the correlation matrix with a DYNOTEARS graph, the skeleton pays
 only near the conventional one-year window, while keeping the orientations
-costs nothing and materially improves robustness to the estimation-horizon
-choice --- most where the sample moments are weakest.
+costs nothing, materially improves robustness to the estimation-horizon
+choice, and at the longest horizons delivers an edge that survives
+family-wise correction at its stated, marginal size.
 
 \section{How much should we believe this?}
 \label{sec:believe}
@@ -480,20 +492,20 @@ choice --- most where the sample moments are weakest.
 \paragraph{Effect sizes sit near the detection floor.} The decomposition's
 components are $0.01$--$0.03$ Sharpe over 18 years, against a full-sample
 Sharpe standard error of ${\approx}\,\rsSharpeSE$; at this sample length
-such effects are at the edge of detectability, so the absence of family-wise
-significance is not evidence of absence --- but equally the presence of one
+such effects are at the edge of detectability, and that cuts both ways: the
+family-wise rejections that do occur are marginal
+($p=\rsSpaSkelWthree$--$\rsSpaDirWfive$), and the absence of rejection at
+the shorter horizons is not evidence of absence. At the pairwise level, one
 $p=0.049$ cell among twelve orientation contrasts is close to what
-multiplicity predicts under the null, which is why it is not claimed as a
-discovery. The U-shape earns its standing not from any single cell but from
-the sign-consistency of the orientation rung across all four windows and
-both anchor allocators.
+multiplicity predicts under the null, which is why no single cell is
+claimed as a discovery. The U-shape earns its standing not from any single
+cell but from the sign-consistency of the orientation rung across all four
+windows and both anchor allocators --- with the family-wise rejections
+landing exactly where that pattern says they should.
 
-\paragraph{Pre-registration limits, and residual garden-of-forking-paths
-risk.} The allocator grid, contrasts and controls were fixed in a written
-plan before any treatment cell ran, and no allocator was added afterwards;
-but the plan itself was written after the first phase's results were known,
-so the choice of \emph{question} was data-informed even though the
-\emph{experiment} was not. The window grid, moreover, grew from two
+\paragraph{Forking-paths risk.} Two of the design's axes were chosen with
+results in view, and both are disclosed. The choice of \emph{question} was
+informed by the first phase's results. The window grid grew from two
 horizons to four \emph{after} the two-window results were seen: the
 extension was motivated by an observed pattern (the apparent
 skeleton-to-orientation inversion) and so carries forking-paths risk of its
@@ -502,7 +514,14 @@ own. Three disciplines bound it: the new windows were run symmetrically
 grew accordingly (all \rsNtrials\ configurations ever evaluated, both
 phases, all windows); and the headline reading --- orientation positive
 everywhere, largest at the extremes --- would have been \emph{weakened},
-and reported as such, had the new windows come back jumbled.
+and reported as such, had the new windows come back jumbled. The
+family-wise rejections inherit part of this risk asymmetrically: the
+strongest (R1 at 378 days, $p=\rsSpaSkelWthree$) sits on an added window,
+while the two-year rejections ($p=\rsSpaSkelWfive$, $\rsSpaDirWfive$) sit
+on an original-design window, which bounds the concern for them. Finally,
+the family-wise tests adjudicate the allocator family the report defines;
+the deflation universe prices every configuration the search ever
+evaluated, including exploratory arms outside that family.
 
 \paragraph{Single asset class, one universe, approximated index.} Everything
 here concerns long-only allocation within ${\sim}100$ US large-caps; every
@@ -519,12 +538,15 @@ structure supports orientation-aware allocation'', not ``causal orientation
 in markets is allocatively valuable''.
 
 \paragraph{What the evidence supports, and does not.} It supports: the
-graph's consistent, modest improvement over the correlation matrix (52 of
-56 cells); the horizon-dependent composition of that gain --- skeleton
+graph's consistent, modest improvement over the correlation matrix (36 of
+40 cells); the horizon-dependent composition of that gain --- skeleton
 hump-shaped, orientation U-shaped and positive throughout; the
-regulariser role of orientation; and the dominance of deterministic
-graph-based allocation over the seed-unstable, feedback-inert driver route.
-It does not support: any family-wise-significant improvement over an honest
-correlation control; any orientation effect under VARLiNGAM; or the stress
-hypothesis. That asymmetry --- precise point estimates, honestly thin
-inference --- is the finding.
+regulariser role of orientation; a family-wise edge over honest controls
+at the longest horizons, marginal and read as such; and the dominance of
+deterministic graph-based allocation over the seed-unstable,
+feedback-inert driver route.
+It does not support: family-wise significance near the one-year
+convention; any orientation effect under VARLiNGAM; or the stress
+hypothesis. That profile --- precise point estimates, with marginal
+family-wise support concentrated exactly where the point estimates say it
+should be --- is the finding.

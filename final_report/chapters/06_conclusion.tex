@@ -21,8 +21,9 @@ correlation matrix is stable across estimation horizons, but its source
 shifts --- the skeleton pays only near the conventional one-year window,
 while orientation pays at every horizon, most where sample moments are
 weakest. Orientation buys robustness to the estimation horizon, not level
---- and no step of the decomposition is family-wise significant against
-honest controls.} In detail (net annualised Sharpe, 2007--2024, monthly
+--- and the decomposition's family-wise support reaches conventional
+significance only at the longest horizons, marginally, exactly where the
+point estimates peak.} In detail (net annualised Sharpe, 2007--2024, monthly
 rebalancing, 5\,bps costs, windows of 189/252/378/504 trading days):
 
 \begin{enumerate}[itemsep=2pt]
@@ -44,14 +45,16 @@ rebalancing, 5\,bps costs, windows of 189/252/378/504 trading days):
         threshold, and \orientsem{} and \skelsem{} at the 18-month window attain the two
         highest Deflated Sharpe ratios of all \rsNtrials\ configurations
         evaluated ($\rsDtwosDSRWthree$, $\rsDoneDSRWthree$).
-  \item \textbf{Nothing survives family-wise correction against honest
-        anchors.} Of the ten SPA runs across four families, Hansen's
-        procedure rejects in exactly one --- the causal family against the
-        weak HSP baseline ($p=\rsSpaConsistent$); against the \HRP{}
-        control ($p=\rsSpaSkelWone$--$\rsSpaSkelWfive$ across windows) and
-        against the skeleton control
-        ($p=\rsSpaDirWfive$--$\rsSpaDirWtwo$) the decomposition's steps are
-        directionally consistent but statistically unconfirmed. The $90\%$
+  \item \textbf{Family-wise support is marginal and confined to the longest
+        horizons.} Of the ten SPA runs across four families, Hansen's
+        procedure rejects in four: decisively for the causal family against
+        the weak HSP baseline ($p=\rsSpaConsistent$), and marginally ---
+        $p=\rsSpaSkelWthree$--$\rsSpaDirWfive$ --- for the graph family
+        against the \HRP{} control at 18 months and two years and for the
+        orientation family against the skeleton control at two years,
+        exactly where the point estimates peak. Nothing rejects near the
+        one-year convention, and the marginal rejections leave the window
+        axis itself unpriced. The $90\%$
         Model Confidence Set over \rsMcsUniverse\ one-year strategies
         eliminates only the HSP baseline.
   \item \textbf{The effect is method- and regime-specific.} Under VARLiNGAM
@@ -90,8 +93,9 @@ rebalancing, 5\,bps costs, windows of 189/252/378/504 trading days):
   \item \textbf{Empirical:} the decomposition itself, traced across four
         estimation horizons (a stable total; skeleton hump-shaped and
         peaking at the one-year convention; orientation positive at every
-        horizon and largest where sample moments are weakest; nothing
-        family-wise significant against honest controls), its method- and
+        horizon and largest where sample moments are weakest; family-wise
+        support marginal and confined to the longest horizons), its
+        method- and
         regime-dependence, and the finding that textbook HRP beats the HSP
         machinery built to improve on it.
   \item \textbf{Meta-scientific:} a quantified seed audit substantiating the
@@ -99,9 +103,9 @@ rebalancing, 5\,bps costs, windows of 189/252/378/504 trading days):
         identification of a monthly feedback loop's measurement problem
         (one ${\sim}95\%$-noise observation per update); and a
         bit-reproducible pipeline --- including a data-determinism defect
-        whose fix overturned two previously-drawn conclusions --- with the
-        allocator grid fixed before any treatment ran, every later
-        extension disclosed as such, all cells cache-verified, and the
+        whose fix overturned two previously-drawn conclusions --- with
+        every design extension disclosed as such, all cells
+        cache-verified, and the
         harness gated on a byte-perfect replication of the prior phase's
         result.
 \end{itemize}
@@ -112,7 +116,8 @@ rebalancing, 5\,bps costs, windows of 189/252/378/504 trading days):
 Stated without hedging. \textbf{(i)} The decomposition's components are
 $0.01$--$0.03$ Sharpe: near the 18-year detection floor, individually
 non-significant against honest controls, and plausibly underpowered ---
-the point estimates are precise, the inference is thin. \textbf{(ii)} The
+the point estimates are precise; the inference, where it clears the
+family-wise bar, is marginal. \textbf{(ii)} The
 orientation effect exists under one discovery method (DYNOTEARS); until
 another method reproduces it, it should be read as a property of DYNOTEARS'
 contemporaneous structure, not of markets. \textbf{(iii)} Long-only US
@@ -122,7 +127,7 @@ universe approximates the S\&P~100 by market-cap ranking and a fixed
 snapshot union, with mild residual survivorship effects. \textbf{(v)} The
 asset-block SEM marginalises over the macro drivers, so the structural
 shocks' assumed independence is an approximation. \textbf{(vi)} The choice
-of Q --- though not the experiment --- was informed by the first phase's
+of Q was informed by the first phase's
 results, and the window grid was widened from two horizons to four after
 the two-window results were seen; both are disclosed, and the unified
 \rsNtrials-trial deflation universe prices in every configuration the

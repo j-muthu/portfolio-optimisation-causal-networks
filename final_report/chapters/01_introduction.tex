@@ -70,7 +70,7 @@ with a documented backtest-overfitting problem
 \cite{bailey2014deflated,lopezdeprado2023causal}, the project demonstrates
 that an effect of this size can be measured with a controlled ablation
 design, a deterministic pipeline and multiplicity-corrected inference ---
-and reported honestly when it does not clear the bar.
+and reported honestly at its true size, whether or not it clears the bar.
 
 \section{The scientific question}
 \label{sec:question}
@@ -123,7 +123,8 @@ whole study:
     what they read from it: \skelsamp{} symmetrises $M$ before clustering (skeleton
     only), while three orientation-aware allocators (\skelsem{}, \orientsamp{}, \orientsem{};
     Chapter~\ref{chap:sensitivity}) consume the directed matrix itself ---
-    one for each way a graph can enter HRP's two steps.
+    orientation entering through the allocation step, the ordering step,
+    and both.
 \end{itemize}
 
 \noindent Q presupposes two requirements, each tested in its own right:
@@ -136,8 +137,7 @@ whole study:
     clustering cannot, so the orientation-aware family of
     Chapter~\ref{chap:sensitivity} is built for the purpose: unit-verified to
     respond to edge direction, while the controls are provably
-    orientation-blind (transpose-invariant), and pre-registered before any
-    result was computed (Section~\ref{sec:ablation-design}).
+    orientation-blind (transpose-invariant).
 \end{enumerate}
 
 \noindent Granted both, Q reduces to two contrasts with a shared anchor,
@@ -206,7 +206,7 @@ against Q.
     identical graphs.
   \item \emph{A multiplicity-, distribution- and stability-aware evaluation}
     (addresses C3; Chapter~\ref{chap:evaluation}): stationary-block-bootstrap
-    contrasts for every pre-registered comparison; the
+    contrasts for every pairwise step of the decomposition; the
     PSR/DSR/Reality-Check/SPA/MCS battery over all \rsNtrials\ trials; a
     \rsSeedN-seed audit quantifying the neural instability of the incumbent
     HSP route; and a quantified account of why its monthly feedback loop
@@ -232,9 +232,14 @@ Chapter~\ref{chap:evaluation}.
     504-day windows (pairwise $p \geq 0.14$ throughout) --- while the
     orientation rung is positive at \emph{every} window and U-shaped:
     $+0.021$, $+0.009$, $+0.012$, $+0.023$ (pairwise $p = 0.08$ and $0.05$
-    at the two extremes). No rung survives family-wise correction (Hansen's
-    SPA: $p \geq \rsSpaSkelWfive$ across the eight skeleton/orientation
-    $\times$ window tests).
+    at the two extremes). Family-wise (Hansen's SPA over the reported
+    family), the graph's edge over the correlation control clears the
+    conventional $5\%$ bar at the two longest windows
+    ($p=\rsSpaSkelWthree$, $\rsSpaSkelWfive$) and the orientation family's
+    edge over the skeleton clears it at two years ($p=\rsSpaDirWfive$) ---
+    marginal rejections ($p \geq \rsSpaSkelWthree$ across the eight
+    skeleton/orientation $\times$ window tests), landing exactly where the
+    point estimates peak.
   \item \textbf{What orientation buys is robustness, not level.} The
     orientation-aware allocators are strong at every window --- \skelsem{} spans
     $0.395$--$0.415$ and \orientsem{} $0.399$--$0.419$ across the four horizons,
@@ -274,9 +279,10 @@ The honest one-line summary: \emph{the causal graph's value to hierarchical
 allocation is stable across estimation horizons, but its source shifts ---
 the skeleton pays only near the conventional one-year window, the
 orientations pay at every horizon and most where sample moments are weakest;
-and neither component's contribution survives family-wise data-snooping
-correction.} Establishing that decomposition, with its uncertainty stated,
-is the contribution.
+and the family-wise support for that edge reaches conventional significance
+only at the longest horizons --- marginally, and exactly where the point
+estimates peak.} Establishing that decomposition, with its uncertainty
+stated, is the contribution.
 
 \section{Report structure}
 \label{sec:structure}
