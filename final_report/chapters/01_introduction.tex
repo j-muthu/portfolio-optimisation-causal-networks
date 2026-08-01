@@ -9,24 +9,25 @@
 Portfolio optimisation divides capital across assets so as to maximise return
 for a given level of risk. Since Markowitz's mean--variance model
 \cite{markowitz1952portfolio}, almost all of its machinery has rested on one
-object: the covariance --- equivalently, the correlation --- matrix of
-returns. Its most successful recent representative, Hierarchical Risk Parity
-(HRP) \cite{lopezdeprado2016hrp}, sidesteps the notorious instability of
-inverting a noisy covariance matrix by \emph{clustering} assets on a
+object: the covariance matrix of returns or, equivalently, the correlation
+matrix. Its most successful recent representative, Hierarchical Risk Parity
+(HRP) \cite{lopezdeprado2016hrp}, avoids the well-documented instability of
+inverting a noisy covariance matrix by clustering assets on a
 correlation-derived distance and allocating by recursive bisection down the
-resulting tree. Clustering is the first step of the algorithm, and what it is
-fed is correlation.
+resulting tree. Clustering is the first step of the algorithm, and its input
+is the correlation matrix.
 
 Correlation brings two distinct deficits to that step. The first is a deficit
-of \emph{information}: correlation is undirected --- it records that two
-assets co-move, but not which one moves the other --- and it can be spurious,
+of \emph{information}: correlation is undirected (it records that two
+assets co-move, but not which moves the other) and it can be spurious,
 because two assets responding to a common cause are statistically
-indistinguishable from two assets genuinely linked \cite{simon1954spurious,
+indistinguishable from two assets that are causally linked
+\cite{simon1954spurious,
 lopezdeprado2023causal}. The second is a deficit of \emph{interface}:
 hierarchical clustering accepts only symmetric matrices, so even if a
-directed description of the market were available, HRP and its descendants
---- including Hierarchical Sensitivity Parity (HSP) \cite{rodriguez2023hsp}
---- could not represent it. If asset $A$ drives asset $B$ but not conversely,
+directed description of the market were available, HRP and its descendants,
+including Hierarchical Sensitivity Parity (HSP) \cite{rodriguez2023hsp},
+could not represent it. If asset $A$ drives asset $B$ but not conversely,
 neither the correlation matrix nor the dendrogram built from it can say so.
 These deficits are separable, and this thesis treats them separately: the
 first asks whether a better \emph{input} to hierarchical allocation exists;
@@ -34,48 +35,50 @@ the second, whether an allocator can be built that \emph{consumes} what the
 better input contains. They become requirements R1 and R2 of
 Section~\ref{sec:question}.
 
-Causal discovery supplies the candidate input. Score-based structure learning
---- NOTEARS \cite{zheng2018notears} and its temporal extension DYNOTEARS
-\cite{pamfil2020dynotears} --- makes it tractable to fit, at every monthly
-rebalance, a directed acyclic graph (DAG) over a hundred assets: an estimate
-not only of which assets are linked but of \emph{which way influence flows}
-between them. A small literature now applies such graphs to equity markets
+Causal discovery supplies the candidate input. Score-based structure
+learning (NOTEARS \cite{zheng2018notears} and its temporal extension
+DYNOTEARS \cite{pamfil2020dynotears}) makes it tractable to fit, at every
+monthly rebalance, a directed acyclic graph (DAG) over a hundred assets: an
+estimate not only of which assets are linked but of the direction of
+influence between them. A small literature now applies such graphs to equity markets
 \cite{howard2025causal,tang2024trading}, but it stops short of the allocation
 step: no published work sets hierarchical portfolio weights from a discovered
 graph, and none asks what the graph's directionality is worth once it gets
 there.
 
-That question is worth splitting, because a DAG carries two separable kinds
-of information. Its \emph{skeleton} --- the undirected pattern of which asset
-pairs are causally linked --- can be handed to an unmodified hierarchical
-allocator by symmetrising the adjacency matrix. Its \emph{edge orientations}
---- the direction of each link --- cannot: a symmetric clustering step
-discards them entirely, so exploiting them requires new allocation machinery.
+The question separates naturally, because a DAG carries two separable kinds
+of information. Its \emph{skeleton}, the undirected pattern of which asset
+pairs are causally linked, can be handed to an unmodified hierarchical
+allocator by symmetrising the adjacency matrix. Its \emph{edge
+orientations}, the direction of each link, cannot: a symmetric clustering
+step discards them entirely, so exploiting them requires new allocation
+machinery.
 Building that machinery, and using it to measure what each layer of the graph
 is worth, is the methodological contribution of this thesis. Either outcome
 is informative. If orientation adds nothing, the skeleton was all that
 mattered and cheap symmetrisation suffices; if it adds value, every
-correlation-fed hierarchical allocator has been leaving information on the
-table.
+correlation-fed hierarchical allocator has been discarding available
+information.
 
-The answer matters to three audiences. For the practitioner Q is a costed
-question --- symmetrising a graph is free, exploiting orientation requires
-the new allocation machinery of this thesis, and discovering the graph at
-all costs hours of compute per backtest --- so the decomposition is a price
-list: it says which layers of causal structure are worth paying for. For
+The answer matters to three audiences. For the practitioner, Q is a
+question about costs: symmetrising a graph is free, exploiting orientation
+requires the new allocation machinery of this thesis, and discovering the
+graph at all costs hours of compute per backtest, so the decomposition
+indicates which layers of causal structure justify their expense. For
 the causal-finance literature, which now builds asset graphs at scale but
 has not yet set portfolio weights from them, it says where in the graph
-allocative value actually resides. And for research practice in a field
+allocative value resides. And for research practice in a field
 with a documented backtest-overfitting problem
 \cite{bailey2014deflated,lopezdeprado2023causal}, the project demonstrates
 that an effect of this size can be measured with a controlled ablation
-design, a deterministic pipeline and multiplicity-corrected inference ---
-and reported honestly at its true size, whether or not it clears the bar.
+design, a deterministic pipeline and multiplicity-corrected inference, and
+reported at its estimated size whether or not it clears conventional
+significance.
 
 \section{The scientific question}
 \label{sec:question}
 
-The thesis answers one precisely-stated question, returned to throughout:
+The thesis addresses a single question, used throughout the report:
 
 \begin{quote}
 \noindent\fbox{\parbox{\dimexpr\linewidth-2\fboxsep-2\fboxrule\relax}{%
@@ -88,33 +91,33 @@ performance gain is attributable to the graph's \textbf{skeleton} versus its
 \noindent Every term is operationalised once, here, and held fixed for the
 whole study:
 \begin{itemize}[itemsep=1pt, topsep=3pt]
-  \item \emph{Hierarchical portfolio allocation}: HRP's two-stage scheme ---
-    a symmetric distance matrix determines an asset ordering, and recursive
-    bisection with inverse-cluster-variance splits determines the weights ---
+  \item \emph{Hierarchical portfolio allocation}: HRP's two-stage scheme
+    (a symmetric distance matrix determines an asset ordering, and recursive
+    bisection with inverse-cluster-variance splits determines the weights),
     long-only, fully invested, on the ${\sim}100$ largest S\&P~500
     constituents (a fixed 99-name universe), rebalanced monthly over
     2007--2024 (215 rebalances at windows up to one year; the 18-month and
     two-year windows' longer burn-ins leave 209 and 203).
   \item \emph{The correlation matrix}: the graph-blind control \HRP{} is
-    López de Prado's original construction --- distance
+    López de Prado's original construction, with the distance
     $\sqrt{\tfrac{1}{2}(1-\rho_{ij})}$ on the lookback window's sample
     correlation \cite{lopezdeprado2016hrp}.
   \item \emph{A discovered causal graph}: the contemporaneous asset--asset
     block of a DYNOTEARS fit on the joint driver--asset panel at each
-    rebalance (primary), with two controls on its orientation content ---
+    rebalance (primary), with two controls on its orientation content:
     VARLiNGAM \cite{hyvarinen2010varlingam}, the same construction with
     differently-identified orientations, and a ridge-regularised Granger
     graph \cite{granger1969investigating}, which preserves a directional
-    ordering but degrades the edge magnitudes; four estimation windows ---
-    189, 252, 378 and 504 trading days (nine months to two years) --- so
-    the decomposition is measured as a function of estimation horizon, not
-    at a single conventional window.
+    ordering but degrades the edge magnitudes. Four estimation windows are
+    used (189, 252, 378 and 504 trading days; nine months to two years), so
+    the decomposition is measured as a function of estimation horizon
+    rather than at a single conventional window.
   \item \emph{Performance gain}: out-of-sample (walk-forward), net-of-cost
     (5\,bps per unit one-way turnover, swept over $\{0,5,10,20\}$\,bps),
-    annualised Sharpe ratio of daily portfolio returns --- supplemented,
-    because daily returns here have excess kurtosis
-    ${\approx}\,\rsKurtosis$, by the Probabilistic and Deflated Sharpe ratios
-    \cite{bailey2012psr,bailey2014deflated}, and adjudicated family-wise by
+    annualised Sharpe ratio of daily portfolio returns, supplemented by the
+    Probabilistic and Deflated Sharpe ratios
+    \cite{bailey2012psr,bailey2014deflated} because daily returns here have
+    excess kurtosis ${\approx}\,\rsKurtosis$, and adjudicated family-wise by
     White's Reality Check, Hansen's SPA and the Model Confidence Set
     \cite{white2000reality,hansen2005spa,hansen2011mcs} over all \rsNtrials\
     configurations evaluated in the project.
@@ -122,18 +125,19 @@ whole study:
     The identical per-window graph $M$ feeds allocators that differ only in
     what they read from it: \skelsamp{} symmetrises $M$ before clustering (skeleton
     only), while three orientation-aware allocators (\skelsem{}, \orientsamp{}, \orientsem{};
-    Chapter~\ref{chap:sensitivity}) consume the directed matrix itself ---
-    orientation entering through the allocation step, the ordering step,
-    and both.
+    Chapter~\ref{chap:sensitivity}) consume the directed matrix itself;
+    orientation enters through the allocation step, the ordering step, or
+    both.
 \end{itemize}
 
 \noindent Q presupposes two requirements, each tested in its own right:
 \begin{enumerate}[label=\textbf{R\arabic*}, itemsep=1pt, topsep=3pt]
-  \item \emph{The causal graph must improve on the correlation matrix at all}
-    --- otherwise there is no gain to decompose. Tested like-for-like: the
+  \item \emph{The causal graph must improve on the correlation matrix at
+    all}, since otherwise there is no gain to decompose. Tested
+    like-for-like: the
     same HRP machinery fed the symmetrised graph (\skelsamp{}) versus the sample
     correlation (\HRP{}), in Section~\ref{sec:r1}.
-  \item \emph{An allocator must be able to exploit orientation} --- symmetric
+  \item \emph{An allocator must be able to exploit orientation}. Symmetric
     clustering cannot, so the orientation-aware family of
     Chapter~\ref{chap:sensitivity} is built for the purpose: unit-verified to
     respond to edge direction, while the controls are provably
@@ -141,16 +145,15 @@ whole study:
 \end{enumerate}
 
 \noindent Granted both, Q reduces to two contrasts with a shared anchor,
-answered in order in Chapter~\ref{chap:evaluation}: the \emph{skeleton rung},
-$\skelsamp{}-\HRP{}$ --- what is it worth to know which pairs are
-genuinely linked? --- and the \emph{orientation rung},
-$\orientany{}-\skelsamp{}$ for the orientation-aware variants $\orientany{}$
---- holding the graph fixed, what is it worth to also know which way each
-link points? The two rungs sum to the total causal-graph gain, so nothing is
-left unattributed. What counts as success is therefore any precisely
-estimated, honestly adjudicated answer at the two rungs --- including a
-null: the failure mode the design guards against is not a small gain but an
-unattributable one.
+answered in order in Chapter~\ref{chap:evaluation}. The \emph{skeleton
+rung}, $\skelsamp{}-\HRP{}$, measures the value of knowing which pairs are
+linked; the \emph{orientation rung}, $\orientany{}-\skelsamp{}$ for each
+orientation-aware variant $\orientany{}$, measures the additional value,
+holding the graph fixed, of knowing the direction of each link. The two
+rungs sum to the total causal-graph gain, so nothing is left unattributed.
+Success is therefore any precisely estimated, rigorously adjudicated answer
+at the two rungs, including a null: the failure mode the design guards
+against is not a small gain but an unattributable one.
 
 \section{Challenges and contributions}
 \label{sec:challenges}
@@ -160,8 +163,8 @@ contributions addressing them (A1--A3), one chapter each. The mapping onto Q
 is direct: C1 supplies the graph, C2 supplies the allocators that decompose
 its value, and C3 supplies the inference that adjudicates the decomposition.
 Together they integrate three literatures that have not previously met at
-the allocation step --- causal structure learning, hierarchical portfolio
-construction, and the backtest-rigour programme --- and A1--A3 are the
+the allocation step (causal structure learning, hierarchical portfolio
+construction, and the backtest-rigour programme), and A1--A3 are the
 project's objectives: Chapters~\ref{chap:discovery}--\ref{chap:evaluation}
 deliver them, and Chapter~\ref{chap:evaluation} assesses them jointly
 against Q.
@@ -172,18 +175,18 @@ against Q.
     panel of assets and macro drivers, under an economically-motivated
     directional prior (drivers may cause assets; single stocks do not cause
     the 10-year Treasury yield), 215 times per configuration, cheaply enough
-    to sweep --- and \emph{reproducibly}: a graph that changes between runs
+    to sweep, and reproducibly: a graph that changes between runs
     invalidates every downstream comparison.
   \item \emph{Feeding a directed graph to an allocator that fundamentally
     consumes symmetric matrices.} Hierarchical clustering requires a
     symmetric distance; naive symmetrisation discards exactly the
     orientations in question. Exploiting them requires allocation machinery
-    with no analogue in the HRP/HSP literature --- and an experimental design
-    in which orientation is the \emph{only} treatment variable.
-  \item \emph{Attributing small performance differences honestly.} The
+    with no analogue in the HRP/HSP literature, and an experimental design
+    in which orientation is the only treatment variable.
+  \item \emph{Attributing small performance differences credibly.} The
     candidate effects are $0.01$--$0.03$ Sharpe on heavy-tailed returns,
     produced by a study that evaluated \rsNtrials\ configurations; the
-    framework this project began from adds two further hazards ---
+    framework this project began from adds two further hazards:
     seed-dependent neural sensitivity estimates, and a monthly feedback
     signal whose sampling noise dwarfs it.
 \end{enumerate}
@@ -193,17 +196,17 @@ against Q.
     (addresses C1; Chapter~\ref{chap:discovery}): DYNOTEARS with the directional prior
     enforced natively and empirically verified to matter; a content-keyed
     discovery cache that makes the full ablation grid tractable
-    (${\sim}700\times$ fan-out speedup); a data-determinism defect found and
-    fixed, making every backtest bit-reproducible; and a single extraction
-    chokepoint guaranteeing every allocator sees the byte-identical graph.
+    (${\sim}700\times$ fan-out speedup); a data-determinism defect found
+    and fixed; and a single extraction chokepoint guaranteeing that every
+    allocator receives the identical graph.
   \item \emph{The orientation-aware allocator family and the fixed-graph
-    ablation} (addresses C2; Chapter~\ref{chap:sensitivity}) --- the core
+    ablation} (addresses C2; Chapter~\ref{chap:sensitivity}), the core
     methodological novelty: an SEM-implied covariance that
-    propagates shocks through all directed paths of the DAG; and
-    \emph{causal-ordered bisection}, which replaces the clustering dendrogram
-    with the DAG's topological order --- each deterministic, seed-free, and
-    evaluated against matched skeleton-only and correlation controls on the
-    identical graphs.
+    propagates shocks through all directed paths of the DAG, and
+    \emph{causal-ordered bisection}, which replaces the clustering
+    dendrogram with the DAG's topological order. Each is deterministic and
+    seed-free, and each is evaluated against matched skeleton-only and
+    correlation controls on the identical graphs.
   \item \emph{A multiplicity-, distribution- and stability-aware evaluation}
     (addresses C3; Chapter~\ref{chap:evaluation}): stationary-block-bootstrap
     contrasts for every pairwise step of the decomposition; the
@@ -219,8 +222,8 @@ against Q.
 All benefits below are measured on the protocol of
 Section~\ref{sec:question} (net of 5\,bps, monthly rebalances, 2007--2024)
 with significance from the Politis--Romano stationary block bootstrap
-\cite{politis1994stationary}, and are reported as measured --- including
-where the answer is ``little'' or ``nothing''. Full detail is in
+\cite{politis1994stationary}, and are reported as measured, including
+where the answer is small or null. Full detail is in
 Chapter~\ref{chap:evaluation}.
 
 \begin{itemize}[itemsep=2pt, topsep=3pt]
@@ -228,38 +231,40 @@ Chapter~\ref{chap:evaluation}.
     over the correlation control is stable across horizons ($+0.018$ to
     $+0.032$ net Sharpe; $36$ of $40$ graph cells above the control) but its
     composition shifts with the window. The skeleton's rung is hump-shaped
-    --- $-0.003$, $+0.022$, $+0.018$, $+0.009$ at the 189-, 252-, 378- and
-    504-day windows (pairwise $p \geq 0.14$ throughout) --- while the
-    orientation rung is positive at \emph{every} window and U-shaped:
-    $+0.021$, $+0.009$, $+0.012$, $+0.023$ (pairwise $p = 0.08$ and $0.05$
+    ($-0.003$, $+0.022$, $+0.018$, $+0.009$ at the 189-, 252-, 378- and
+    504-day windows; pairwise $p \geq 0.14$ throughout), while the
+    orientation rung is positive at every window and U-shaped
+    ($+0.021$, $+0.009$, $+0.012$, $+0.023$; pairwise $p = 0.08$ and $0.05$
     at the two extremes). Family-wise (Hansen's SPA over the reported
     family), the graph's edge over the correlation control clears the
     conventional $5\%$ bar at the two longest windows
-    ($p=\rsSpaSkelWthree$, $\rsSpaSkelWfive$) and the orientation family's
-    edge over the skeleton clears it at two years ($p=\rsSpaDirWfive$) ---
-    marginal rejections ($p \geq \rsSpaSkelWthree$ across the eight
-    skeleton/orientation $\times$ window tests), landing exactly where the
-    point estimates peak.
+    ($p=\rsSpaSkelWthree$, $\rsSpaSkelWfive$), and the orientation
+    family's edge over the skeleton clears it at two years
+    ($p=\rsSpaDirWfive$). These rejections are marginal
+    ($p \geq \rsSpaSkelWthree$ across the eight skeleton/orientation
+    $\times$ window tests) and coincide with the windows where the point
+    estimates peak.
   \item \textbf{What orientation buys is robustness, not level.} The
-    orientation-aware allocators are strong at every window --- \skelsem{} spans
-    $0.395$--$0.415$ and \orientsem{} $0.399$--$0.419$ across the four horizons,
-    versus the skeleton-only allocator's $0.372$--$0.403$ --- and their edge
-    over the skeleton is largest exactly where the sample moments feeding
-    the control are weakest (the nine-month and two-year windows), which
-    reads as causal structure substituting for sample-moment quality. The
-    edge is invariant to transaction costs up to 20\,bps and to the graph's
-    sparsity threshold, and \orientsem{} and \skelsem{} at the 18-month window attain the two
-    highest Deflated Sharpes of all \rsNtrials\ configurations
-    ($\rsDtwosDSRWthree$, $\rsDoneDSRWthree$). It is, however,
-    method-dependent --- absent under VARLiNGAM graphs at all four windows
-    --- and concentrates in calm (bottom-VIX-quintile) regimes rather than
-    stress.
+    orientation-aware allocators are strong at every window (\skelsem{}
+    spans $0.395$--$0.415$ and \orientsem{} $0.399$--$0.419$ across the
+    four horizons, against the skeleton-only allocator's
+    $0.372$--$0.403$), and their edge over the skeleton is largest where
+    the sample moments feeding the control are weakest (the nine-month and
+    two-year windows), consistent with causal structure substituting for
+    sample-moment quality. In point estimates the edge is invariant to
+    transaction costs up to 20\,bps and to the graph's sparsity threshold,
+    and \orientsem{} and \skelsem{} at the 18-month window attain the two
+    highest Deflated Sharpe ratios of all \rsNtrials\ configurations
+    ($\rsDtwosDSRWthree$, $\rsDoneDSRWthree$). The effect is, however,
+    method-dependent (absent under VARLiNGAM graphs at all four windows)
+    and, descriptively, concentrates in calm (bottom-VIX-quintile) regimes
+    rather than stress.
   \item \textbf{The incumbent driver route is dominated.} The HSP-style
     driver-selection pipeline is $K$-fragile; its monthly feedback loop is
     exactly inert across a $3{\times}3$ hyperparameter grid, because its
     reward has signal-to-noise ${\approx}\,\rsRewardSNR$; and its neural
     sensitivity step makes its Sharpe seed-dependent
-    ($\rsSeedMin$--$\rsSeedMax$ over \rsSeedN\ seeds --- a range twice the
+    ($\rsSeedMin$--$\rsSeedMax$ over \rsSeedN\ seeds, a range twice the
     $+0.010$ edge it claims over its own baseline). The headline graph-based
     allocators (\skelsamp{}, \skelsem{}, \orientsem{}) are deterministic and exceed its best seed, and
     the 90\% Model Confidence Set over all trials excludes exactly one
@@ -275,21 +280,20 @@ Chapter~\ref{chap:evaluation}.
     my knowledge, new.
 \end{itemize}
 
-The honest one-line summary: \emph{the causal graph's value to hierarchical
-allocation is stable across estimation horizons, but its source shifts ---
-the skeleton pays only near the conventional one-year window, the
-orientations pay at every horizon and most where sample moments are weakest;
-and the family-wise support for that edge reaches conventional significance
-only at the longest horizons --- marginally, and exactly where the point
-estimates peak.} Establishing that decomposition, with its uncertainty
-stated, is the contribution.
+In summary: \emph{the causal graph's value to hierarchical allocation is
+stable across estimation horizons, but its source shifts: the skeleton pays
+only near the conventional one-year window, while the orientations pay at
+every horizon and most where sample moments are weakest. Family-wise
+support reaches conventional significance only at the longest horizons,
+marginally, where the point estimates also peak.} Establishing that
+decomposition, with its uncertainty stated, is the contribution.
 
 \section{Report structure}
 \label{sec:structure}
 
-Chapter~\ref{chap:background} analyses the three works this study builds on
---- HRP and the backtest-rigour agenda, causal graphs in equity markets, and
-HSP --- and locates the gap. Chapter~\ref{chap:discovery} (A1) presents the
+Chapter~\ref{chap:background} analyses the three works this study builds
+on (HRP and the backtest-rigour agenda, causal graphs in equity markets,
+and HSP) and locates the gap. Chapter~\ref{chap:discovery} (A1) presents the
 discovery pipeline that produces the graphs. Chapter~\ref{chap:sensitivity}
 (A2) develops the allocator family and the fixed-graph ablation that make Q
 answerable. Chapter~\ref{chap:evaluation} (A3) evaluates: the two

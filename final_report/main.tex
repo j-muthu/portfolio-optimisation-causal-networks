@@ -76,8 +76,8 @@
 
 \begin{abstract}
 \noindent Hierarchical portfolio allocators cluster assets on a symmetric
-matrix --- usually the return correlation matrix, blind to which asset
-moves which. Temporal causal discovery
+matrix, usually the return correlation matrix, which records co-movement
+but not its direction. Temporal causal discovery
 yields a richer input: a directed acyclic graph, carrying a \emph{skeleton}
 (which pairs are linked) and \emph{edge orientations} (which way influence
 flows); symmetric clustering keeps only the first. The thesis asks:
@@ -90,35 +90,38 @@ A fixed-graph ablation answers it. At 215 monthly rebalances over
 2007--2024 on the ${\sim}100$ largest S\&P~500 names, one DYNOTEARS
 graph (VARLiNGAM and ridge-Granger as comparators) feeds a graph-blind
 HRP control, a skeleton-only allocator, and three
-orientation-aware allocators that consume the DAG natively. Performance means out-of-sample,
+orientation-aware allocators that consume the DAG natively. Performance
+denotes out-of-sample,
 net-of-cost annualised Sharpe at four estimation horizons (nine months to
 two years), adjudicated by a
 PSR/DSR/Reality-Check/SPA/MCS battery over all \rsNtrials\ configurations.
 
-The answer: the graph's total gain over the control is stable but never
-individually significant --- $+0.018$ to $+0.032$ net Sharpe for the best
-orientation-aware allocator at every window ($p=0.43$--$0.12$) --- but its
-\emph{composition} shifts. Across the four
+The graph's total gain over the control is stable but never
+individually significant ($+0.018$ to $+0.032$ net Sharpe for the best
+orientation-aware allocator at every window; $p=0.43$--$0.12$), but its
+composition shifts. Across the four
 windows, the skeleton's rung is hump-shaped and largest near the
 one-year convention, while the
-orientation rung is positive at \emph{every} horizon and largest at the
-extremes, where sample moments are weakest. Orientation thus acts as a \emph{regulariser} --- substituting
-causal structure for sample-moment quality --- and attains the study's two
-highest deflated Sharpes. The support tracks that composition: one of
-twelve pairwise orientation contrasts reaches $p<0.05$ --- roughly what
-multiplicity predicts --- and Hansen's SPA rejects only where the
+orientation rung is positive at every horizon and largest at the
+extremes, where sample moments are weakest. Orientation therefore acts as
+a regulariser, substituting
+causal structure for sample-moment quality, and attains the study's two
+highest deflated Sharpe ratios. The statistical support matches this
+pattern: one of
+twelve pairwise orientation contrasts reaches $p<0.05$, roughly the rate
+multiplicity predicts, and Hansen's SPA rejects only where the
 point estimates peak: the graph family over the control at the two longest
 horizons ($p=\rsSpaSkelWthree$, $\rsSpaSkelWfive$) and orientation over
 the skeleton at two years ($p=\rsSpaDirWfive$), marginally; the effect
-vanishes under VARLiNGAM.
+is absent under VARLiNGAM.
 
-Two supporting results: the HSP driver route's monthly reward is
-unlearnable (${\sim}95\%$ noise) and its Sharpe seed-unstable over
-\rsSeedN\ seeds; the graph route is deterministic and beats its best
+Two supporting results reinforce this: the HSP driver route's monthly
+reward is unlearnable (${\sim}95\%$ noise) and its Sharpe varies with the
+network seed; the graph route is deterministic and beats its best
 seed. The
-contribution is a controlled, reproducible decomposition of where the
+contribution is a controlled decomposition of where the
 graph's value lies: in the skeleton near the one-year convention, and in
-the orientations at every horizon --- past the family-wise bar only at
+the orientations at every horizon, past the family-wise bar only at
 the longest.
 \end{abstract}
 
@@ -127,7 +130,7 @@ the longest.
 \section*{Statement of originality}
 This report and the work it describes are my own. The research was conducted
 under the supervision of Dr.\ Ce Guo and Prof.\ Wayne Luk. All external
-sources --- published work, datasets and third-party code --- are cited in
+sources (published work, datasets and third-party code) are cited in
 the text; vendored third-party libraries are identified as such in the
 repository. All numerical results are reproducible from the committed code
 and cached data (Appendix~\ref{app:tables}).
@@ -137,15 +140,15 @@ No Imperial ethics approval was required: the project uses only publicly
 available market and macroeconomic data and involves no human participants or
 personal data. The work is a retrospective backtest study; it makes no
 investment recommendations, and Chapter~\ref{chap:evaluation} quantifies
-precisely the uncertainty with which its results should be read.
+the uncertainty with which its results should be read.
 
 \section*{Use of generative AI}
 Generative AI (Anthropic's Claude) was used in two capacities, both reviewed
 by me as author. \emph{As a coding assistant} during implementation: all
 AI-assisted code was human-reviewed and is covered by the project's test
 suite and by the end-to-end verification gates of
-Section~\ref{sec:ablation-design} --- including a byte-perfect replication
-gate against an independently produced historical result --- so no
+Section~\ref{sec:ablation-design}, including a replication
+gate against an independently produced historical result, so no
 correctness claim rests on unverified generated code. \emph{As a drafting and
 proofreading aid} for the prose of this report: AI-drafted text was checked
 and edited line by line, and, because unverified numerical claims are a known
