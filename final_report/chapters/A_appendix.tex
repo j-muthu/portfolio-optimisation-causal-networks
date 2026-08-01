@@ -13,9 +13,11 @@ disagree with a quoted increment by one unit in the third decimal.
 
 Table~\ref{tab:matrix-full} gives every cell of the fixed-graph ablation
 (net annualised Sharpe) plus the supporting arms. The GRANGER control's
-scope is deliberately narrow --- one representative allocator per way of
-consuming the graph (skeleton \skelsamp{}, magnitudes \skelsem{}, ordering \orientsamp{}), at the
-one-year window --- since its role is to dissociate ordering from
+scope is deliberately narrow, covering one representative allocator per way
+of
+consuming the graph (skeleton \skelsamp{}, magnitudes \skelsem{}, ordering
+\orientsamp{}) at the
+one-year window, since its role is to dissociate ordering from
 magnitudes, not to serve as a third full arm.
 
 \begin{table}[h]
@@ -163,11 +165,12 @@ Politis--Romano bootstrap, 2000 resamples, mean block 21.
 \section{Reproducibility}
 
 All results derive from committed code and cached data and are
-bit-reproducible: after the data-determinism fix of Section~\ref{sec:cache},
-two independent end-to-end runs produce byte-identical graphs, weights and
+exactly reproducible: after the data-determinism fix of
+Section~\ref{sec:cache},
+two independent end-to-end runs produce identical graphs, weights and
 NAVs, verified by the replication gate (\skelsamp{} vs the prior phase's committed
 bundle: $\Delta$Sharpe $= 0$, max weight difference $= 0.0$ over all 215
-rebalances; re-verified on the four-window grid by a byte-identical repeat
+rebalances; re-verified on the four-window grid by an exact repeat
 of a 378-day cell). The ablation ran on 1{,}684 cache-verified graph fits
 with a 100\% hit rate; each backtest regenerates in ${\approx}40$ seconds
 from the cache.
@@ -185,8 +188,8 @@ report regenerates offline without it.
 four steps, each idempotent against the cache: (1) run the unit-test suite
 (60+ tests, including the orientation-blindness and orientation-sensitivity
 properties of Section~\ref{sec:ablation-design}); (2) run the backtest grid,
-which verifies every graph fit as a cache hit --- a miss halts the run
-rather than silently refitting; (3) rebuild the statistics macros with
+which verifies every graph fit as a cache hit (a miss halts the run
+rather than silently refitting); (3) rebuild the statistics macros with
 \texttt{scripts/robust\_stats.py -{}-phase-ii}; (4) rebuild the figures with
 \texttt{scripts/plot\_phase\_ii\_figures.py} and compile the report.
 \paragraph{Provenance.} Every statistic quoted in the text is either a

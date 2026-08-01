@@ -9,21 +9,23 @@
 This thesis asked one question: when the correlation matrix in
 hierarchical portfolio allocation is replaced by a discovered causal graph,
 how much of the performance gain is attributable to the graph's skeleton
-versus its edge orientations? It made the question answerable by building the
-machinery it presupposes --- a reproducible rolling discovery pipeline that
-delivers a byte-identical asset--asset DAG to every allocator (A1), and an
+versus its edge orientations? It made the question answerable by building
+the
+machinery it presupposes (a reproducible rolling discovery pipeline that
+delivers the identical asset--asset DAG to every allocator, A1, and an
 orientation-aware allocator family with provably orientation-blind skeleton
-and correlation controls (A2, discharging requirement R2) --- and answered
+and correlation controls, A2, discharging requirement R2) and answered
 it under multiplicity-, distribution- and stability-aware inference (A3).
 
-The answer, in two lines: \emph{the causal graph's gain over the
+The answer, in summary: \emph{the causal graph's gain over the
 correlation matrix is stable across estimation horizons, but its source
-shifts --- the skeleton pays only near the conventional one-year window,
+shifts: the skeleton pays only near the conventional one-year window,
 while orientation pays at every horizon, most where sample moments are
-weakest. Orientation buys robustness to the estimation horizon, not level
---- and the decomposition's family-wise support reaches conventional
-significance only at the longest horizons, marginally, exactly where the
-point estimates peak.} In detail (net annualised Sharpe, 2007--2024, monthly
+weakest. Orientation buys robustness to the estimation horizon, not level,
+and the decomposition's family-wise support reaches conventional
+significance only at the longest horizons, marginally, where the
+point estimates also peak.} In detail (net annualised Sharpe, 2007--2024,
+monthly
 rebalancing, 5\,bps costs, windows of 189/252/378/504 trading days):
 
 \begin{enumerate}[itemsep=2pt]
@@ -33,47 +35,56 @@ rebalancing, 5\,bps costs, windows of 189/252/378/504 trading days):
         rising to $+0.036$ for \orientsem{} at two years; 36 of 40
         graph-versus-control cells are positive.
   \item \textbf{Its composition shifts with the window.} The skeleton's
-        rung is hump-shaped --- $-0.003$, $+0.022$, $+0.018$, $+0.009$
-        across the four windows --- while orientation's is positive
-        everywhere and U-shaped: $+0.021$, $+0.009$, $+0.012$, $+0.023$
-        (pairwise $p=0.08$/$0.47$/$0.33$/$0.049$), largest exactly where
-        the sample moments are weakest. Orientation buys \emph{robustness
-        to the estimation horizon}, not level: \skelsem{} ($0.395$--$0.415$) and
-        \orientsem{} ($0.399$--$0.419$) are strong at every window while the
-        skeleton-only allocator spans $0.372$--$0.403$, the increment is
-        invariant to costs up to 20\,bps and to the graph's sparsity
-        threshold, and \orientsem{} and \skelsem{} at the 18-month window attain the two
+        rung is hump-shaped ($-0.003$, $+0.022$, $+0.018$, $+0.009$
+        across the four windows), while orientation's is positive
+        everywhere and U-shaped ($+0.021$, $+0.009$, $+0.012$, $+0.023$;
+        pairwise $p=0.08$/$0.47$/$0.33$/$0.049$), largest where
+        the sample moments are weakest. Orientation buys robustness
+        to the estimation horizon, not level: \skelsem{}
+        ($0.395$--$0.415$) and
+        \orientsem{} ($0.399$--$0.419$) are strong at every window while
+        the
+        skeleton-only allocator spans $0.372$--$0.403$; the increment is
+        invariant, in point estimates, to costs up to 20\,bps and to the
+        graph's sparsity
+        threshold; and \orientsem{} and \skelsem{} at the 18-month window
+        attain the two
         highest Deflated Sharpe ratios of all \rsNtrials\ configurations
         evaluated ($\rsDtwosDSRWthree$, $\rsDoneDSRWthree$).
   \item \textbf{Family-wise support is marginal and confined to the longest
         horizons.} Of the ten SPA runs across four families, Hansen's
         procedure rejects in four: decisively for the causal family against
-        the weak HSP baseline ($p=\rsSpaConsistent$), and marginally ---
-        $p=\rsSpaSkelWthree$--$\rsSpaDirWfive$ --- for the graph family
+        the weak HSP baseline ($p=\rsSpaConsistent$), and marginally
+        ($p=\rsSpaSkelWthree$--$\rsSpaDirWfive$) for the graph family
         against the \HRP{} control at 18 months and two years and for the
         orientation family against the skeleton control at two years,
-        exactly where the point estimates peak. Nothing rejects near the
+        where the point estimates also peak. Nothing rejects near the
         one-year convention, and the marginal rejections leave the window
         axis itself unpriced. The $90\%$
         Model Confidence Set over \rsMcsUniverse\ one-year strategies
         eliminates only the HSP baseline.
-  \item \textbf{The effect is method- and regime-specific.} Under VARLiNGAM
+  \item \textbf{The effect is method- and regime-specific.} Under
+        VARLiNGAM
         graphs orientation adds nothing at any of the four windows; under
         the magnitude-degraded ridge-Granger control the topological
-        \emph{ordering} survives but the SEM-implied covariance collapses ---
-        so the orientation's value lies in trustworthy edge magnitudes, not
-        in the arrows alone. The orientation edge concentrates in calm
+        ordering survives but the SEM-implied covariance collapses, so
+        the orientation's value lies in trustworthy edge magnitudes, not
+        in the arrows alone. Descriptively, the orientation edge
+        concentrates in calm
         (bottom-VIX-quintile) regimes; the stress hypothesis is rejected.
-  \item \textbf{The incumbent driver route is dominated.} HSP-style driver
+  \item \textbf{The incumbent driver route is dominated.} HSP-style
+        driver
         selection is $K$-fragile; its monthly feedback loop is exactly inert
-        across the full hyperparameter grid, and could not learn anyway
-        (reward signal-to-noise ${\approx}\,\rsRewardSNR$ --- the update
-        frequency \emph{is} the measurement problem); and its neural
+        across the full hyperparameter grid, and could not learn in any
+        case
+        (reward signal-to-noise ${\approx}\,\rsRewardSNR$: the update
+        frequency is itself the measurement problem); and its neural
         sensitivity step makes its Sharpe seed-dependent across
-        $[\rsSeedMin,\rsSeedMax]$ over \rsSeedN\ seeds --- a range twice
+        $[\rsSeedMin,\rsSeedMax]$ over \rsSeedN\ seeds, a range twice
         its claimed edge, with the committed value at the $\rsSeedPct$th
         percentile of its own seed distribution. The graph-based allocators
-        are deterministic, and the headline three (\skelsamp{}, \skelsem{}, \orientsem{}) exceed even
+        are deterministic, and the headline three (\skelsamp{},
+        \skelsem{}, \orientsem{}) exceed even
         its luckiest seed.
 \end{enumerate}
 
@@ -81,10 +92,11 @@ rebalancing, 5\,bps costs, windows of 189/252/378/504 trading days):
 \label{sec:contributions}
 
 \begin{itemize}[itemsep=2pt]
-  \item \textbf{Methodological:} the orientation-aware allocator family ---
-        SEM-implied (de-standardised, residual-calibrated)
-        covariance allocation; and causal-ordered bisection, which replaces
-        the clustering dendrogram with the DAG's topological order --- together
+  \item \textbf{Methodological:} the orientation-aware allocator family
+        (SEM-implied, de-standardised, residual-calibrated
+        covariance allocation, and causal-ordered bisection, which replaces
+        the clustering dendrogram with the DAG's topological order),
+        together
         with the fixed-graph ablation design that makes skeleton and
         orientation separately measurable, with provably orientation-blind
         controls. To my knowledge, both the family and the decomposition are
@@ -96,27 +108,29 @@ rebalancing, 5\,bps costs, windows of 189/252/378/504 trading days):
         horizon and largest where sample moments are weakest; family-wise
         support marginal and confined to the longest horizons), its
         method- and
-        regime-dependence, and the finding that textbook HRP beats the HSP
+        regime-dependence, and the finding that textbook HRP outperforms
+        the HSP
         machinery built to improve on it.
-  \item \textbf{Meta-scientific:} a quantified seed audit substantiating the
+  \item \textbf{Meta-scientific:} a quantified seed audit substantiating
+        the
         instability critique of neural sensitivity-based allocation; the
         identification of a monthly feedback loop's measurement problem
         (one ${\sim}95\%$-noise observation per update); and a
-        bit-reproducible pipeline --- including a data-determinism defect
-        whose fix overturned two previously-drawn conclusions --- with
+        reproducible pipeline (including a data-determinism defect
+        whose fix overturned two previously-drawn conclusions), with
         every design extension disclosed as such, all cells
         cache-verified, and the
-        harness gated on a byte-perfect replication of the prior phase's
+        harness gated on an exact replication of the prior phase's
         result.
 \end{itemize}
 
 \section{Limitations}
 \label{sec:limitations}
 
-Stated without hedging. \textbf{(i)} The decomposition's components are
+\textbf{(i)} The decomposition's components are
 $0.01$--$0.03$ Sharpe: near the 18-year detection floor, individually
-non-significant against honest controls, and plausibly underpowered ---
-the point estimates are precise; the inference, where it clears the
+non-significant against the stronger controls, and plausibly underpowered.
+The point estimates are precise; the inference, where it clears the
 family-wise bar, is marginal. \textbf{(ii)} The
 orientation effect exists under one discovery method (DYNOTEARS); until
 another method reproduces it, it should be read as a property of DYNOTEARS'
@@ -139,38 +153,39 @@ $p=0.008$), so the nine-month rungs carry extra estimator uncertainty.
 \section{Broader impact}
 \label{sec:impact}
 
-\paragraph{For investors.} Allocation research is consumed by asset managers
-and pension schemes, so its failures are borne --- diffusely, and years
-later --- by end savers. The characteristic harm in this literature is not a
+\paragraph{For investors.} Allocation research is consumed by asset
+managers
+and pension schemes, so its failures are borne, diffusely and years
+later, by end savers. The characteristic harm in this literature is not a
 malfunctioning system but a convincing backtest of an overfit strategy;
 multiplicity-corrected, family-wise-honest evaluation is therefore not
 methodological decoration but the investor-protection function of research
 method, and this report applies it to its own headline. The same honesty is
 a corrective to what might be called \emph{causal-washing}: a ``causal''
 label invites over-trust, and the finding here is that a causal method's
-value can be modest, window- and method-dependent, and --- at the
-conventional one-year window --- largely attributable to structure that
+value can be modest, window- and method-dependent, and, at the
+conventional one-year window, largely attributable to structure that
 cheap symmetrisation already captures. The label guarantees nothing; the
 decomposition, not the branding, is what carries information.
 
 \paragraph{For the field.} Three of this project's technical choices
 generalise into norms. The seed audit has an uncomfortable reading for
 published neural-pipeline results: an author free to choose among \rsSeedN\
-seeds could have reported $\rsSeedMax$ rather than $\rsSeedMin$ --- an
-entire claimed edge manufactured by one undisclosed decision --- so
+seeds could have reported $\rsSeedMax$ rather than $\rsSeedMin$, an
+entire claimed edge manufactured by one undisclosed decision, so
 deterministic constructions, or disclosed seed distributions, should be the
 default. The measurement problem generalises to any feedback trading
 system: a reward that is ${\sim}95\%$ noise per update cannot teach,
 whatever the learning rule sitting on top of it, and checking reward
-estimability at the design stage would spare the field many dead ends. And
-the determinism episode of Section~\ref{sec:cache} --- two conclusions
-overturned by a reproducibility fix --- argues that bit-reproducibility
+estimability at the design stage would spare the field repeated failures.
+The determinism episode of Section~\ref{sec:cache} (two conclusions
+overturned by a reproducibility fix) argues that reproducibility
 belongs among publication prerequisites rather than aspirations.
 
 \paragraph{Costs.} The content-keyed cache cut the marginal cost of a
 configuration from ${\sim}15$ hours to ${\sim}40$ seconds, which is what
-made an \rsNtrials-configuration study --- and hence its multiplicity
-correction --- affordable at all. The compute and energy economics of
+made an \rsNtrials-configuration study, and hence its multiplicity
+correction, affordable at all. The compute and energy economics of
 caching-first experimental design are a transferable, if unglamorous,
 contribution to sustainable empirical research: rigour and efficiency were
 complements here, not a trade-off.
@@ -190,18 +205,21 @@ observations to average over, and a longer reward window would raise the
 signal-to-noise of each one. Only after one of these changes is any feedback
 rule worth re-testing. \textbf{(3)}
 \textbf{Signed structural allocation.} Equalising risk contributions over
-\emph{structural shock origins} --- where risk enters the causal system ---
+structural shock origins (where risk enters the causal system)
 rather than over correlated returns is the natural next use of
 $\Sigma_{\mathrm{SEM}}$; but exact per-shock parity generally requires
 shorting, so a long--short mandate, not the long-only setting studied here,
 is its natural home. \textbf{(4) Richer universes}, where cross-asset
-causal chains are plausibly longer-lived than among 99 co-moving large-caps
---- multi-asset-class portfolios are where the skeleton/orientation split
-could genuinely differ. \textbf{(5) Orientation-aware risk attribution.} The
-total-effect matrix $B$ supports ex-post decompositions (which shocks drove
-this month's loss?) that the correlation toolkit cannot express ---
-worthwhile even where the allocation gain is modest. The reproducibility
-infrastructure built here --- the deterministic pipeline, the discovery cache
-and the ablation harness --- makes each of these a matter of days, not
-months, of compute; which, as this project found twice, is a prerequisite
+causal chains are plausibly longer-lived than among 99 co-moving
+large-caps:
+multi-asset-class portfolios are where the skeleton/orientation split
+could materially differ. \textbf{(5) Orientation-aware risk attribution.}
+The
+total-effect matrix $B$ supports ex-post decompositions, attributing a
+month's loss to the shocks that drove it, that the correlation toolkit
+cannot express;
+worthwhile even where the allocation gain is modest. The
+infrastructure built here (the deterministic pipeline, the discovery cache
+and the ablation harness) makes each of these a matter of days, not
+months, of compute, which, as this project found twice, is a prerequisite
 for trusting the answers.

@@ -5,16 +5,17 @@
 
 This chapter evaluates (A3, addressing C3). Its structure follows the
 logical order in which Q must be answered. Section~\ref{sec:method} fixes
-how the gain is measured. Section~\ref{sec:r1} tests requirement R1 ---
-whether the causal graph improves on the correlation matrix at all --- and
+how the gain is measured. Section~\ref{sec:r1} tests requirement R1,
+whether the causal graph improves on the correlation matrix at all, and
 disposes of the driver route the project began from.
-Section~\ref{sec:decomposition} presents the decomposition of the gain into
-skeleton and orientation --- the answer to Q --- together with its
+Section~\ref{sec:decomposition} presents the decomposition of the gain
+into
+skeleton and orientation (the answer to Q), together with its
 robustness to the design's free parameters. Section~\ref{sec:believe-rigour}
 subjects every claim to the multiplicity-aware inference battery, and
 Section~\ref{sec:believe} closes with the threats to validity.
 
-\section{How should the gain be measured?}
+\section{Measurement protocol}
 \label{sec:method}
 
 \paragraph{Protocol.} Every configuration runs the identical walk-forward
@@ -35,9 +36,9 @@ is preserved. Because daily returns here are heavily non-normal (excess
 kurtosis ${\approx}\,\rsKurtosis$; Figure~\ref{fig:retdist}) and because this
 project evaluated \rsNtrials\ distinct configurations in total, pairwise
 $p$-values are never taken at face value: every claim is re-adjudicated by
-the battery of Section~\ref{sec:believe-rigour} --- Probabilistic and
+the battery of Section~\ref{sec:believe-rigour}: Probabilistic and
 Deflated Sharpe ratios \cite{bailey2012psr,bailey2014deflated} (the DSR
-deflating against \emph{all} \rsNtrials\ trials), White's Reality Check
+deflating against all \rsNtrials\ trials), White's Reality Check
 \cite{white2000reality}, Hansen's SPA \cite{hansen2005spa} for each
 family-wise comparison, and the $90\%$ Model Confidence Set
 \cite{hansen2011mcs}. Regimes are defined by NBER recession dates and
@@ -49,10 +50,10 @@ driver-route pipeline under \rsSeedN\ different neural-network seeds with
 everything else frozen, measuring how much of its performance is
 initialisation noise (Section~\ref{sec:seed-audit}); the graph-based
 allocators need no
-such audit, being deterministic --- consecutive runs are byte-identical, a
+such audit, being deterministic, a
 property verified by the replication gate
-(Section~\ref{sec:ablation-design}). And every number in this chapter comes
-from the bit-reproducible pipeline of Section~\ref{sec:cache}.
+(Section~\ref{sec:ablation-design}). Every number in this chapter comes
+from the pipeline of Section~\ref{sec:cache}.
 
 \begin{figure}[tbp]
   \centering
@@ -64,8 +65,7 @@ from the bit-reproducible pipeline of Section~\ref{sec:cache}.
   \label{fig:retdist}
 \end{figure}
 
-\section{R1: does the causal graph improve on the correlation matrix at
-all?}
+\section{R1: the causal graph against the correlation matrix}
 \label{sec:r1}
 
 Requirement R1 asks whether there is any gain to decompose. The like-for-like
@@ -75,57 +75,65 @@ earns $\rsCorrSharpeWone$, $\rsCorrSharpe$, $\rsCorrSharpeWthree$ and
 $\rsCorrSharpeWfive$ at the 189-, 252-, 378- and 504-day windows; the best
 graph treatment (\skelsem{}) delivers a total causal-graph gain over it of $+0.018$,
 $+0.031$, $+0.030$ and $+0.032$ respectively ($p=0.43$--$0.12$;
-Table~\ref{tab:decomp}), with \orientsem{} reaching $+0.036$ at two years. Of the 40
-graph-versus-\HRP{} cells --- five graph-consuming allocators, both
-discovery methods, four windows --- 36 are above the control (19 of 20 under
+Table~\ref{tab:decomp}), with \orientsem{} reaching $+0.036$ at two
+years. Of the 40
+graph-versus-\HRP{} cells (five graph-consuming allocators, both
+discovery methods, four windows), 36 are above the control (19 of 20 under
 DYNOTEARS; the single exception is the skeleton-only allocator at the
 nine-month window), a direction-consistency far beyond what independent
-noise would produce, though \emph{no cell is individually significant}. The
-family-wise test (Hansen's SPA, the reported causal-structure family against
+noise would produce, though no cell is individually significant. The
+family-wise test (Hansen's SPA, the reported causal-structure family
+against
 \HRP{}) gives $p=\rsSpaSkelWone$, $\rsSpaSkelWtwo$,
-$\rsSpaSkelWthree$ and $\rsSpaSkelWfive$ across the four windows ---
+$\rsSpaSkelWthree$ and $\rsSpaSkelWfive$ across the four windows,
 strengthening with the horizon and crossing the $5\%$ bar at the two
 longest. R1 is therefore supported directionally at every window and
 family-wise at the longer horizons: the causal graph consistently
 out-performs the correlation matrix by a modest margin, and at 18 months
-and two years that margin survives having the family search priced in ---
-marginally, a size Section~\ref{sec:believe-rigour} weighs.
+and two years that margin survives having the family search priced in,
+marginally, at a size Section~\ref{sec:believe-rigour} weighs.
 
-Two contextual facts sharpen this reading. First, an earlier phase of this
+Two contextual facts inform this reading. First, an earlier phase of this
 project reported the same comparison against the HSP baseline V0
-(correlation-\emph{selected} drivers plus neural sensitivities) and found it
+(correlation-selected drivers plus neural sensitivities) and found it
 strongly significant ($+0.032$, $p<0.001$; family-wise
 $p=\rsSpaConsistent$). The \HRP{} control explains the discrepancy:
-plain correlation-distance HRP itself beats V0 ($\rsCorrSharpe$ vs $0.371$ at
-one year) --- \emph{the HSP driver-and-network machinery subtracts value
-relative to textbook HRP} --- so much of the earlier significance was a
-statement about V0's machinery, not about the correlation matrix. Stating Q
-against the stronger control is the epistemically honest choice, and it
+plain correlation-distance HRP itself beats V0 ($\rsCorrSharpe$ vs $0.371$
+at
+one year), so the HSP driver-and-network machinery subtracts value
+relative to textbook HRP, and much of the earlier significance was a
+statement about V0's machinery rather than about the correlation matrix.
+Stating Q
+against the stronger control is the more conservative choice, and it
 costs the headline its stars.
 
 \paragraph{The driver route is a documented dead end.} The rest of this
 section disposes of the arm the project began from, because its failure
 motivates allocating from the graph directly. Causal driver selection (V1)
 beats V0 only at the data-chosen $K{=}17$ ($+0.010$, $p=0.27$) and the sign
-flips across $K\in\{10,14,20,25\}$ (Figure~\ref{fig:ksens}) --- the edge is
-$K$-fragile, consistent with the calibration finding that zero drivers clear
+flips across $K\in\{10,14,20,25\}$ (Figure~\ref{fig:ksens}): the edge is
+$K$-fragile, consistent with the calibration finding that zero drivers
+clear
 FDR-controlled significance (Section~\ref{sec:selection}). The closed loop
-(V2) is exactly \emph{inert}: across the full
+(V2) is exactly inert: across the full
 $\alpha\in\{0.4,0.6,0.8\}\times\gamma\in\{0.1,0.3,0.5\}$ grid its weights
 equal open-loop V1's at every rebalance (Figure~\ref{fig:grid}), because the
-utility blend can only re-rank drivers \emph{within} the causally-selected
-set. And even where it could act, it could not learn: the monthly reward
-$R[t]$ is a Sharpe ratio estimated from 21 daily observations --- across 215
+utility blend can only re-rank drivers within the causally-selected
+set. Even where it could act, it could not learn: the monthly reward
+$R[t]$ is a Sharpe ratio estimated from 21 daily observations, and across
+215
 rebalances it has mean $\rsRewardMean$ and standard deviation
 $\rsRewardStd$, a per-update signal-to-noise ratio of
-${\approx}\,\rsRewardSNR$. \emph{The update frequency is the measurement
-problem}: a monthly loop receives one number a month that is ${\sim}95\%$
-noise, so no feedback rule at this frequency could extract the signal; a
+${\approx}\,\rsRewardSNR$. The update frequency is itself the measurement
+problem: a monthly loop receives one number a month that is ${\sim}95\%$
+noise, so no feedback rule at this frequency could extract the signal, and
+a
 redesign would have to raise the update frequency (or lengthen the reward
 window) before touching the learning rule. Together with the seed
-instability quantified in Section~\ref{sec:seed-audit}, the driver route is
-dominated on every axis by the deterministic graph route --- which is
-precisely why Q is about the graph.
+instability quantified in Section~\ref{sec:seed-audit}, the driver route
+is
+dominated on every axis by the graph route, which is
+why Q is about the graph.
 
 \begin{figure}[tbp]
   \centering
@@ -143,7 +151,7 @@ precisely why Q is about the graph.
   \includegraphics[width=0.7\textwidth]{figures/feedback_grid.png}
   \caption{The closed loop is inert: V2 net Sharpe across the
     $\alpha\times\gamma$ feedback grid (one-year window) is $0.381$
-    everywhere --- identical to open-loop V1 to four decimals. The feedback
+    everywhere, identical to open-loop V1 to four decimals. The feedback
     can only re-rank within the causally-selected set, and its monthly reward
     has signal-to-noise ${\approx}\,\rsRewardSNR$.}
   \label{fig:grid}
@@ -159,21 +167,22 @@ the two rungs of the decomposition traced across the four estimation
 windows. Figure~\ref{fig:decomp} shows the per-window levels,
 Table~\ref{tab:decomp} the numbers, and Figure~\ref{fig:heatmap} the full
 allocator--method matrix. Three features carry the answer to Q. First, the
-\emph{total} causal-graph gain is stable: $+0.018$ to $+0.032$ (\skelsem{}) at every
+total causal-graph gain is stable: $+0.018$ to $+0.032$ (\skelsem{}) at
+every
 horizon, rising to $+0.036$ for \orientsem{} at two years. Second, the
-\emph{skeleton} rung is hump-shaped --- $-0.003$ at nine months, peaking at
-$+0.022$ at the one-year convention, decaying to $+0.009$ at two years ---
+skeleton rung is hump-shaped ($-0.003$ at nine months, peaking at
+$+0.022$ at the one-year convention, decaying to $+0.009$ at two years) and
 never individually significant ($p \geq 0.14$). Third, the
-\emph{orientation} rung is positive at every window and U-shaped: $+0.021$
-($p=0.08$), $+0.009$ ($p=0.47$), $+0.012$ ($p=0.33$), $+0.023$ ($p=0.049$)
---- largest at the two extremes, smallest exactly where the skeleton peaks,
+orientation rung is positive at every window and U-shaped ($+0.021$ at
+$p=0.08$, $+0.009$ at $p=0.47$, $+0.012$ at $p=0.33$, $+0.023$ at
+$p=0.049$): largest at the two extremes, smallest where the skeleton peaks,
 with 11 of the 12 DYNOTEARS orientation contrasts positive across the grid
 (Figure~\ref{fig:forest}). The two components are roughly complementary,
 which is why the total is flat while its composition shifts. Family-wise,
 Hansen's SPA over the direction-aware variants against their own skeleton
 control gives $p=\rsSpaDirWone$, $\rsSpaDirWtwo$, $\rsSpaDirWthree$ and
-$\rsSpaDirWfive$ across the four windows --- rejecting at the $5\%$ level
-only at two years, exactly where the pairwise effect peaks;
+$\rsSpaDirWfive$ across the four windows, rejecting at the $5\%$ level
+only at two years, where the pairwise effect also peaks;
 Section~\ref{sec:believe-rigour} sizes that rejection.
 
 \begin{figure}[tbp]
@@ -184,7 +193,7 @@ Section~\ref{sec:believe-rigour} sizes that rejection.
     skeleton addition (\skelsamp{} $-$ \HRP{}, hump-shaped) and the
     orientation addition (\skelsem{} $-$ \skelsamp{}, U-shaped, positive throughout) with
     $95\%$ block-bootstrap CIs; the VARLiNGAM orientation series (grey)
-    stays at zero. Right: the same two additions stacked --- the total gain
+    stays at zero. Right: the same two additions stacked. The total gain
     is stable while its composition shifts, orientation contributing most
     where the sample moments feeding the control are weakest.}
   \label{fig:gradient}
@@ -229,8 +238,9 @@ Section~\ref{sec:believe-rigour} sizes that rejection.
   \caption{Net Sharpe by discovery method $\times$ allocator at the four
     windows (boxed column: the symmetrised control \skelsamp{}; panel titles carry
     the \HRP{} baseline). The DYNOTEARS orientation-aware cells (\skelsem{},
-    \orientsem{}) are strong at every window --- \orientsem{} at 378 days (0.419) is the
-    study-wide best --- while the VARLiNGAM rows show no orientation effect
+    \orientsem{}) are strong at every window (\orientsem{} at 378 days,
+    0.419, is the
+    study-wide best), while the VARLiNGAM rows show no orientation effect
     anywhere.}
   \label{fig:heatmap}
 \end{figure}
@@ -248,44 +258,49 @@ Section~\ref{sec:believe-rigour} sizes that rejection.
   \label{fig:forest}
 \end{figure}
 
-\subsection{What is orientation actually buying?}
+\subsection{What orientation contributes}
 
-Not level, but \emph{robustness to the estimation horizon}. The skeleton
+Orientation contributes robustness to the estimation horizon rather than
+level. The skeleton
 allocator's performance is window-fragile ($0.372$--$0.403$ across the four
-windows, and below the control at nine months); \skelsem{} ($0.395$--$0.415$) and
-\orientsem{} ($0.399$--$0.419$) are strong everywhere (Figure~\ref{fig:nav} shows the
-one-year NAV paths). The U-shape of Figure~\ref{fig:gradient} says
-\emph{when} orientation pays, and it is exactly when the sample moments
-feeding the allocator are least reliable: at 189 days the sample covariance
-is estimated from barely $1.9$ observations per asset (noise), at 504 days
-it averages across regimes it should distinguish (staleness), and at the
-one-year sweet spot --- where the estimation literature puts the
-noise--staleness optimum, and where the skeleton's own contribution peaks
---- orientation adds least. $\Sigma_{\mathrm{SEM}}$, built from the
+windows, and below the control at nine months); \skelsem{}
+($0.395$--$0.415$) and
+\orientsem{} ($0.399$--$0.419$) are strong everywhere
+(Figure~\ref{fig:nav} shows the
+one-year NAV paths). The U-shape of Figure~\ref{fig:gradient} indicates
+when orientation pays: when the sample moments
+feeding the allocator are least reliable. At 189 days the sample covariance
+is estimated from barely $1.9$ observations per asset (noise); at 504 days
+it averages across regimes it should distinguish (staleness); and at the
+one-year window, where the estimation literature puts the
+noise--staleness optimum and where the skeleton's own contribution peaks,
+orientation adds least. $\Sigma_{\mathrm{SEM}}$, built from the
 contemporaneous graph and its shock variances, substitutes causal structure
 for sample-moment quality at both ends of that trade-off. On this reading,
 orientation acts as a regulariser of the allocation step rather than a
-source of extra return --- a mechanism that the initial two-window design
-could only suggest (skeleton-carried at one year, orientation-carried at
-two) and that the four-point gradient now supports at every horizon
+source of extra return; the initial two-window design could only suggest
+this mechanism (skeleton-carried at one year, orientation-carried at
+two), and the four-point gradient now supports it at every horizon
 measured.
 
 \paragraph{An alternative explanation, and the evidence against it.} The
-contrast $\skelsem{}-\skelsamp{}$ compares the SEM-implied covariance against
+contrast $\skelsem{}-\skelsamp{}$ compares the SEM-implied covariance
+against
 the sample covariance, and $\Sigma_{\mathrm{SEM}}$ is also a
-\emph{structured} estimator --- fewer effective parameters, shrinkage-like
-in character --- so a sceptic can read the two-year gain as a generic
+structured estimator (fewer effective parameters, shrinkage-like
+in character), so a sceptic could read the two-year gain as a generic
 structured-covariance effect rather than a directional one. Two
-observations push back. First, orientation is \emph{constitutive} of the
+observations argue against this. First, orientation is constitutive of the
 estimator, not a decoration on it: the exact total-effect algebra of
-Section~\ref{sec:sem} exists only because the directed graph is acyclic, so
+Section~\ref{sec:sem} exists only because the directed graph is acyclic,
+so
 there is no orientation-free version of $\Sigma_{\mathrm{SEM}}$ to
 attribute the gain to. Second, and empirically, the identical construction
-on VARLiNGAM graphs --- equally structured, differently oriented --- yields
+on VARLiNGAM graphs (equally structured, differently oriented) yields
 nothing, and its magnitude-degraded GRANGER version collapses (both shown
-in the discovery-method comparison of the next subsection): if generic
+in the discovery-method comparison of the next subsection); if generic
 structure were the mechanism, both should have
-worked. The gain therefore tracks the \emph{content} of the DYNOTEARS
+worked. The gain therefore tracks the content of the DYNOTEARS
 orientations, not the mere presence of structure. A fully dispositive
 control would require a symmetric analogue of $\Sigma_{\mathrm{SEM}}$,
 which the acyclicity requirement rules out; that residual is recorded as a
@@ -297,23 +312,27 @@ limitation rather than argued away.
   \caption{Cumulative net NAV, one-year window: the correlation control, the
     HSP baseline V0, the skeleton \skelsamp{}, the orientation-aware \skelsem{} and \orientsem{}, and
     the driver route V1. All variants absorb the full ${\approx}51\%$ GFC
-    drawdown --- the study concerns relative allocation quality, not
+    drawdown; the study concerns relative allocation quality, not
     drawdown avoidance.}
   \label{fig:nav}
 \end{figure}
 
-\subsection{Is the split robust to the design knobs?}
+\subsection{Robustness to design parameters}
 
 \paragraph{Sparsity ($\tau$).} Thresholding the graph at
-$\tau\in\{0,0.01,0.05,0.10\}$ leaves the treatment flat-to-better (\orientsamp{}:
+$\tau\in\{0,0.01,0.05,0.10\}$ leaves the treatment flat-to-better
+(\orientsamp{}:
 $0.399\to0.402$ at the heaviest threshold) while the
-skeleton control drifts down ($0.403\to0.394$) --- the orientation-aware
-allocators are not artefacts of the regularisation knob.
+skeleton control drifts down ($0.403\to0.394$), so the orientation-aware
+allocators are not artefacts of the regularisation threshold. These sweep
+differences are point estimates; they were not formally tested.
 
 \paragraph{Costs and turnover.} The orientation increment is
-cost-invariant: \skelsem{}$-$\skelsamp{} at two years moves from $+0.022$ to $+0.025$ as
-costs rise from 0 to 20\,bps, because \skelsem{}'s turnover ($0.102$ one-way per
-rebalance) is \emph{below} the control's ($0.112$). Orientation does not win
+cost-invariant in point estimates: \skelsem{}$-$\skelsamp{} at two years
+moves from $+0.022$ to $+0.025$ as
+costs rise from 0 to 20\,bps, because \skelsem{}'s turnover ($0.102$
+one-way per
+rebalance) is below the control's ($0.112$). Orientation does not win
 by trading less, and is not eroded by trading more.
 
 \paragraph{Discovery method.} Under VARLiNGAM graphs the orientation effect
@@ -322,29 +341,35 @@ Figure~\ref{fig:forest}, right, and the grey series of
 Figure~\ref{fig:gradient}). The decomposition is therefore
 \emph{method-dependent}: DYNOTEARS' jointly-optimised, acyclicity-constrained
 $W$ supports orientation-aware allocation where VARLiNGAM's ICA-ordered
-$B_0$ does not --- consistent with VARLiNGAM's identification weakening as
-residuals Gaussianise over longer windows, and, at the nine-month window,
+$B_0$ does not. This is consistent with VARLiNGAM's identification
+weakening as
+residuals Gaussianise over longer windows and, at the nine-month window,
 with its unpruned $B_0$ saturating in the thin-sample regime (density
-$32\%$ against DYNOTEARS' stable $6$--$7\%$; Section~\ref{sec:asset-graph}),
+$32\%$ against DYNOTEARS' stable $6$--$7\%$;
+Section~\ref{sec:asset-graph}),
 so its short-window graphs carry little usable orientation signal either.
-The magnitude-degraded GRANGER control then localises \emph{where inside
-the orientation} the value sits: causal-ordered bisection survives on its
-graphs (\orientsamp{} $=0.393$ vs DYNOTEARS' $0.399$) while the SEM-covariance
+The magnitude-degraded GRANGER control then localises where inside
+the orientation the value sits: causal-ordered bisection survives on its
+graphs (\orientsamp{} $=0.393$ vs DYNOTEARS' $0.399$) while the
+SEM-covariance
 allocator collapses (\skelsem{} $=0.352$; gap $-0.060$,
 $p=0.12$). A ridge-VAR coefficient matrix carries a serviceable
-\emph{ordering} but not structural effect sizes, so the dissociation says
-the orientation rung's value does not lie in merely knowing which way the
-arrows point --- an ordering survives even a one-lag ridge regression ---
+ordering but not structural effect sizes, so the dissociation indicates
+that the orientation rung's value does not lie in merely knowing which way
+the
+arrows point (an ordering survives even a one-lag ridge regression)
 but in edge magnitudes trustworthy enough to propagate shocks, the
 ingredient only the jointly-optimised DYNOTEARS fit supplies. This is a
 refinement of the answer to Q, not a separate benchmark: ``orientation''
 pays through its weighted, propagatable form.
 
 \paragraph{The controls disagree at the shortest window.} At 189 days the
-two orientation-blind symmetrisations diverge: \skelalt{} beats \skelsamp{} by $+0.025$
-($p=0.008$) --- the only $p<0.01$ contrast in the study, and it is
-control-versus-control. The honest reading is that at the shortest window
-the \emph{choice of symmetrisation} matters as much as orientation itself,
+two orientation-blind symmetrisations diverge: \skelalt{} beats
+\skelsamp{} by $+0.025$
+($p=0.008$), the only $p<0.01$ contrast in the study, and a
+control-versus-control comparison. The implication is that at the shortest
+window
+the choice of symmetrisation matters as much as orientation itself,
 so the nine-month skeleton and orientation rungs carry an extra layer of
 estimator uncertainty that the anchored decomposition cannot remove; the
 w189 column is read with that caveat throughout.
@@ -352,28 +377,34 @@ w189 column is read with that caveat throughout.
 \paragraph{Provenance of the window grid.} The 252- and 504-day windows are
 the literature conventions and were run first; the 189- and 378-day windows
 were added afterwards, precisely because a two-point design cannot
-distinguish a crossover from noise. The extension widened a design axis ---
-no allocator was added --- and every cell it produced is reported here and
+distinguish a crossover from noise. The extension widened a design axis
+(no allocator was added), and every cell it produced is reported here and
 priced into the \rsNtrials-trial deflation universe
 (Section~\ref{sec:believe} returns to the forking-paths implications).
 
-\subsection{Where does orientation help --- stress or calm?}
+\subsection{Regime dependence}
 \label{sec:regimes}
 
-The prior-verification result (Section~\ref{sec:discovery-run}) showed edge
-\emph{assignment} matters most in stress windows, motivating the hypothesis
-that orientation-aware allocation would earn its keep in crises. The
-regime-conditional analysis rejects this (Figure~\ref{fig:regime}): at the
+The prior-verification result (Section~\ref{sec:discovery-run}) showed
+edge
+assignment matters most in stress windows, motivating the hypothesis
+that orientation-aware allocation would add most value in crises. The
+regime-conditional analysis contradicts this (Figure~\ref{fig:regime}): at
+the
 one-year window the orientation-aware allocators' edge over V0 concentrates
-in the \emph{bottom} VIX quintile ($+0.22$/$+0.25$ Sharpe for \skelsem{}/\orientsem{}) and is
-approximately zero (\skelsem{}) to negative (\orientsem{}) in the top quintile; in NBER
-recessions the skeleton allocator is the strongest and \skelsem{} adds nothing. A
+in the bottom VIX quintile ($+0.22$/$+0.25$ Sharpe for
+\skelsem{}/\orientsem{}) and is
+approximately zero (\skelsem{}) to negative (\orientsem{}) in the top
+quintile, while in NBER
+recessions the skeleton allocator is the strongest and \skelsem{} adds
+nothing. These regime-conditional figures are descriptive; no formal
+regime-level test was run. A
 plausible reading is that in stress, correlations rise toward one and any
-structure --- causal or correlational --- is swamped by the common factor,
-while in calm markets cross-sectional causal heterogeneity is the signal;
-but whatever the mechanism, the hypothesis as stated was wrong, and is
-reported as such --- an outcome Howard et al.'s stable-regime centrality
-alpha (Section~\ref{sec:howard-theme}) had already hinted at.
+structure, causal or correlational, is swamped by the common factor,
+while in calm markets cross-sectional causal heterogeneity is the signal.
+Whatever the mechanism, the hypothesis as stated was wrong and is
+reported as such, an outcome that Howard et al.'s stable-regime centrality
+alpha (Section~\ref{sec:howard-theme}) had anticipated.
 
 \begin{figure}[tbp]
   \centering
@@ -384,7 +415,7 @@ alpha (Section~\ref{sec:howard-theme}) had already hinted at.
   \label{fig:regime}
 \end{figure}
 
-\section{What survives rigour?}
+\section{Multiplicity-aware adjudication}
 \label{sec:believe-rigour}
 
 % Numbers in this section come from _generated/robust_stats.tex, regenerated
@@ -392,69 +423,73 @@ alpha (Section~\ref{sec:howard-theme}) had already hinted at.
 
 \paragraph{Non-normality and selection bias (PSR/DSR).} Every headline
 allocator's Probabilistic Sharpe ratio (the probability its true Sharpe
-exceeds zero given the sample's higher moments) is high --- \HRP{}
-$\rsCorrPSR$, \skelsamp{} $\rsVprimePSR$, \skelsem{} $\rsDonePSR$ at one year --- so the
-\emph{levels} are not fat-tail artefacts. Deflating against the best Sharpe
-expected from \rsNtrials\ no-skill trials, the two \emph{highest Deflated
-Sharpe ratios in the entire study} belong to the orientation-aware
-allocators at the 18-month window --- \orientsem{} ($\rsDtwosDSRWthree$) and \skelsem{}
-($\rsDoneDSRWthree$), against the control's $\rsCorrDSR$ and the skeleton's
-$\rsVprimeDSR$ --- and orientation-aware cells fill the top of the deflation
+exceeds zero given the sample's higher moments) is high (\HRP{}
+$\rsCorrPSR$, \skelsamp{} $\rsVprimePSR$, \skelsem{} $\rsDonePSR$ at
+one year), so the
+levels are not fat-tail artefacts. Deflating against the best Sharpe
+expected from \rsNtrials\ no-skill trials, the two highest Deflated
+Sharpe ratios in the entire study belong to the orientation-aware
+allocators at the 18-month window, \orientsem{} ($\rsDtwosDSRWthree$) and
+\skelsem{}
+($\rsDoneDSRWthree$) against the control's $\rsCorrDSR$ and the skeleton's
+$\rsVprimeDSR$, and orientation-aware cells fill the top of the deflation
 table across windows. The ordering of the decomposition survives deflation;
 how much of its statistical separation survives is what the family-wise
 tests size next.
 
-\paragraph{Family-wise comparisons (RC/SPA).} Four SPA families --- ten
-test runs in all, each over the family of strategies the report defines ---
+\paragraph{Family-wise comparisons (RC/SPA).} Four SPA families (ten
+test runs in all, each over the family of strategies the report defines)
 adjudicate the claims with the search priced in. \textbf{(i)}
 Causal-structure strategies vs the HSP baseline V0 at one
-year: $p=\rsSpaConsistent$ --- significant, but as Section~\ref{sec:r1}
+year: $p=\rsSpaConsistent$, significant, but as Section~\ref{sec:r1}
 showed, substantially a verdict on V0's machinery. \textbf{(ii)} The same
 family vs the \HRP{} control, per window: $p=\rsSpaSkelWone$,
-$\rsSpaSkelWtwo$, $\rsSpaSkelWthree$, $\rsSpaSkelWfive$ --- tightening
+$\rsSpaSkelWtwo$, $\rsSpaSkelWthree$, $\rsSpaSkelWfive$, tightening
 with the horizon and rejecting at the two longest windows; R1 is
 established family-wise there, marginally, and nowhere else.
 \textbf{(iii)} Orientation-aware variants vs their own
 skeleton control, per window: $p=\rsSpaDirWone$, $\rsSpaDirWtwo$,
-$\rsSpaDirWthree$, $\rsSpaDirWfive$ --- rejecting only at two years,
-exactly where the pairwise orientation effect peaks. \textbf{(iv)} The
-Chapter-\ref{chap:sensitivity} allocator family against V0: $p=\rsSpaDvar$
---- not significant even against the weak anchor. The pattern: four of the
-ten runs reject --- family (i) decisively on the weak incumbent anchor, and
+$\rsSpaDirWthree$, $\rsSpaDirWfive$, rejecting only at two years,
+where the pairwise orientation effect also peaks. \textbf{(iv)} The
+Chapter-\ref{chap:sensitivity} allocator family against V0: $p=\rsSpaDvar$,
+not significant even against the weak anchor. In sum, four of the
+ten runs reject: family (i) decisively on the weak incumbent anchor, and
 three marginal rejections ($p=\rsSpaSkelWthree$--$\rsSpaDirWfive$) at the
-longest horizons of families (ii) and (iii), exactly where the pairwise
+longest horizons of families (ii) and (iii), coinciding with the windows
+where the pairwise
 point estimates peak. Two considerations size the latter: the per-window
 SPA prices the search across strategies but not across the four estimation
 windows, and the rejections sit just under the bar rather than deep beneath
-it. They are therefore read as moderate evidence --- stronger than
-suggestive, short of decisive --- that the causal-structure edge at the
+it. They are therefore read as moderate evidence, stronger than
+suggestive but short of decisive, that the causal-structure edge at the
 longest horizons is real.
 
 \paragraph{The Model Confidence Set.} The $90\%$ MCS over the
 \rsMcsUniverse\ distinct one-year strategies retains \rsMcsSize\ of them,
-eliminating only \rsMcsExcluded. Read correctly, this is a statement about
+eliminating only \rsMcsExcluded. This is best read as a statement about
 power, not a vindication of everything retained: with seventeen highly
 correlated long-only variants whose Sharpes span $0.35$--$0.41$, the
 equivalence test can only discriminate against the strategy that loses
-\emph{consistently} --- the HSP baseline V0. The MCS confirms V0's
-inferiority and otherwise declines to rank the causal family --- including
+consistently, the HSP baseline V0. The MCS confirms V0's
+inferiority and otherwise declines to rank the causal family, including
 declining to separate treatments from controls.
 
 \paragraph{The seed audit.}
 \label{sec:seed-audit}
 Re-running the committed driver-route configuration (V1, one-year window,
-$K{=}17$) under \rsSeedN\ neural-network seeds --- discovery cached, so the
-initialisation is the \emph{only} varying ingredient --- moves its net
+$K{=}17$) under \rsSeedN\ neural-network seeds (discovery cached, so the
+initialisation is the only varying ingredient) moves its net
 Sharpe across $[\rsSeedMin, \rsSeedMax]$ (median $\rsSeedMedian$;
 Figure~\ref{fig:seed}). The range ($\rsSeedRange$) is more than twice the
 $+0.010$ edge the arm claims over its own baseline, and the committed value
-sits at the $\rsSeedPct$th percentile of its own seed distribution --- at
+sits at the $\rsSeedPct$th percentile of its own seed distribution: at
 the unluckiest seed the edge all but vanishes. This quantifies, on this
 pipeline, the concern that neural sensitivity-based results are fragile to
-undisclosed seed choices; and it is the strongest argument for the
-deterministic graph-based family, every member of which sits \emph{above the seed
-cloud's maximum} --- the headline allocators \skelsamp{}, \skelsem{} and \orientsem{} comfortably so
---- and all of which produce byte-identical results on every run.
+undisclosed seed choices, and it is the strongest argument for the
+deterministic graph-based family, every member of which sits above the seed
+cloud's maximum (the headline allocators \skelsamp{}, \skelsem{} and
+\orientsem{} comfortably so)
+and produces identical results on every run.
 
 \begin{figure}[tbp]
   \centering
@@ -468,25 +503,26 @@ cloud's maximum} --- the headline allocators \skelsamp{}, \skelsem{} and \orient
 \end{figure}
 
 \paragraph{Verdict on Q, with uncertainty stated.} The decomposition's
-\emph{point estimates} are clear and internally consistent: a stable total
-gain whose composition shifts with the horizon --- skeleton hump-shaped and
+point estimates are clear and internally consistent: a stable total
+gain whose composition shifts with the horizon (skeleton hump-shaped and
 peaking at the one-year convention, orientation positive at every window
-and largest at the extremes --- with the orientation-aware allocators
-topping the study-wide DSR table. Its \emph{statistical support} is
-moderate and honestly sized: 36 of 40 graph-versus-correlation cells
+and largest at the extremes), with the orientation-aware allocators
+topping the study-wide DSR table. Its statistical support is
+moderate and reported at its estimated size: 36 of 40
+graph-versus-correlation cells
 positive; one pairwise-significant orientation cell among twelve
-($p=0.049$), one suggestive one ($p=0.08$); and family-wise rejections
-confined to the longest horizons --- R1 at 18 months and two years
-($p=\rsSpaSkelWthree$, $\rsSpaSkelWfive$), orientation at two years
-($p=\rsSpaDirWfive$) --- marginal, and exactly where the point estimates
-peak. The largest defensible claim: \emph{if} one
+($p=0.049$) and one suggestive one ($p=0.08$); and family-wise rejections
+confined to the longest horizons (R1 at 18 months and two years,
+$p=\rsSpaSkelWthree$ and $\rsSpaSkelWfive$; orientation at two years,
+$p=\rsSpaDirWfive$), marginal, and coinciding with the peaks of the point
+estimates. The largest defensible claim is conditional: if one
 replaces the correlation matrix with a DYNOTEARS graph, the skeleton pays
 only near the conventional one-year window, while keeping the orientations
 costs nothing, materially improves robustness to the estimation-horizon
 choice, and at the longest horizons delivers an edge that survives
 family-wise correction at its stated, marginal size.
 
-\section{How much should we believe this?}
+\section{Threats to validity}
 \label{sec:believe}
 
 \paragraph{Effect sizes sit near the detection floor.} The decomposition's
@@ -500,8 +536,8 @@ $p=0.049$ cell among twelve orientation contrasts is close to what
 multiplicity predicts under the null, which is why no single cell is
 claimed as a discovery. The U-shape earns its standing not from any single
 cell but from the sign-consistency of the orientation rung across all four
-windows and both anchor allocators --- with the family-wise rejections
-landing exactly where that pattern says they should.
+windows and both anchor allocators, with the family-wise rejections
+landing where that pattern says they should.
 
 \paragraph{Forking-paths risk.} Two of the design's axes were chosen with
 results in view, and both are disclosed. The choice of \emph{question} was
@@ -512,9 +548,9 @@ skeleton-to-orientation inversion) and so carries forking-paths risk of its
 own. Three disciplines bound it: the new windows were run symmetrically
 (every allocator, both methods, all cells reported); the deflation universe
 grew accordingly (all \rsNtrials\ configurations ever evaluated, both
-phases, all windows); and the headline reading --- orientation positive
-everywhere, largest at the extremes --- would have been \emph{weakened},
-and reported as such, had the new windows come back jumbled. The
+phases, all windows); and the headline reading (orientation positive
+everywhere, largest at the extremes) would have been weakened,
+and reported as such, had the new windows come back inconsistent. The
 family-wise rejections inherit part of this risk asymmetrically: the
 strongest (R1 at 378 days, $p=\rsSpaSkelWthree$) sits on an added window,
 while the two-year rejections ($p=\rsSpaSkelWfive$, $\rsSpaDirWfive$) sit
@@ -539,14 +575,16 @@ in markets is allocatively valuable''.
 
 \paragraph{What the evidence supports, and does not.} It supports: the
 graph's consistent, modest improvement over the correlation matrix (36 of
-40 cells); the horizon-dependent composition of that gain --- skeleton
-hump-shaped, orientation U-shaped and positive throughout; the
-regulariser role of orientation; a family-wise edge over honest controls
-at the longest horizons, marginal and read as such; and the dominance of
+40 cells); the horizon-dependent composition of that gain (skeleton
+hump-shaped, orientation U-shaped and positive throughout); the
+regulariser role of orientation; a family-wise edge over the stronger
+controls
+at the longest horizons, marginal and reported as such; and the dominance
+of
 deterministic graph-based allocation over the seed-unstable,
 feedback-inert driver route.
 It does not support: family-wise significance near the one-year
 convention; any orientation effect under VARLiNGAM; or the stress
-hypothesis. That profile --- precise point estimates, with marginal
-family-wise support concentrated exactly where the point estimates say it
-should be --- is the finding.
+hypothesis. That profile, precise point estimates with marginal
+family-wise support concentrated where those estimates say it
+should be, is the finding.
