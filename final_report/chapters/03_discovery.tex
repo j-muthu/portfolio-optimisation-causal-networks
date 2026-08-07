@@ -239,8 +239,8 @@ allocator--method--window cell, plus the sparsity, cost and comparator
 sweeps) ran against 1{,}684 cached graph fits with a verified 100\% hit
 rate and zero refits (a key miss halts the run rather than silently
 refitting a subtly different graph), at ${\approx}40$ seconds per backtest
-instead of ${\approx}15$ hours; extending the window grid from two to four
-horizons cost one overnight populate run rather than weeks. The cache also
+instead of ${\approx}15$ hours; populating a new estimation window costs
+one overnight run rather than weeks. The cache also
 guarantees the ablation's
 premise: allocators cannot see different graphs, because there is exactly
 one graph per (method, window, data) key.
