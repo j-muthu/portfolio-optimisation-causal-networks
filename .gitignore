@@ -4,6 +4,7 @@ __pycache__/
 *.egg-info/
 .venv/
 venv/
+.pytest_cache/
 
 # OS
 .DS_Store
@@ -53,3 +54,18 @@ final_report/main.run.xml
 final_report/main.toc
 final_report/main.lof
 final_report/main.lot
+final_report/main.synctex.gz
+
+# Personal notes / assessment material — not part of the project codebase
+MSc Project Assessment Criteria.md
+key weaknesses.md
+summary_of_workflow.md
+supervisor_checkin_email.md
+
+# Working notes removed from main; still tracked on report branches
+# (tracking overrides ignore, so these entries are inert there).
+FINDINGS.md
+PHASE_II_PLAN.md
+hrp_hsp_notes.md
+marking-criteria-for-report.md
+examiner-precision.bundle
