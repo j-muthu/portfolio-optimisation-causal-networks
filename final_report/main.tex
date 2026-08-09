@@ -76,17 +76,21 @@
 
 \begin{abstract}
 \noindent Hierarchical portfolio allocators cluster assets on a symmetric
-matrix, usually the return correlation matrix, which records co-movement
-but not its direction. Temporal causal discovery
-yields a richer input: a directed acyclic graph, carrying a \emph{skeleton}
-(which pairs are linked) and \emph{edge orientations} (which way influence
-flows); symmetric clustering keeps only the first. The thesis asks:
-\emph{when the correlation matrix in hierarchical portfolio
+matrix, usually the return correlation matrix. This matrix records the co-movement of assets,
+but not which assets' movement precedes (or influences) others.
+Causal discovery algorithms, by contrast, yield information about 
+both which asset pairs are linked and which way influence flows 
+(termed ``skeleton'' and ``edge orientations'', respectively), 
+by producing directed acyclic graphs. The thesis asks:
+when the correlation matrix in hierarchical portfolio
 allocation is replaced by a discovered causal graph, how much of the
 performance gain is attributable to the graph's skeleton versus its edge
-orientations?}
+orientations?
 
-A fixed-graph ablation answers it. At 215 monthly rebalances over
+I answer this question using a fixed-graph ablation: allocators that
+differ only in how much of the graph they can read all receive the
+identical graph, so performance differences isolate exactly that choice.
+At 215 monthly rebalances over
 2007--2024 on the ${\sim}100$ largest S\&P~500 names, one DYNOTEARS
 graph (VARLiNGAM and ridge-Granger as comparators) feeds a graph-blind
 HRP control, a skeleton-only allocator, and three
