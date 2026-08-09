@@ -62,10 +62,11 @@ key weaknesses.md
 summary_of_workflow.md
 supervisor_checkin_email.md
 
-# Working notes removed from main; still tracked on report branches
+# Personal notes removed from main; still tracked on report branches
 # (tracking overrides ignore, so these entries are inert there).
-FINDINGS.md
-PHASE_II_PLAN.md
+# NB: FINDINGS.md, PHASE_II_PLAN.md and the two plan docs stay tracked on main
+# — pipeline/ and scripts/ cite them as the spec they implement.
 hrp_hsp_notes.md
 marking-criteria-for-report.md
 examiner-precision.bundle
+causal-network-representations-in-factor-investing.md
