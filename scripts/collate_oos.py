@@ -1,0 +1,84 @@
+"""Collate the 2025-26 out-of-sample slice (PREDICTIONS_OOS.md).
+
+Reads the ``results/oos_*`` bundles and emits ``results/oos_slice.csv``:
+net annualised Sharpe per cell plus the pre-committed contrasts per
+window (skeleton = D0 - CORR, orientation = D1 - D0, total = D1 - CORR,
+D2s - D0, and the D1 - D0df residual). POINT ESTIMATES ONLY by
+pre-commitment: at ~19 months no bootstrap p-value on this slice is
+evidence in either direction, so none is computed here.
+
+Usage:  python -m scripts.collate_oos
+"""
+from __future__ import annotations
+
+import pickle
+
+import pandas as pd
+
+from pipeline._vendored import THESIS_ROOT
+from pipeline.evaluation.metrics import annualised_sharpe
+
+RESULTS = THESIS_ROOT / "results"
+WINDOWS = (189, 252, 378, 504)
+ALLOCS = ("CORR", "D0", "D0s", "D1", "D2", "D2s", "D0df")
+
+
+def _returns(tag: str) -> pd.Series | None:
+    path = RESULTS / tag / "closed_loop.pkl"
+    if not path.exists():
+        return None
+    with path.open("rb") as fh:
+        bt = pickle.load(fh)["backtest"]
+    nav = pd.Series(bt.nav_net).astype(float)
+    nav.index = pd.to_datetime(nav.index)
+    return nav.sort_index().pct_change().dropna()
+
+
+def main() -> None:
+    rets: dict[tuple[str, int], pd.Series] = {}
+    for w in WINDOWS:
+        for a in ALLOCS:
+            tag = (f"oos_corr_hrp_w{w}" if a == "CORR"
+                   else f"oos_dynotears_{a}_w{w}")
+            r = _returns(tag)
+            if r is not None:
+                rets[(a, w)] = r
+
+    rows = []
+    for (a, w), r in sorted(rets.items(), key=lambda kv: (kv[0][1], kv[0][0])):
+        rows.append({"allocator": a, "window": w, "n_days": len(r),
+                     "sharpe": round(annualised_sharpe(r), 4)})
+    levels = pd.DataFrame(rows)
+
+    def sh(a: str, w: int) -> float | None:
+        r = rets.get((a, w))
+        return annualised_sharpe(r) if r is not None else None
+
+    contrasts = []
+    for w in WINDOWS:
+        pairs = {"skeleton (D0-CORR)": ("D0", "CORR"),
+                 "orientation (D1-D0)": ("D1", "D0"),
+                 "total (D1-CORR)": ("D1", "CORR"),
+                 "D2s-D0": ("D2s", "D0"),
+                 "residual (D1-D0df)": ("D1", "D0df")}
+        for name, (a, b) in pairs.items():
+            sa, sb = sh(a, w), sh(b, w)
+            if sa is not None and sb is not None:
+                contrasts.append({"contrast": name, "window": w,
+                                  "delta_sharpe": round(sa - sb, 4)})
+    cdf = pd.DataFrame(contrasts)
+
+    out = RESULTS / "oos_slice.csv"
+    levels.to_csv(out, index=False)
+    cdf.to_csv(RESULTS / "oos_contrasts.csv", index=False)
+    print("=== OOS levels (net annualised Sharpe, 2025-01..2026-07) ===")
+    print(levels.pivot_table(index="allocator", columns="window",
+                             values="sharpe").to_string(float_format=lambda x: f"{x:.3f}"))
+    print("\n=== OOS contrasts (point estimates only, per PREDICTIONS_OOS.md) ===")
+    print(cdf.pivot_table(index="contrast", columns="window",
+                          values="delta_sharpe").to_string(float_format=lambda x: f"{x:+.3f}"))
+    print(f"\nsaved -> {out} and oos_contrasts.csv")
+
+
+if __name__ == "__main__":
+    main()

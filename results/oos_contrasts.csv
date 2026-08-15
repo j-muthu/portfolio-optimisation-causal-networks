@@ -1,0 +1,21 @@
+contrast,window,delta_sharpe
+skeleton (D0-CORR),189,0.0566
+orientation (D1-D0),189,0.0349
+total (D1-CORR),189,0.0915
+D2s-D0,189,-0.0415
+residual (D1-D0df),189,-0.0114
+skeleton (D0-CORR),252,0.0962
+orientation (D1-D0),252,0.0763
+total (D1-CORR),252,0.1724
+D2s-D0,252,0.0094
+residual (D1-D0df),252,-0.0088
+skeleton (D0-CORR),378,0.1016
+orientation (D1-D0),378,0.1214
+total (D1-CORR),378,0.223
+D2s-D0,378,0.0876
+residual (D1-D0df),378,-0.004
+skeleton (D0-CORR),504,0.1441
+orientation (D1-D0),504,0.0732
+total (D1-CORR),504,0.2173
+D2s-D0,504,0.0946
+residual (D1-D0df),504,0.02
