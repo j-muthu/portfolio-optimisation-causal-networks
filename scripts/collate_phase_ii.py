@@ -37,6 +37,10 @@ METHODS = ("dynotears", "varlingam", "granger")
 ALLOCS = ("D0", "D0s", "D1", "D2", "D2s", "D3", "D4")
 WINDOWS = (189, 252, 378, 504)
 DIRECTION_AWARE = ("D1", "D2", "D2s", "D3", "D4")
+# Mechanism controls (PREDICTIONS_COVARIANCE_CONTROLS.md): direction-free
+# covariances on D0's clustering, DYNOTEARS only. Deliberately NOT in ALLOCS —
+# they must not enter the family contrasts or the best(D*) selection.
+CONTROL_ALLOCS = ("D0lw", "D0df")
 
 PHASE_I = {
     "V0": "phase_i_v0_w{w}",
@@ -95,6 +99,11 @@ def main() -> None:
                 r = _load_returns(f"phase_ii_{m}_{a}_w{w}")
                 if r is not None:
                     rets[(m, a, w)] = r
+    for a in CONTROL_ALLOCS:
+        for w in WINDOWS:
+            r = _load_returns(f"phase_ii_dynotears_{a}_w{w}")
+            if r is not None:
+                rets[("dynotears", a, w)] = r
     comparators: dict[tuple[str, int], pd.Series] = {}
     for name, stem in PHASE_I.items():
         for w in WINDOWS:
@@ -167,6 +176,21 @@ def main() -> None:
             out.append(_contrast(
                 f"GRANGER-DYNO@{best_a}", g_cands[best_a], d_cands[best_a], w, "granger",
             ))
+
+    # 5. Mechanism controls: how much of the D1 − D0 gap does each
+    #    direction-free covariance reproduce, per window?
+    for w in WINDOWS:
+        d0 = rets.get(("dynotears", "D0", w))
+        d1 = rets.get(("dynotears", "D1", w))
+        if d0 is None:
+            continue
+        for a in CONTROL_ALLOCS:
+            r = rets.get(("dynotears", a, w))
+            if r is None:
+                continue
+            out.append(_contrast(f"{a}-D0", r, d0, w, "dynotears"))
+            if d1 is not None:
+                out.append(_contrast(f"D1-{a}", d1, r, w, "dynotears"))
 
     contrasts = pd.DataFrame(out)
     contrasts.to_csv(RESULTS / "phase_ii_contrasts.csv", index=False)

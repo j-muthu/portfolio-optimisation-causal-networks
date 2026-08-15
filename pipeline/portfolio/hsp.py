@@ -45,6 +45,25 @@ def ledoit_wolf_covariance(returns: pd.DataFrame) -> pd.DataFrame:
     return pd.DataFrame(lw.covariance_, index=returns.columns, columns=returns.columns)
 
 
+def defactored_covariance(returns: pd.DataFrame) -> pd.DataFrame:
+    """Single-factor residual covariance: the market factor is the equal-weight
+    cross-sectional mean of the window, each asset is regressed on it, and the
+    covariance of the residuals is returned (same ddof as ``DataFrame.cov``).
+
+    This is the direction-free "de-factoring" control for the Σ_SEM mechanism
+    question (PREDICTIONS_COVARIANCE_CONTROLS.md): it removes the common
+    market component with no graph at all.
+    """
+    rets = returns.dropna()
+    X = rets.to_numpy(dtype=float)
+    X = X - X.mean(axis=0)
+    m = X.mean(axis=1)
+    beta = (X.T @ m) / max(float(m @ m), 1e-300)
+    resid = X - np.outer(m, beta)
+    cov = (resid.T @ resid) / (len(rets) - 1)
+    return pd.DataFrame(cov, index=rets.columns, columns=rets.columns)
+
+
 # ============================================================================
 # HSP weights
 # ============================================================================
@@ -112,6 +131,7 @@ def hsp_weights_from_window(
 __all__ = [
     "sample_covariance",
     "ledoit_wolf_covariance",
+    "defactored_covariance",
     "hsp_weights_from_S",
     "hsp_weights_from_window",
 ]

@@ -1,7 +1,8 @@
 """Integration test: the Phase-II ablation isolates edge direction.
 
 The design claim is that direction is the *sole* treatment variable: the
-control allocators (D0, D0s) must be blind to edge direction, while the
+control allocators (D0, D0s, and the mechanism controls D0lw/D0df) must be
+blind to edge direction, while the
 direction-aware allocators (D1, D2, D2s, D3, D4) must respond to it. The
 sharpest formulation is transpose (in)variance — reversing every edge
 (``M → Mᵀ``) changes nothing the controls can see (the embedding halves
@@ -69,7 +70,7 @@ def test_direction_is_live_d0_vs_d2_differ_on_same_graph():
     assert not np.allclose(w0.to_numpy(), w2.to_numpy())
 
 
-@pytest.mark.parametrize("name", ["D0", "D0s"])
+@pytest.mark.parametrize("name", ["D0", "D0s", "D0lw", "D0df"])
 def test_controls_are_transpose_invariant(name):
     M = _chainlike_dag()
     rets = _returns()

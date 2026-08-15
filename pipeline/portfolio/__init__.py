@@ -35,6 +35,7 @@ from pipeline.portfolio.hrp import (
     recursive_bisection,
 )
 from pipeline.portfolio.hsp import (
+    defactored_covariance,
     hsp_weights_from_S,
     hsp_weights_from_window,
     ledoit_wolf_covariance,
@@ -56,6 +57,7 @@ __all__ = [
     "hsp_weights_from_window",
     "sample_covariance",
     "ledoit_wolf_covariance",
+    "defactored_covariance",
     # Strategy variants
     "v0_vanilla_hsp",
     "v0prime_asset_only_causal_hrp",

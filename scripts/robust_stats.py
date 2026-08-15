@@ -92,12 +92,22 @@ def _all_trial_tags() -> dict[str, str]:
 # check; drop_duplicate_configs removes it before SPA/MCS.
 PHASE_II_ALLOCS = ("D0", "D0s", "D1", "D2", "D2s", "D3", "D4")
 # The allocators the report defines (the 2x2 crossing + the second
-# symmetrisation control). SPA/MCS comparison sets are restricted to these so
-# every family-wise test adjudicates exactly the reported family.
-# PHASE_II_ALLOCS above stays wider: it loads every evaluated bundle so the
-# DSR deflation universe keeps pricing the full search (all trials evaluated,
-# including the exploratory D3/D4 arms).
+# symmetrisation control), a restriction of the pre-registered E1 grid chosen
+# AFTER the four-window results were seen. The battery therefore runs every
+# family-wise test twice: once over the pre-registered family (PHASE_II_ALLOCS,
+# the primary numbers) and once over this reported family (labelled as the
+# narrowed set). PHASE_II_ALLOCS also loads every evaluated bundle so the DSR
+# deflation universe keeps pricing the full search.
 REPORTED_ALLOCS = ("D0", "D0s", "D1", "D2", "D2s")
+# Direction-aware members of each family (candidates vs the D0/V0prime anchor).
+DIRECTION_FAMILY = ("1", "2", "2s")
+DIRECTION_FAMILY_PRE = ("1", "2", "2s", "3", "4")
+# Post-hoc mechanism controls (PREDICTIONS_COVARIANCE_CONTROLS.md): D0's
+# clustering with a Ledoit-Wolf / de-factored covariance, DYNOTEARS only.
+# They join the deflation universe (they are evaluated trials) but belong to
+# NEITHER family-wise comparison set: they diagnose the Σ_SEM mechanism and
+# were introduced after both families were fixed.
+CONTROL_ALLOCS = ("D0lw", "D0df")
 PHASE_II_METHODS = (("dynotears", "DYNO"), ("varlingam", "VARL"))
 # The Phase-II window grid is wider than Phase I's: the skeleton-vs-orientation
 # decomposition is measured as a function of estimation-window length.
@@ -113,6 +123,8 @@ def _phase_ii_tags() -> dict[str, str]:
         for method, short in PHASE_II_METHODS:
             for a in PHASE_II_ALLOCS:
                 tags[f"{short}-{a}_w{w}"] = f"phase_ii_{method}_{a}_w{w}"
+        for a in CONTROL_ALLOCS:            # mechanism controls, DYNOTEARS only
+            tags[f"DYNO-{a}_w{w}"] = f"phase_ii_dynotears_{a}_w{w}"
     for a in ("D0", "D1", "D2", "D3"):      # E2 GRANGER arm (w252 only)
         tags[f"GRAN-{a}_w252"] = f"phase_ii_granger_{a}_w252"
     for tau in ("0.01", "0.05", "0.1"):     # E3 τ sweep (DYNO w252)
@@ -362,54 +374,75 @@ def main(argv: list[str] | None = None) -> None:
     # jointly once the Phase-II arm is on the table".
     mcs_universe = list(headline252)
     spa_phase_ii = None
+    spa_phase_ii_pre = None
     spa_direction: dict[int, dict] = {}
+    spa_direction_pre: dict[int, dict] = {}
     spa_skeleton: dict[int, dict] = {}
+    spa_skeleton_pre: dict[int, dict] = {}
+
+    def _spa_family(bench: str, cands: list[str]) -> dict | None:
+        cands = [c for c in drop_duplicate_configs(returns, [bench] + cands)
+                 if c != bench]
+        if bench in returns.columns and cands:
+            return run_spa(returns, benchmark=bench, candidates=cands)
+        return None
+
     if args.phase_ii:
-        d252 = [c for c in returns.columns
-                if c.startswith(("DYNO-", "VARL-", "GRAN-", "CORR-")) and c.endswith("_w252")
-                and "_tau" not in c
-                # Only the reported family: exploratory D3/D4 arms (incl. the
-                # GRANGER D3 cell) stay in the deflation universe but not in
-                # the family-wise comparison sets.
-                and not any(f"-{a}_" in c for a in ("D3", "D4"))]
-        d252 = drop_duplicate_configs(returns, mcs_universe + d252)
+        def _d252(excluded: tuple[str, ...]) -> list[str]:
+            # The mechanism controls (CONTROL_ALLOCS) are excluded from BOTH
+            # versions: they diagnose the Σ_SEM mechanism and are candidates
+            # of neither family. The GRANGER D3 cell follows its allocator.
+            drop = excluded + CONTROL_ALLOCS
+            return [c for c in returns.columns
+                    if c.startswith(("DYNO-", "VARL-", "GRAN-", "CORR-"))
+                    and c.endswith("_w252") and "_tau" not in c
+                    and not any(f"-{a}_" in c for a in drop)]
+        # Pre-registered E1 family first (the primary numbers), then the
+        # reported family (the post-hoc narrowing the report must label).
+        d252_pre = drop_duplicate_configs(returns, mcs_universe + _d252(()))
+        d_only_pre = [c for c in d252_pre if c not in mcs_universe]
+        if d_only_pre:
+            spa_phase_ii_pre = run_spa(returns, benchmark="V0_w252",
+                                       candidates=d_only_pre)
+        d252 = drop_duplicate_configs(returns, mcs_universe + _d252(("D3", "D4")))
         d_only = [c for c in d252 if c not in mcs_universe]
         if d_only:
             spa_phase_ii = run_spa(returns, benchmark="V0_w252", candidates=d_only)
         mcs_universe = d252
         # The family-wise adjudication of the Phase-II question itself: does
         # ANY direction-aware allocator beat its own symmetrised control D0
-        # (≡ V0prime), per window? This is the fixed-graph direction effect
-        # with the multiplicity of the reported direction-aware family
-        # (D1/D2/D2s, both methods) priced in.
+        # (≡ V0prime), per window? Run over the pre-registered direction-aware
+        # family (D1/D2/D2s/D3/D4, both methods) and the reported one
+        # (D1/D2/D2s).
         # At windows without a Phase-I V0prime bundle the benchmark falls back
         # to DYNO-D0, which replicates V0prime byte-for-byte where both exist.
         for w in PHASE_II_WINDOWS:
             bench = f"V0prime_w{w}"
             if bench not in returns.columns:
                 bench = f"DYNO-D0_w{w}"
-            cands = [c for c in returns.columns
-                     if c.split("_")[0] in {f"{s}-D{v}" for s in ("DYNO", "VARL")
-                                            for v in ("1", "2", "2s")}
-                     and c.endswith(f"_w{w}") and "_tau" not in c]
-            cands = [c for c in drop_duplicate_configs(returns, [bench] + cands)
-                     if c != bench]
-            if bench in returns.columns and cands:
-                spa_direction[w] = run_spa(returns, benchmark=bench, candidates=cands)
-        # R1 family-wise: does ANY causal-structure strategy of the reported
-        # family beat the plain correlation-distance HRP control, per window?
-        # (The skeleton-vs-correlation half of the decomposition.)
+            for fam, out in ((DIRECTION_FAMILY_PRE, spa_direction_pre),
+                             (DIRECTION_FAMILY, spa_direction)):
+                cands = [c for c in returns.columns
+                         if c.split("_")[0] in {f"{s}-D{v}" for s in ("DYNO", "VARL")
+                                                for v in fam}
+                         and c.endswith(f"_w{w}") and "_tau" not in c]
+                res = _spa_family(bench, cands)
+                if res is not None:
+                    out[w] = res
+        # R1 family-wise: does ANY causal-structure strategy beat the plain
+        # correlation-distance HRP control, per window? Again both families.
         for w in PHASE_II_WINDOWS:
             bench = f"CORR-HRP_w{w}"
-            cands = [c for c in returns.columns
-                     if (c.startswith(tuple(f"{s}-{a}_" for s in ("DYNO", "VARL")
-                                            for a in REPORTED_ALLOCS))
-                         or c == f"V0prime_w{w}")
-                     and c.endswith(f"_w{w}") and "_tau" not in c]
-            cands = [c for c in drop_duplicate_configs(returns, [bench] + cands)
-                     if c != bench]
-            if bench in returns.columns and cands:
-                spa_skeleton[w] = run_spa(returns, benchmark=bench, candidates=cands)
+            for fam, out in ((PHASE_II_ALLOCS, spa_skeleton_pre),
+                             (REPORTED_ALLOCS, spa_skeleton)):
+                cands = [c for c in returns.columns
+                         if (c.startswith(tuple(f"{s}-{a}_" for s in ("DYNO", "VARL")
+                                                for a in fam))
+                             or c == f"V0prime_w{w}")
+                         and c.endswith(f"_w{w}") and "_tau" not in c]
+                res = _spa_family(bench, cands)
+                if res is not None:
+                    out[w] = res
     mcs_in, _ = run_mcs(returns, mcs_universe)
     # mark MCS membership on the table (only meaningful for the MCS universe)
     table["in_mcs90"] = [bool(c in mcs_in) if c in mcs_universe else ""
@@ -420,12 +453,18 @@ def main(argv: list[str] | None = None) -> None:
     print("\n=== PSR / DSR by configuration ===")
     print(table.to_string(index=False))
     print(f"\n=== SPA/RC (causal vs V0, w252) ===\n{spa}")
+    if spa_phase_ii_pre is not None:
+        print(f"\n=== SPA/RC (Phase-II D-variants vs V0, w252, PRE-REGISTERED family) ===\n{spa_phase_ii_pre}")
     if spa_phase_ii is not None:
-        print(f"\n=== SPA/RC (Phase-II D-variants vs V0, w252) ===\n{spa_phase_ii}")
+        print(f"\n=== SPA/RC (Phase-II D-variants vs V0, w252, reported family) ===\n{spa_phase_ii}")
+    for w, res in spa_direction_pre.items():
+        print(f"\n=== SPA/RC (direction-aware vs D0/V0prime, w{w}, PRE-REGISTERED family) ===\n{res}")
     for w, res in spa_direction.items():
-        print(f"\n=== SPA/RC (direction-aware vs D0/V0prime, w{w}) ===\n{res}")
+        print(f"\n=== SPA/RC (direction-aware vs D0/V0prime, w{w}, reported family) ===\n{res}")
+    for w, res in spa_skeleton_pre.items():
+        print(f"\n=== SPA/RC (causal structure vs CORR-HRP, w{w}, PRE-REGISTERED family) ===\n{res}")
     for w, res in spa_skeleton.items():
-        print(f"\n=== SPA/RC (causal structure vs CORR-HRP, w{w}) ===\n{res}")
+        print(f"\n=== SPA/RC (causal structure vs CORR-HRP, w{w}, reported family) ===\n{res}")
     print(f"\n=== MCS 90% set (w252 universe, n={len(mcs_universe)}) ===\n{mcs_in}")
 
     # --- measurement problem on the closed loop (V2/V1 w252) ---
@@ -511,18 +550,39 @@ def main(argv: list[str] | None = None) -> None:
         "rsDzeroSharpeWone":   _fmt(cell("DYNO-D0_w189", "sharpe_ann")),
         "rsDzeroSharpeWthree": _fmt(cell("DYNO-D0_w378", "sharpe_ann")),
         "rsDzeroSharpeWfive":  _fmt(cell("DYNO-D0_w504", "sharpe_ann")),
-        # data-snooping battery
+        # mechanism controls (direction-free covariances on D0's clustering)
+        "rsDlwSharpe":       _fmt(cell("DYNO-D0lw_w252", "sharpe_ann")),
+        "rsDlwSharpeWone":   _fmt(cell("DYNO-D0lw_w189", "sharpe_ann")),
+        "rsDlwSharpeWthree": _fmt(cell("DYNO-D0lw_w378", "sharpe_ann")),
+        "rsDlwSharpeWfive":  _fmt(cell("DYNO-D0lw_w504", "sharpe_ann")),
+        "rsDdfSharpe":       _fmt(cell("DYNO-D0df_w252", "sharpe_ann")),
+        "rsDdfSharpeWone":   _fmt(cell("DYNO-D0df_w189", "sharpe_ann")),
+        "rsDdfSharpeWthree": _fmt(cell("DYNO-D0df_w378", "sharpe_ann")),
+        "rsDdfSharpeWfive":  _fmt(cell("DYNO-D0df_w504", "sharpe_ann")),
+        "rsDdfDSRWthree":    _fmt(cell("DYNO-D0df_w378", "dsr")),
+        # data-snooping battery. Unsuffixed macros = the reported (narrowed)
+        # family; the *Pre macros = the pre-registered E1 family, which the
+        # report quotes FIRST wherever a family-wise number appears.
         "rsSpaRC":         _fmt(spa["rc_lower"]),
         "rsSpaConsistent": _fmt(spa["spa_consistent"]),
         "rsSpaDvar":       _fmt(spa_phase_ii["spa_consistent"]) if spa_phase_ii else "--",
+        "rsSpaDvarPre":    _fmt(spa_phase_ii_pre["spa_consistent"]) if spa_phase_ii_pre else "--",
         "rsSpaDirWone":    _fmt(spa_direction[189]["spa_consistent"]) if 189 in spa_direction else "--",
         "rsSpaDirWtwo":    _fmt(spa_direction[252]["spa_consistent"]) if 252 in spa_direction else "--",
         "rsSpaDirWthree":  _fmt(spa_direction[378]["spa_consistent"]) if 378 in spa_direction else "--",
         "rsSpaDirWfive":   _fmt(spa_direction[504]["spa_consistent"]) if 504 in spa_direction else "--",
+        "rsSpaDirWonePre":    _fmt(spa_direction_pre[189]["spa_consistent"]) if 189 in spa_direction_pre else "--",
+        "rsSpaDirWtwoPre":    _fmt(spa_direction_pre[252]["spa_consistent"]) if 252 in spa_direction_pre else "--",
+        "rsSpaDirWthreePre":  _fmt(spa_direction_pre[378]["spa_consistent"]) if 378 in spa_direction_pre else "--",
+        "rsSpaDirWfivePre":   _fmt(spa_direction_pre[504]["spa_consistent"]) if 504 in spa_direction_pre else "--",
         "rsSpaSkelWone":   _fmt(spa_skeleton[189]["spa_consistent"]) if 189 in spa_skeleton else "--",
         "rsSpaSkelWtwo":   _fmt(spa_skeleton[252]["spa_consistent"]) if 252 in spa_skeleton else "--",
         "rsSpaSkelWthree": _fmt(spa_skeleton[378]["spa_consistent"]) if 378 in spa_skeleton else "--",
         "rsSpaSkelWfive":  _fmt(spa_skeleton[504]["spa_consistent"]) if 504 in spa_skeleton else "--",
+        "rsSpaSkelWonePre":   _fmt(spa_skeleton_pre[189]["spa_consistent"]) if 189 in spa_skeleton_pre else "--",
+        "rsSpaSkelWtwoPre":   _fmt(spa_skeleton_pre[252]["spa_consistent"]) if 252 in spa_skeleton_pre else "--",
+        "rsSpaSkelWthreePre": _fmt(spa_skeleton_pre[378]["spa_consistent"]) if 378 in spa_skeleton_pre else "--",
+        "rsSpaSkelWfivePre":  _fmt(spa_skeleton_pre[504]["spa_consistent"]) if 504 in spa_skeleton_pre else "--",
         "rsMcsSize":       str(len(mcs_in)),
         "rsMcsUniverse":   str(len(mcs_universe)),
         "rsMcsExcluded":   pretty_excluded,

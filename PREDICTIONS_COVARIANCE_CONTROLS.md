@@ -92,3 +92,29 @@ slightly above D0 at the short window (shrinkage helps most when N ≈ T)
 and near D0 at one year; if instead D0lw ≫ D0 everywhere, the study's
 use of the plain sample covariance in all Phase-II anchors becomes a
 limitation worth its own sentence.
+
+---
+
+## Outcome (recorded after the runs, 2026-08-15, same day)
+
+Everything above this line is unchanged from the pre-run commit.
+
+Net Sharpe at 189/252/378/504 days: D0 0.387/0.403/0.403/0.372;
+D1 0.408/0.411/0.415/0.395; D0lw 0.384/0.394/0.383/0.353;
+D0df 0.405/0.408/0.416/0.406.
+
+* Shrinkage account: FAILS. D0lw sits below D0 at every window;
+  D1 − D0lw = +0.018 to +0.042, p = 0.035 at two years.
+* De-factoring account: SUCCEEDS. D0df reproduces the D1 − D0 gap at
+  every window; residual D1 − D0df = −0.011 to +0.004, p ≥ 0.51
+  throughout. Gap-closure rho ≥ 0.6 at all four windows, ≥ 1 at the
+  two longest.
+
+Interpretation 3 applies, as pre-committed: the covariance-channel gain
+is not attributed to directional content; the operative ingredient of
+Σ_SEM is its independent-shock assumption (market-factor removal),
+which needs no graph. The report's mechanism paragraph, headline
+summaries, abstract and limitations were revised accordingly. The
+ancillary prediction was also wrong in an informative way: Ledoit-Wolf
+shrinkage HURTS this allocator at every window, so the sample
+covariance was not the weak link.

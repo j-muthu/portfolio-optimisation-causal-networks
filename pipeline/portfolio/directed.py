@@ -51,7 +51,11 @@ from pipeline.portfolio._old_v123 import (
     symmetrise_distance,
 )
 from pipeline.portfolio.hrp import hrp_weights
-from pipeline.portfolio.hsp import sample_covariance
+from pipeline.portfolio.hsp import (
+    defactored_covariance,
+    ledoit_wolf_covariance,
+    sample_covariance,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -257,6 +261,37 @@ def d0s_weights(
     )
 
 
+def d0lw_weights(
+    graph: AssetGraphWindow,
+    returns_window: pd.DataFrame,
+    linkage_method: str = "single",
+) -> pd.Series:
+    """D0lw — D0's clustering with a Ledoit-Wolf shrunk covariance. A
+    direction-free mechanism control (PREDICTIONS_COVARIANCE_CONTROLS.md):
+    if generic shrinkage explains the D1 − D0 gap, this closes it with no
+    directional content. Outside both SPA families by construction."""
+    rets = returns_window[list(graph.asset_names)].dropna()
+    return _hrp_from_distance(
+        causal_embedding_distance(graph.M), graph,
+        ledoit_wolf_covariance(rets), linkage_method,
+    )
+
+
+def d0df_weights(
+    graph: AssetGraphWindow,
+    returns_window: pd.DataFrame,
+    linkage_method: str = "single",
+) -> pd.Series:
+    """D0df — D0's clustering with a single-factor residual (de-factored)
+    covariance. The second mechanism control: if stripping the market factor
+    explains the D1 − D0 gap, this closes it with no directional content."""
+    rets = returns_window[list(graph.asset_names)].dropna()
+    return _hrp_from_distance(
+        causal_embedding_distance(graph.M), graph,
+        defactored_covariance(rets), linkage_method,
+    )
+
+
 def d1_weights(
     graph: AssetGraphWindow,
     returns_window: pd.DataFrame,
@@ -304,7 +339,7 @@ def d4_coancestry_weights(
 # ============================================================================
 # Dispatch (the runner's single entry point)
 # ============================================================================
-ALLOCATORS = ("CORR", "D0", "D0s", "D1", "D2", "D2s", "D3", "D4")
+ALLOCATORS = ("CORR", "D0", "D0s", "D0lw", "D0df", "D1", "D2", "D2s", "D3", "D4")
 
 
 def dispatch_allocator(
@@ -327,6 +362,8 @@ def dispatch_allocator(
         "CORR": corr_hrp_weights,
         "D0": d0_weights,
         "D0s": d0s_weights,
+        "D0lw": d0lw_weights,
+        "D0df": d0df_weights,
         "D1": d1_weights,
         "D3": d3_srp_weights,
         "D4": d4_coancestry_weights,
@@ -343,6 +380,8 @@ __all__ = [
     "dispatch_allocator",
     "d0_weights",
     "d0s_weights",
+    "d0lw_weights",
+    "d0df_weights",
     "d1_weights",
     "d3_srp_weights",
     "d4_coancestry_weights",
