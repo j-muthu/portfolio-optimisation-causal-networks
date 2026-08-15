@@ -94,6 +94,12 @@ def main(argv: list[str] | None = None) -> None:
         # The plain correlation-distance HRP control is graph-blind, so it is
         # method-independent: one tag regardless of --method.
         tag = f"phase_ii_corr_hrp_w{args.window}"
+    elif args.allocator in ("EW", "IVP"):
+        # Naive anchors are graph-blind and method-independent too.
+        tag = f"phase_ii_{args.allocator.lower()}_w{args.window}"
+    elif args.allocator == "HERCC":
+        # The correlation-distance HERC control is graph-blind as well.
+        tag = f"phase_ii_herc_corr_w{args.window}"
     else:
         tag = f"phase_ii_{args.method}_{args.allocator}_w{args.window}"
     if args.tau > 0.0:

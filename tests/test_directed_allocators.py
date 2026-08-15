@@ -210,3 +210,50 @@ def test_d4_identical_ancestry_gives_zero_distance_pair():
     rets = _returns(g.asset_names, seed=9)
     w = dispatch_allocator("D4", g, rets)
     assert w.sum() == pytest.approx(1.0, abs=1e-9)
+
+
+# ============================================================================
+# HERC family (second family member; PREDICTIONS_HERC.md)
+# ============================================================================
+def test_herc_budgets_conserved_and_tree_read():
+    """HERC weights sum to 1, are long-only, and differ generically from
+    HRP's on the same (distance, covariance) pair — the tree-reading rule
+    is a real degree of freedom, not a relabelling."""
+    N = 12
+    g = _graph(_random_dag(N, seed=41))
+    rets = _returns(g.asset_names, seed=11)
+    w_herc = dispatch_allocator("HERC0", g, rets)
+    w_hrp = dispatch_allocator("D0", g, rets)
+    assert w_herc.sum() == pytest.approx(1.0, abs=1e-9)
+    assert np.all(w_herc.to_numpy() >= -1e-12)
+    assert not np.allclose(w_herc.to_numpy(), w_hrp.to_numpy())
+
+
+def test_herc0_is_orientation_blind():
+    """HERC0 must be invariant to transposing every edge (the same
+    orientation-blindness property D0 carries: the embedding distance is
+    permutation-of-coordinates invariant under transpose)."""
+    N = 10
+    M = _random_dag(N, seed=53)
+    rets = _returns([f"A{i}" for i in range(N)], seed=29)
+    w_fwd = dispatch_allocator("HERC0", _graph(M), rets)
+    w_rev = dispatch_allocator("HERC0", _graph(M.T, is_dag=True), rets)
+    pd.testing.assert_series_equal(w_fwd, w_rev)
+
+
+def test_hercc_is_graph_blind():
+    rets = _returns([f"A{i}" for i in range(8)], seed=17)
+    w_a = dispatch_allocator("HERCC", _graph(_random_dag(8, seed=1)), rets)
+    w_b = dispatch_allocator("HERCC", _graph(_random_dag(8, seed=2)), rets)
+    pd.testing.assert_series_equal(w_a, w_b)
+
+
+def test_herc1_is_orientation_sensitive():
+    """HERC1 allocates on Σ_struct, so transposing the edges must change
+    its weights generically (the orientation-sensitivity counterpart)."""
+    N = 10
+    M = _random_dag(N, seed=53)
+    rets = _returns([f"A{i}" for i in range(N)], seed=29)
+    w_fwd = dispatch_allocator("HERC1", _graph(M), rets)
+    w_rev = dispatch_allocator("HERC1", _graph(M.T), rets)
+    assert not np.allclose(w_fwd.to_numpy(), w_rev.to_numpy())

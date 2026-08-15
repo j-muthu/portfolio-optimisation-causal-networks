@@ -50,7 +50,7 @@ from pipeline.portfolio._old_v123 import (
     nearest_psd,
     symmetrise_distance,
 )
-from pipeline.portfolio.hrp import hrp_weights
+from pipeline.portfolio.hrp import herc_weights, hrp_weights
 from pipeline.portfolio.hsp import (
     defactored_covariance,
     ledoit_wolf_covariance,
@@ -292,6 +292,114 @@ def d0df_weights(
     )
 
 
+def _herc_from_distance(
+    dist_arr: np.ndarray,
+    graph: AssetGraphWindow,
+    covariance: pd.DataFrame,
+    linkage_method: str,
+) -> pd.Series:
+    """House pattern for the HERC family: nearest-PSD the distance, then
+    HERC (mirrors ``_hrp_from_distance``)."""
+    dist_arr = nearest_psd(dist_arr)
+    D = pd.DataFrame(dist_arr, index=graph.asset_names, columns=graph.asset_names)
+    return herc_weights(D, covariance, linkage_method=linkage_method)
+
+
+def hercc_weights(
+    graph: AssetGraphWindow,
+    returns_window: pd.DataFrame,
+    linkage_method: str = "single",
+) -> pd.Series:
+    """HERCC — correlation-distance HERC: the graph-blind control of the
+    second family member (PREDICTIONS_HERC.md). Same relationship to
+    ​CORR as HERC0 has to D0: only the allocator's tree-reading rule
+    differs from the HRP family."""
+    rets = returns_window[list(graph.asset_names)].dropna()
+    corr = rets.corr().to_numpy()
+    return _herc_from_distance(
+        correlation_distance(corr), graph, sample_covariance(rets), linkage_method,
+    )
+
+
+def herc0_weights(
+    graph: AssetGraphWindow,
+    returns_window: pd.DataFrame,
+    linkage_method: str = "single",
+) -> pd.Series:
+    """HERC0 — embedding-distance HERC + sample cov (the skeleton member:
+    D0's distance, HERC's tree-reading rule)."""
+    return _herc_from_distance(
+        causal_embedding_distance(graph.M), graph,
+        _sample_cov(graph, returns_window), linkage_method,
+    )
+
+
+def herc1_weights(
+    graph: AssetGraphWindow,
+    returns_window: pd.DataFrame,
+    linkage_method: str = "single",
+) -> pd.Series:
+    """HERC1 — embedding-distance HERC on Σ_struct (the orientation member:
+    D1's covariance, HERC's tree-reading rule)."""
+    return _herc_from_distance(
+        causal_embedding_distance(graph.M), graph,
+        structural_covariance_v2(graph), linkage_method,
+    )
+
+
+def d0pc_weights(
+    graph: AssetGraphWindow,
+    returns_window: pd.DataFrame,
+    linkage_method: str = "single",
+) -> pd.Series:
+    """D0pc — graph-free skeleton control (PREDICTIONS_SKELETON_CONTROL.md).
+
+    D0's construction with the discovered skeleton replaced by a thresholded
+    partial-correlation matrix: Ledoit-Wolf covariance on the window,
+    inverted to a precision, converted to partial correlations, largest-|rho|
+    cells kept, density-matched by nonzero-cell count to the paired
+    discovered graph (which enters only through that scalar). Same embedding
+    distance and sample covariance as D0; no causal discovery anywhere.
+    Outside both SPA families by construction, like D0lw/D0df."""
+    rets = returns_window[list(graph.asset_names)].dropna()
+    theta = np.linalg.inv(ledoit_wolf_covariance(rets).to_numpy())
+    d = np.sqrt(np.diag(theta))
+    pc = -theta / np.outer(d, d)
+    np.fill_diagonal(pc, 0.0)
+    nnz = int(np.count_nonzero(graph.M))
+    flat = np.sort(np.abs(pc).ravel())
+    if 0 < nnz < flat.size:
+        kth = flat[-nnz]
+        pc = np.where(np.abs(pc) >= kth, pc, 0.0)
+    return _hrp_from_distance(
+        causal_embedding_distance(pc), graph,
+        _sample_cov(graph, returns_window), linkage_method,
+    )
+
+
+def ew_weights(
+    graph: AssetGraphWindow,
+    returns_window: pd.DataFrame,
+    linkage_method: str = "single",
+) -> pd.Series:
+    """EW — 1/N over the graph's asset set (naive anchor; graph and window
+    unused). PREDICTIONS_SKELETON_CONTROL.md; anchors, not treatments."""
+    names = list(graph.asset_names)
+    return pd.Series(1.0 / len(names), index=names)
+
+
+def ivp_weights(
+    graph: AssetGraphWindow,
+    returns_window: pd.DataFrame,
+    linkage_method: str = "single",
+) -> pd.Series:
+    """IVP — inverse-variance weights on the window's sample variances
+    (risk-based naive anchor; graph unused)."""
+    rets = returns_window[list(graph.asset_names)].dropna()
+    iv = 1.0 / rets.var().to_numpy(dtype=float)
+    return pd.Series(iv / iv.sum(), index=list(graph.asset_names))
+
+
 def d1_weights(
     graph: AssetGraphWindow,
     returns_window: pd.DataFrame,
@@ -339,7 +447,9 @@ def d4_coancestry_weights(
 # ============================================================================
 # Dispatch (the runner's single entry point)
 # ============================================================================
-ALLOCATORS = ("CORR", "D0", "D0s", "D0lw", "D0df", "D1", "D2", "D2s", "D3", "D4")
+ALLOCATORS = ("CORR", "D0", "D0s", "D0lw", "D0df", "D0pc", "EW", "IVP",
+              "HERCC", "HERC0", "HERC1",
+              "D1", "D2", "D2s", "D3", "D4")
 
 
 def dispatch_allocator(
@@ -364,6 +474,12 @@ def dispatch_allocator(
         "D0s": d0s_weights,
         "D0lw": d0lw_weights,
         "D0df": d0df_weights,
+        "D0pc": d0pc_weights,
+        "EW": ew_weights,
+        "IVP": ivp_weights,
+        "HERCC": hercc_weights,
+        "HERC0": herc0_weights,
+        "HERC1": herc1_weights,
         "D1": d1_weights,
         "D3": d3_srp_weights,
         "D4": d4_coancestry_weights,

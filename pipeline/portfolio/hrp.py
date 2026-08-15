@@ -133,8 +133,75 @@ def hrp_weights(
     return pd.Series(weights, index=assets, name="weight")
 
 
+# ============================================================================
+# HERC (Raffinot 2018), full-recursion variant
+# ============================================================================
+def herc_weights(
+    distance: pd.DataFrame,
+    covariance: pd.DataFrame,
+    linkage_method: str = "single",
+) -> pd.Series:
+    """Hierarchical Equal Risk Contribution weights (full-recursion variant).
+
+    Same clustering stage as :func:`hrp_weights` (same distance input, same
+    linkage), but the allocation stage walks the dendrogram's ACTUAL
+    topology top-down: at every internal node the budget splits between the
+    two child clusters in inverse proportion to their inverse-variance
+    portfolio variances (the same cluster-risk measure HRP's bisection
+    uses), recursing until every leaf carries its budget. This is the
+    dendrogram-topology counterpart of HRP's recursive bisection, which
+    reads the tree only through the quasi-diagonal leaf ordering — exactly
+    the interface property the allocator family varies. Raffinot's original
+    HERC additionally cuts the tree at an optimal cluster count and offers
+    other risk measures; this variant fixes full recursion and
+    inverse-cluster-variance splits so the only change from HRP is *how*
+    the tree is read.
+    """
+    from scipy.cluster.hierarchy import linkage as scipy_linkage
+    from scipy.spatial.distance import squareform
+
+    if list(distance.index) != list(covariance.index):
+        raise ValueError("distance and covariance must share the same asset ordering")
+    assets = list(distance.index)
+    N = len(assets)
+
+    dist_arr = distance.to_numpy()
+    dist_arr = (dist_arr + dist_arr.T) / 2.0
+    np.fill_diagonal(dist_arr, 0.0)
+    condensed = squareform(dist_arr, checks=False)
+    tree = scipy_linkage(condensed, method=linkage_method).astype(int)
+
+    cov = covariance.to_numpy()
+
+    # leaves(node): leaf ids < N; internal node N+j has children tree[j, 0:2].
+    def leaves(node: int) -> list[int]:
+        if node < N:
+            return [node]
+        j = node - N
+        return leaves(int(tree[j, 0])) + leaves(int(tree[j, 1]))
+
+    weights = np.zeros(N)
+
+    def descend(node: int, budget: float) -> None:
+        if node < N:
+            weights[node] = budget
+            return
+        j = node - N
+        left, right = int(tree[j, 0]), int(tree[j, 1])
+        v_left = _cluster_variance(cov, leaves(left))
+        v_right = _cluster_variance(cov, leaves(right))
+        alpha = 1.0 - v_left / max(v_left + v_right, 1e-18)
+        descend(left, budget * alpha)
+        descend(right, budget * (1.0 - alpha))
+
+    descend(N + tree.shape[0] - 1, 1.0)   # root
+    weights = weights / weights.sum()
+    return pd.Series(weights, index=assets, name="weight")
+
+
 __all__ = [
     "quasi_diagonal_order",
     "recursive_bisection",
     "hrp_weights",
+    "herc_weights",
 ]
