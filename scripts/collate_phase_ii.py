@@ -1,4 +1,4 @@
-"""Phase-II collation — headline matrix + the four pre-registered contrasts.
+"""Phase-II collation — headline matrix + the four pre-specified contrasts.
 
 Reads every ``results/phase_ii_*`` bundle plus the Phase-I comparators and
 emits:
@@ -7,7 +7,7 @@ emits:
   CAGR, max drawdown, mean one-way turnover, final NAV.
 * ``results/phase_ii_contrasts.csv`` — the §2-E1 contrasts with
   Politis–Romano stationary-block-bootstrap ΔSharpe CIs and p-values
-  (2000 resamples, block 21 — identical to the Phase-I protocol):
+  (10000 resamples, mean block 21):
 
   1. ``D{X} − D0`` per (method, window) — the direction effect, fixed graph.
   2. ``D0 − V0`` — replication of the Phase-I V0′-beats-correlation result
@@ -32,15 +32,29 @@ from pipeline.evaluation.bootstrap import sharpe_difference_ci
 from pipeline.evaluation.metrics import annualised_sharpe
 
 RESULTS = THESIS_ROOT / "results"
-N_RESAMPLES = 2000
+N_RESAMPLES = 10000
 METHODS = ("dynotears", "varlingam", "granger")
 ALLOCS = ("D0", "D0s", "D1", "D2", "D2s", "D3", "D4")
 WINDOWS = (189, 252, 378, 504)
 DIRECTION_AWARE = ("D1", "D2", "D2s", "D3", "D4")
-# Mechanism controls (PREDICTIONS_COVARIANCE_CONTROLS.md): direction-free
-# covariances on D0's clustering, DYNOTEARS only. Deliberately NOT in ALLOCS —
-# they must not enter the family contrasts or the best(D*) selection.
-CONTROL_ALLOCS = ("D0lw", "D0df")
+# Mechanism controls (PREDICTIONS_COVARIANCE_CONTROLS.md and
+# PREDICTIONS_SKELETON_CONTROL.md): direction-free covariances on D0's
+# clustering plus the graph-free partial-correlation skeleton, DYNOTEARS
+# only. Deliberately NOT in ALLOCS — they must not enter the family
+# contrasts or the best(D*) selection.
+CONTROL_ALLOCS = ("D0lw", "D0df", "D0pc")
+# Naive anchors (graph-blind, method-independent): levels only, no family.
+ANCHORS = {
+    "EW": "phase_ii_ew_w{w}",
+    "IVP": "phase_ii_ivp_w{w}",
+}
+# HERC second family member (PREDICTIONS_HERC.md): its own control and two
+# graph cells, DYNOTEARS only; outside both SPA families by pre-commitment.
+HERC = {
+    "HERCC": "phase_ii_herc_corr_w{w}",
+    "HERC0": "phase_ii_dynotears_HERC0_w{w}",
+    "HERC1": "phase_ii_dynotears_HERC1_w{w}",
+}
 
 PHASE_I = {
     "V0": "phase_i_v0_w{w}",
@@ -110,6 +124,18 @@ def main() -> None:
             r = _load_returns(stem.format(w=w))
             if r is not None:
                 comparators[(name, w)] = r
+    anchors: dict[tuple[str, int], pd.Series] = {}
+    for name, stem in ANCHORS.items():
+        for w in WINDOWS:
+            r = _load_returns(stem.format(w=w))
+            if r is not None:
+                anchors[(name, w)] = r
+    herc: dict[tuple[str, int], pd.Series] = {}
+    for name, stem in HERC.items():
+        for w in WINDOWS:
+            r = _load_returns(stem.format(w=w))
+            if r is not None:
+                herc[(name, w)] = r
 
     # ------------------------------------------------------------------
     # Matrix
@@ -119,6 +145,10 @@ def main() -> None:
         rows.append({"method": m, "allocator": a, "window": w, **_metrics_row(r)})
     for (name, w), r in sorted(comparators.items()):
         rows.append({"method": "phase_i", "allocator": name, "window": w, **_metrics_row(r)})
+    for (name, w), r in sorted(anchors.items()):
+        rows.append({"method": "anchor", "allocator": name, "window": w, **_metrics_row(r)})
+    for (name, w), r in sorted(herc.items()):
+        rows.append({"method": "herc", "allocator": name, "window": w, **_metrics_row(r)})
     matrix = pd.DataFrame(rows)
     matrix.to_csv(RESULTS / "phase_ii_matrix.csv", index=False)
     print("=== phase_ii_matrix.csv ===")
@@ -191,6 +221,23 @@ def main() -> None:
             out.append(_contrast(f"{a}-D0", r, d0, w, "dynotears"))
             if d1 is not None:
                 out.append(_contrast(f"D1-{a}", d1, r, w, "dynotears"))
+        # Skeleton-channel control (PREDICTIONS_SKELETON_CONTROL.md): does
+        # the graph-free partial-correlation skeleton reproduce D0's gain
+        # over the correlation control?
+        pc = rets.get(("dynotears", "D0pc", w))
+        corr = comparators.get(("CORR-HRP", w))
+        if pc is not None and corr is not None:
+            out.append(_contrast("D0pc-CORR", pc, corr, w, "dynotears"))
+
+    # 6. HERC second family member (PREDICTIONS_HERC.md): the two channels
+    #    on the second tree-reading rule, mirroring D0-CORR and D1-D0.
+    for w in WINDOWS:
+        hc, h0, h1 = (herc.get(("HERCC", w)), herc.get(("HERC0", w)),
+                      herc.get(("HERC1", w)))
+        if hc is not None and h0 is not None:
+            out.append(_contrast("HERC0-HERCC", h0, hc, w, "herc"))
+        if h0 is not None and h1 is not None:
+            out.append(_contrast("HERC1-HERC0", h1, h0, w, "herc"))
 
     contrasts = pd.DataFrame(out)
     contrasts.to_csv(RESULTS / "phase_ii_contrasts.csv", index=False)

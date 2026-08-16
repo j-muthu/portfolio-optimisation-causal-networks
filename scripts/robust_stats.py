@@ -92,9 +92,9 @@ def _all_trial_tags() -> dict[str, str]:
 # check; drop_duplicate_configs removes it before SPA/MCS.
 PHASE_II_ALLOCS = ("D0", "D0s", "D1", "D2", "D2s", "D3", "D4")
 # The allocators the report defines (the 2x2 crossing + the second
-# symmetrisation control), a restriction of the pre-registered E1 grid chosen
+# symmetrisation control), a restriction of the pre-specified E1 grid chosen
 # AFTER the four-window results were seen. The battery therefore runs every
-# family-wise test twice: once over the pre-registered family (PHASE_II_ALLOCS,
+# family-wise test twice: once over the pre-specified family (PHASE_II_ALLOCS,
 # the primary numbers) and once over this reported family (labelled as the
 # narrowed set). PHASE_II_ALLOCS also loads every evaluated bundle so the DSR
 # deflation universe keeps pricing the full search.
@@ -102,12 +102,23 @@ REPORTED_ALLOCS = ("D0", "D0s", "D1", "D2", "D2s")
 # Direction-aware members of each family (candidates vs the D0/V0prime anchor).
 DIRECTION_FAMILY = ("1", "2", "2s")
 DIRECTION_FAMILY_PRE = ("1", "2", "2s", "3", "4")
-# Post-hoc mechanism controls (PREDICTIONS_COVARIANCE_CONTROLS.md): D0's
-# clustering with a Ledoit-Wolf / de-factored covariance, DYNOTEARS only.
+# Post-hoc mechanism controls (PREDICTIONS_COVARIANCE_CONTROLS.md and
+# PREDICTIONS_SKELETON_CONTROL.md): D0's clustering with a Ledoit-Wolf /
+# de-factored covariance, and the graph-free partial-correlation skeleton,
+# DYNOTEARS only.
 # They join the deflation universe (they are evaluated trials) but belong to
-# NEITHER family-wise comparison set: they diagnose the Σ_SEM mechanism and
+# NEITHER family-wise comparison set: they diagnose the mechanisms and
 # were introduced after both families were fixed.
-CONTROL_ALLOCS = ("D0lw", "D0df")
+CONTROL_ALLOCS = ("D0lw", "D0df", "D0pc")
+# Naive anchors (graph-blind, method-independent): deflation universe only.
+ANCHOR_TAGS = {"EW": "phase_ii_ew_w{w}", "IVP": "phase_ii_ivp_w{w}"}
+# HERC second family member (PREDICTIONS_HERC.md). Tag names carry no
+# "DYNO-" prefix ON PURPOSE: the family filters key on that prefix, and the
+# HERC cells belong to NEITHER SPA family (both were fixed before this arm
+# existed). They join only the deflation universe.
+HERC_TAGS = {"HERCC": "phase_ii_herc_corr_w{w}",
+             "HERC0": "phase_ii_dynotears_HERC0_w{w}",
+             "HERC1": "phase_ii_dynotears_HERC1_w{w}"}
 PHASE_II_METHODS = (("dynotears", "DYNO"), ("varlingam", "VARL"))
 # The Phase-II window grid is wider than Phase I's: the skeleton-vs-orientation
 # decomposition is measured as a function of estimation-window length.
@@ -125,6 +136,10 @@ def _phase_ii_tags() -> dict[str, str]:
                 tags[f"{short}-{a}_w{w}"] = f"phase_ii_{method}_{a}_w{w}"
         for a in CONTROL_ALLOCS:            # mechanism controls, DYNOTEARS only
             tags[f"DYNO-{a}_w{w}"] = f"phase_ii_dynotears_{a}_w{w}"
+        for a, stem in ANCHOR_TAGS.items():  # naive anchors, method-blind
+            tags[f"{a}_w{w}"] = stem.format(w=w)
+        for a, stem in HERC_TAGS.items():    # HERC family member
+            tags[f"{a}_w{w}"] = stem.format(w=w)
     for a in ("D0", "D1", "D2", "D3"):      # E2 GRANGER arm (w252 only)
         tags[f"GRAN-{a}_w252"] = f"phase_ii_granger_{a}_w252"
     for tau in ("0.01", "0.05", "0.1"):     # E3 τ sweep (DYNO w252)
@@ -226,7 +241,7 @@ def psr_dsr_table(returns: pd.DataFrame, baseline: str) -> pd.DataFrame:
 
 
 def run_spa(returns: pd.DataFrame, benchmark: str, candidates: list[str],
-            block_size: int = 21, reps: int = 2000, seed: int = 42) -> dict:
+            block_size: int = 21, reps: int = 10000, seed: int = 42) -> dict:
     """White's Reality Check + Hansen's SPA: do any ``candidates`` beat the
     ``benchmark``? Loss = negative return (lower loss = higher return), so a low
     p-value means a candidate significantly out-returns the benchmark.
@@ -274,7 +289,7 @@ def _handrolled_reality_check(returns: pd.DataFrame, benchmark: str,
 
 
 def run_mcs(returns: pd.DataFrame, configs: list[str], size: float = 0.10,
-            block_size: int = 21, reps: int = 2000, seed: int = 42) -> tuple[list[str], pd.DataFrame]:
+            block_size: int = 21, reps: int = 10000, seed: int = 42) -> tuple[list[str], pd.DataFrame]:
     """Model Confidence Set over ``configs`` at confidence ``1-size`` (loss =
     negative return). Returns ``(included_names, pvalue_frame)``.
     """
@@ -308,6 +323,36 @@ def pooled_excess_kurtosis(returns: pd.DataFrame) -> float:
     """Mean across configurations of the daily-return excess kurtosis."""
     return float(np.mean([stats.kurtosis(returns[c].dropna(), fisher=True, bias=False)
                           for c in returns.columns]))
+
+
+def full_sample_sharpe_se(returns: pd.Series, periods_per_year: int = 252) -> float:
+    """SE of the full-sample annualised Sharpe (Lo 2002, iid approximation):
+    SE(sr_hat_daily) = sqrt((1 + sr_d^2/2)/n), scaled by sqrt(periods/year).
+    Distinct from ``measurement_problem``'s per-holding-window SE."""
+    r = returns.dropna()
+    sr_d = per_period_sharpe(r)
+    return float(np.sqrt((1.0 + 0.5 * sr_d ** 2) / len(r)) * np.sqrt(periods_per_year))
+
+
+def contrast_se_mde(returns: pd.DataFrame, a: str, b: str,
+                    reps: int = 10000, block: float = 21.0,
+                    seed: int = 42) -> tuple[float, float]:
+    """Stationary-block-bootstrap SE of the annualised ΔSharpe(a − b), plus the
+    one-sided minimum detectable effect at 5% size / 80% power
+    (MDE = (z_0.95 + z_0.80) · SE ≈ 2.49 · SE). The joint (a, b) panel is
+    resampled so the correlation between the strategies is preserved."""
+    from pipeline.evaluation.metrics import annualised_sharpe as _sh
+    arr = returns[[a, b]].dropna().to_numpy(dtype=float)
+    n = len(arr)
+    rng = np.random.default_rng(seed)
+    diffs = np.empty(reps)
+    for i in range(reps):
+        idx = stationary_block_indices(n, block, rng)
+        panel = arr[idx]
+        diffs[i] = _sh(pd.Series(panel[:, 0])) - _sh(pd.Series(panel[:, 1]))
+    se = float(diffs.std(ddof=1))
+    mde = float((stats.norm.ppf(0.95) + stats.norm.ppf(0.80)) * se)
+    return se, mde
 
 
 # ============================================================================
@@ -379,6 +424,8 @@ def main(argv: list[str] | None = None) -> None:
     spa_direction_pre: dict[int, dict] = {}
     spa_skeleton: dict[int, dict] = {}
     spa_skeleton_pre: dict[int, dict] = {}
+    spa_pooled: dict[str, dict | None] = {"skel": None, "skel_pre": None,
+                                          "dir": None, "dir_pre": None}
 
     def _spa_family(bench: str, cands: list[str]) -> dict | None:
         cands = [c for c in drop_duplicate_configs(returns, [bench] + cands)
@@ -411,7 +458,7 @@ def main(argv: list[str] | None = None) -> None:
         mcs_universe = d252
         # The family-wise adjudication of the Phase-II question itself: does
         # ANY direction-aware allocator beat its own symmetrised control D0
-        # (≡ V0prime), per window? Run over the pre-registered direction-aware
+        # (≡ V0prime), per window? Run over the pre-specified direction-aware
         # family (D1/D2/D2s/D3/D4, both methods) and the reported one
         # (D1/D2/D2s).
         # At windows without a Phase-I V0prime bundle the benchmark falls back
@@ -443,6 +490,32 @@ def main(argv: list[str] | None = None) -> None:
                 res = _spa_family(bench, cands)
                 if res is not None:
                     out[w] = res
+        # Pooled strategies×windows SPA: one family per question over the
+        # UNION of the four estimation windows, pricing the search across
+        # strategies AND windows jointly (the axis the per-window SPA leaves
+        # unpriced). Benchmark = the family's control at the conventional
+        # one-year window; run for the pre-specified and narrowed families.
+        def _pool_skel(fam: tuple[str, ...]) -> list[str]:
+            return [c for c in returns.columns
+                    if (c.startswith(tuple(f"{s}-{a}_" for s in ("DYNO", "VARL")
+                                           for a in fam))
+                        or c.startswith("V0prime_w"))
+                    and "_tau" not in c]
+
+        def _pool_dir(fam: tuple[str, ...]) -> list[str]:
+            return [c for c in returns.columns
+                    if c.split("_")[0] in {f"{s}-D{v}" for s in ("DYNO", "VARL")
+                                           for v in fam}
+                    and "_tau" not in c]
+
+        skel_bench = "CORR-HRP_w252"
+        dir_bench = ("V0prime_w252" if "V0prime_w252" in returns.columns
+                     else "DYNO-D0_w252")
+        if skel_bench in returns.columns:
+            spa_pooled["skel_pre"] = _spa_family(skel_bench, _pool_skel(PHASE_II_ALLOCS))
+            spa_pooled["skel"] = _spa_family(skel_bench, _pool_skel(REPORTED_ALLOCS))
+        spa_pooled["dir_pre"] = _spa_family(dir_bench, _pool_dir(DIRECTION_FAMILY_PRE))
+        spa_pooled["dir"] = _spa_family(dir_bench, _pool_dir(DIRECTION_FAMILY))
     mcs_in, _ = run_mcs(returns, mcs_universe)
     # mark MCS membership on the table (only meaningful for the MCS universe)
     table["in_mcs90"] = [bool(c in mcs_in) if c in mcs_universe else ""
@@ -465,6 +538,12 @@ def main(argv: list[str] | None = None) -> None:
         print(f"\n=== SPA/RC (causal structure vs CORR-HRP, w{w}, PRE-REGISTERED family) ===\n{res}")
     for w, res in spa_skeleton.items():
         print(f"\n=== SPA/RC (causal structure vs CORR-HRP, w{w}, reported family) ===\n{res}")
+    for key, label in (("skel_pre", "causal structure vs CORR-HRP w252, POOLED windows, PRE-REGISTERED"),
+                       ("skel", "causal structure vs CORR-HRP w252, POOLED windows, reported"),
+                       ("dir_pre", "direction-aware vs D0/V0prime w252, POOLED windows, PRE-REGISTERED"),
+                       ("dir", "direction-aware vs D0/V0prime w252, POOLED windows, reported")):
+        if spa_pooled.get(key) is not None:
+            print(f"\n=== SPA/RC ({label} family) ===\n{spa_pooled[key]}")
     print(f"\n=== MCS 90% set (w252 universe, n={len(mcs_universe)}) ===\n{mcs_in}")
 
     # --- measurement problem on the closed loop (V2/V1 w252) ---
@@ -472,6 +551,21 @@ def main(argv: list[str] | None = None) -> None:
     reward = load_reward_series(rtag)
     mp = measurement_problem(reward) if reward is not None else {}
     print(f"\n=== measurement problem ({rtag}) ===\n{mp}")
+
+    # --- full-sample SE and contrast-level precision (power context) ---
+    se_full = (full_sample_sharpe_se(returns["DYNO-D1_w252"])
+               if "DYNO-D1_w252" in returns.columns else float("nan"))
+    se_total = mde_total = se_orient = mde_orient = float("nan")
+    if args.phase_ii:
+        if {"DYNO-D1_w252", "CORR-HRP_w252"} <= set(returns.columns):
+            se_total, mde_total = contrast_se_mde(returns, "DYNO-D1_w252",
+                                                  "CORR-HRP_w252")
+        if {"DYNO-D2s_w252", "DYNO-D0_w252"} <= set(returns.columns):
+            se_orient, mde_orient = contrast_se_mde(returns, "DYNO-D2s_w252",
+                                                    "DYNO-D0_w252")
+        print(f"\n=== precision === full-sample Sharpe SE {se_full:.3f} | "
+              f"ΔSharpe SE (D1−CORR) {se_total:.3f}, MDE80 {mde_total:.3f} | "
+              f"ΔSharpe SE (D2s−D0) {se_orient:.3f}, MDE80 {mde_orient:.3f}")
 
     # --- self-check: reproduce the headline Sharpes ---
     print("\n=== self-check: headline annualised Sharpe ===")
@@ -493,9 +587,28 @@ def main(argv: list[str] | None = None) -> None:
 
     # The joint MCS keeps most of the correlated causal variants, so the
     # informative quantity is who is EXCLUDED, not the long member list.
+    # Excluded names are rendered with the report's display macros, not the
+    # internal config tags (naming policy: no V*/D* codenames in prose).
+    display = {
+        "V0": r"\hspbase{}",
+        "V0prime": r"\skelsamp{}",
+        "V1-DYNOTEARS": r"\hspcausal{}",
+        "V1-VARLiNGAM": r"\hspcausal{} (VARLiNGAM)",
+        "V2-DYNOTEARS": r"\hsploop{}",
+        "V2-VARLiNGAM": r"\hsploop{} (VARLiNGAM)",
+        "CORR-HRP": r"\HRP{}",
+        "DYNO-D0": r"\skelsamp{}", "DYNO-D0s": r"\skelalt{}",
+        "DYNO-D1": r"\skelsem{}", "DYNO-D2": r"\orientsamp{}",
+        "DYNO-D2s": r"\orientsem{}",
+        "VARL-D0": r"\skelsamp{} (VARLiNGAM)", "VARL-D0s": r"\skelalt{} (VARLiNGAM)",
+        "VARL-D1": r"\skelsem{} (VARLiNGAM)", "VARL-D2": r"\orientsamp{} (VARLiNGAM)",
+        "VARL-D2s": r"\orientsem{} (VARLiNGAM)",
+        "DYNO-D0lw": "the Ledoit-Wolf control", "DYNO-D0df": "the de-factored control",
+    }
     excluded = [c for c in mcs_universe if c not in mcs_in]
     pretty_excluded = ", ".join(
-        e.replace("_w252", "").replace("V0prime", "V0$'$") for e in excluded) or "none"
+        display.get(e.replace("_w252", ""), e.replace("_w252", ""))
+        for e in excluded) or "none"
 
     # E7 seed audit (results/seed_audit.csv, written by scripts/run_seed_audit.py).
     seed_macros: dict[str, str] = {}
@@ -560,8 +673,20 @@ def main(argv: list[str] | None = None) -> None:
         "rsDdfSharpeWthree": _fmt(cell("DYNO-D0df_w378", "sharpe_ann")),
         "rsDdfSharpeWfive":  _fmt(cell("DYNO-D0df_w504", "sharpe_ann")),
         "rsDdfDSRWthree":    _fmt(cell("DYNO-D0df_w378", "dsr")),
+        # skeleton-channel control (graph-free partial-correlation skeleton)
+        "rsDpcSharpe":       _fmt(cell("DYNO-D0pc_w252", "sharpe_ann")),
+        "rsDpcSharpeWone":   _fmt(cell("DYNO-D0pc_w189", "sharpe_ann")),
+        "rsDpcSharpeWthree": _fmt(cell("DYNO-D0pc_w378", "sharpe_ann")),
+        "rsDpcSharpeWfive":  _fmt(cell("DYNO-D0pc_w504", "sharpe_ann")),
+        # naive anchors (one-year cells; the appendix table carries the rest)
+        "rsEwSharpe":        _fmt(cell("EW_w252", "sharpe_ann")),
+        "rsIvpSharpe":       _fmt(cell("IVP_w252", "sharpe_ann")),
+        # HERC second family member (one-year cells)
+        "rsHercCorrSharpe":  _fmt(cell("HERCC_w252", "sharpe_ann")),
+        "rsHercSkelSharpe":  _fmt(cell("HERC0_w252", "sharpe_ann")),
+        "rsHercSemSharpe":   _fmt(cell("HERC1_w252", "sharpe_ann")),
         # data-snooping battery. Unsuffixed macros = the reported (narrowed)
-        # family; the *Pre macros = the pre-registered E1 family, which the
+        # family; the *Pre macros = the pre-specified E1 family, which the
         # report quotes FIRST wherever a family-wise number appears.
         "rsSpaRC":         _fmt(spa["rc_lower"]),
         "rsSpaConsistent": _fmt(spa["spa_consistent"]),
@@ -583,6 +708,10 @@ def main(argv: list[str] | None = None) -> None:
         "rsSpaSkelWtwoPre":   _fmt(spa_skeleton_pre[252]["spa_consistent"]) if 252 in spa_skeleton_pre else "--",
         "rsSpaSkelWthreePre": _fmt(spa_skeleton_pre[378]["spa_consistent"]) if 378 in spa_skeleton_pre else "--",
         "rsSpaSkelWfivePre":  _fmt(spa_skeleton_pre[504]["spa_consistent"]) if 504 in spa_skeleton_pre else "--",
+        "rsSpaSkelPooled":    _fmt(spa_pooled["skel"]["spa_consistent"]) if spa_pooled["skel"] else "--",
+        "rsSpaSkelPooledPre": _fmt(spa_pooled["skel_pre"]["spa_consistent"]) if spa_pooled["skel_pre"] else "--",
+        "rsSpaDirPooled":     _fmt(spa_pooled["dir"]["spa_consistent"]) if spa_pooled["dir"] else "--",
+        "rsSpaDirPooledPre":  _fmt(spa_pooled["dir_pre"]["spa_consistent"]) if spa_pooled["dir_pre"] else "--",
         "rsMcsSize":       str(len(mcs_in)),
         "rsMcsUniverse":   str(len(mcs_universe)),
         "rsMcsExcluded":   pretty_excluded,
@@ -592,6 +721,13 @@ def main(argv: list[str] | None = None) -> None:
         "rsRewardStd":  _fmt(mp.get("reward_std", float("nan"))),
         "rsRewardSNR":  _fmt(mp.get("reward_snr", float("nan")), 2),
         "rsSharpeSE":   _fmt(mp.get("sharpe_se_window", float("nan")), 2),
+        # full-sample and contrast-level precision (Lo 2002 SE; block-bootstrap
+        # ΔSharpe SEs and one-sided 5%/80% minimum detectable effects)
+        "rsSharpeSEFull":      _fmt(se_full, 2),
+        "rsContrastSETotal":   _fmt(se_total, 3),
+        "rsContrastMDETotal":  _fmt(mde_total, 3),
+        "rsContrastSEOrient":  _fmt(se_orient, 3),
+        "rsContrastMDEOrient": _fmt(mde_orient, 3),
         **seed_macros,
     }
     write_macros(GEN / "robust_stats.tex", macros)

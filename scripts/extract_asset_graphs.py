@@ -131,7 +131,7 @@ def main(argv: list[str] | None = None) -> None:
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
 
     methods = [args.method] if args.method else ["dynotears", "varlingam"]
-    windows = [args.window] if args.window else [252, 504]
+    windows = [args.window] if args.window else [189, 252, 378, 504]
 
     joint, rebalance_dates = build_phase_i_inputs()
     print(

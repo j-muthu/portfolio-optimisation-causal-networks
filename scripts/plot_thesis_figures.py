@@ -10,8 +10,8 @@ Figures
 -------
 1. nav_curves.png        cumulative net NAV, V0/V0'/V1-DYNO/V1-VAR, w252 & w504
 2. sharpe_matrix.png     net Sharpe by variant x lookback window
-3. k_sensitivity.png     J4a: V0 vs V1 Sharpe across K (the K-fragility)
-4. feedback_grid.png     J4b: V2 Sharpe across the alpha/gamma grid (inert)
+3. k_sensitivity.png     J4a: hsp-baseline vs causal-hsp across K (K-fragility)
+4. feedback_grid.png     J4b: causal-hsp-feedback across alpha/gamma grid (inert)
 5. regime_excess.png     regime-conditional Sharpe, excess over V0 (w252)
 6. directional_prior.png J1: how much the asset->driver prior does
 7. nts_probe.png         J5: NTS-NOTEARS vs DYNOTEARS agreement + cost
@@ -50,10 +50,10 @@ C = {
     "DYNOTEARS": "#0072B2", "VARLiNGAM": "#E69F00", "NTS": "#CC79A7",
 }
 LABEL = {
-    "V0": "V0  vanilla HSP (cum-corr)",
-    "V0prime": "V0′  asset-only Causal-HRP",
-    "V1-DYNOTEARS": "V1  Causal-HSP (DYNOTEARS)",
-    "V1-VARLiNGAM": "V1  Causal-HSP (VARLiNGAM)",
+    "V0": "hsp-baseline  HSP as published",
+    "V0prime": "skeleton-hrp  asset-only Causal-HRP",
+    "V1-DYNOTEARS": "causal-hsp  (DYNOTEARS)",
+    "V1-VARLiNGAM": "causal-hsp  (VARLiNGAM)",
 }
 # bundle tag per (variant, window)
 TAG = {
@@ -91,7 +91,8 @@ def fig_nav_curves():
         ax.grid(True, alpha=0.3)
     axes[0].set_ylabel("Cumulative net NAV (start = 1.0)")
     axes[0].legend(frameon=False, fontsize=8.5, loc="upper left")
-    fig.suptitle("Cumulative net NAV, 2007–2024 (V2 ≡ V1, omitted)", fontsize=12)
+    fig.suptitle("Cumulative net NAV, 2007–2024 "
+                 "(causal-hsp-feedback ≡ causal-hsp, omitted)", fontsize=12)
     fig.tight_layout()
     _save(fig, "nav_curves.png")
 
@@ -112,7 +113,8 @@ def fig_sharpe_matrix():
             if not np.isnan(val):
                 ax.text(xi, val + 0.002, f"{val:.3f}", ha="center", va="bottom", fontsize=8)
     ax.set_xticks(x)
-    ax.set_xticklabels(["V0", "V0′", "V1-DYNO", "V1-VAR"])
+    ax.set_xticklabels(["hsp-baseline", "skeleton-hrp", "causal-hsp\n(DYNO)",
+                        "causal-hsp\n(VAR)"], fontsize=8)
     ax.set_ylim(0.34, 0.415)
     ax.set_ylabel("Annualised Sharpe (net)")
     ax.set_title("Net Sharpe by variant and lookback window (frozen-EEM)")
@@ -130,8 +132,9 @@ def fig_k_sensitivity():
     fig, axes = plt.subplots(1, 2, figsize=(12, 5), sharey=True)
     for ax, w in zip(axes, (252, 504)):
         sub = df[df.window == w].sort_values("K")
-        ax.plot(sub.K, sub.sharpe_V0, "o-", color=C["V0"], label="V0 (cum-corr)")
-        ax.plot(sub.K, sub.sharpe_V1, "s-", color=C["V1-DYNOTEARS"], label="V1 (DYNOTEARS)")
+        ax.plot(sub.K, sub.sharpe_V0, "o-", color=C["V0"], label="hsp-baseline")
+        ax.plot(sub.K, sub.sharpe_V1, "s-", color=C["V1-DYNOTEARS"],
+                label="causal-hsp (DYNOTEARS)")
         ax.axvline(17, color="k", ls=":", lw=0.9, alpha=0.6)
         ax.text(17, ax.get_ylim()[0], " K=17 (Kneedle)", fontsize=7.5, va="bottom", rotation=90)
         ax.set_title(f"Lookback {w} days")
@@ -140,7 +143,8 @@ def fig_k_sensitivity():
         ax.grid(True, alpha=0.3)
     axes[0].set_ylabel("Annualised Sharpe (net)")
     axes[0].legend(frameon=False, loc="best")
-    fig.suptitle("K-sensitivity: the V1>V0 edge is not robust to K", fontsize=12)
+    fig.suptitle("K-sensitivity: causal-hsp's edge over hsp-baseline "
+                 "is not robust to K", fontsize=12)
     fig.tight_layout()
     _save(fig, "k_sensitivity.png")
 
@@ -160,8 +164,9 @@ def fig_feedback_grid():
         for j in range(piv.shape[1]):
             ax.text(j, i, f"{piv.values[i, j]:.3f}", ha="center", va="center",
                     color="white", fontsize=9)
-    fig.colorbar(im, ax=ax, label="V2 net Sharpe")
-    ax.set_title("V2 Sharpe across the α/γ feedback grid:\nclosed loop is inert (V2 ≡ V1 = 0.381 everywhere)",
+    fig.colorbar(im, ax=ax, label="causal-hsp-feedback net Sharpe")
+    ax.set_title("causal-hsp-feedback Sharpe across the α/γ feedback grid:\n"
+                 "closed loop is inert (≡ causal-hsp = 0.381 everywhere)",
                  fontsize=11)
     fig.tight_layout()
     _save(fig, "feedback_grid.png")
@@ -185,8 +190,9 @@ def fig_regime_excess():
                if "-" in v else LABEL[v].split("  ")[0], color=C[v])
     ax.axhline(0, color="k", lw=0.8)
     ax.set_xticks(x); ax.set_xticklabels(rlabel)
-    ax.set_ylabel("Regime Sharpe − V0 (net)")
-    ax.set_title("Regime-conditional edge over V0, window 252\n(causal variants beat V0 in every regime; V0′ most)",
+    ax.set_ylabel("Regime Sharpe − hsp-baseline (net)")
+    ax.set_title("Regime-conditional edge over hsp-baseline, window 252\n"
+                 "(causal variants win in every regime; skeleton-hrp most)",
                  fontsize=11)
     ax.legend(frameon=False, loc="upper left")
     ax.grid(True, axis="y", alpha=0.3)
@@ -260,7 +266,6 @@ def fig_returns_distribution():
     if not pooled:
         return
     r = np.concatenate(pooled)
-    exk = float(stats.kurtosis(r, fisher=True, bias=False))
     fig, ax = plt.subplots(figsize=(7.5, 5))
     ax.hist(r, bins=200, density=True, color="#0072B2", alpha=0.55,
             label="daily net returns (pooled)")
@@ -270,7 +275,10 @@ def fig_returns_distribution():
     ax.set_yscale("log")  # log-y exposes the tails the normal misses
     ax.set_xlabel("daily net return")
     ax.set_ylabel("density (log)")
-    ax.set_title(f"Daily returns are heavy-tailed (excess kurtosis ≈ {exk:.1f})\n"
+    # No kurtosis figure in the title: the caption quotes \rsKurtosis (the
+    # mean per-config estimate from robust_stats.py), and quoting a second,
+    # differently-pooled estimate here put two conflicting numbers on one page.
+    ax.set_title("Daily returns are heavy-tailed\n"
                  "— why the Sharpe is supplemented by PSR/DSR", fontsize=11)
     ax.legend(frameon=False, loc="upper right")
     ax.grid(True, alpha=0.3, which="both")
@@ -287,7 +295,8 @@ def fig_dsr_mcs():
     df = df[df.config.isin(order)].set_index("config").reindex(order).dropna(how="all")
     if df.empty:
         return
-    labels = ["V0", "V0′", "V1-DYNO", "V1-VAR"][:len(df)]
+    labels = ["hsp-baseline", "skeleton-hrp", "causal-hsp\n(DYNO)",
+              "causal-hsp\n(VAR)"][:len(df)]
     x = np.arange(len(df)); bw = 0.38
     fig, ax = plt.subplots(figsize=(8.5, 5))
     ax.bar(x - bw / 2, df.psr_vs_zero, bw, color="#56B4E9", label="PSR (vs 0)")

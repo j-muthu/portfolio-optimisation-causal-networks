@@ -43,7 +43,7 @@ def stationary_block_indices(
     i = 0
     while i < n:
         block_start = int(rng.integers(0, n))
-        block_len = 1 + int(rng.geometric(p))
+        block_len = int(rng.geometric(p))
         block_len = min(block_len, n - i)
         for k in range(block_len):
             indices[i + k] = (block_start + k) % n
