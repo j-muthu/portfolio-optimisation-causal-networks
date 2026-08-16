@@ -110,3 +110,26 @@ def test_key_isolation():
     assert base == discovery_cache_key(
         frame, dcols, acols, "dynotears", {"lambda_w": 0.05}
     )
+
+
+def test_cache_key_invariant_to_datetime_index_unit():
+    """The key must not depend on the index's datetime64 resolution: the
+    joint index inherits its unit from whichever cache parquet was written
+    most finely, and an environment change once flipped it (us -> ns),
+    silently re-keying 1,684 byte-identical fits."""
+    import numpy as np
+    import pandas as pd
+
+    from pipeline.discovery.cache import discovery_cache_key
+
+    rng = np.random.default_rng(0)
+    idx = pd.date_range("2020-01-01", periods=30, freq="B")
+    df = pd.DataFrame(rng.standard_normal((30, 4)),
+                      index=idx, columns=list("abcd"))
+    keys = set()
+    for unit in ("s", "ms", "us", "ns"):
+        d2 = df.copy()
+        d2.index = df.index.as_unit(unit)
+        keys.add(discovery_cache_key(d2, ["a"], ["b", "c", "d"],
+                                     "dynotears", {}))
+    assert len(keys) == 1, f"key varies with index unit: {keys}"

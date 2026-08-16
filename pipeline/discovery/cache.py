@@ -70,7 +70,18 @@ def discovery_cache_key(
     h.update(values.tobytes())
     idx = joint_window.index
     if isinstance(idx, pd.DatetimeIndex):
-        h.update(idx.asi8.tobytes())
+        # Normalise to MICROSECOND resolution before hashing. The joint
+        # index's datetime unit is inherited from whichever cache parquet
+        # was written most finely, so it can flip (us <-> ns) when an
+        # environment change alters what a refetch writes, silently
+        # re-keying every window while the data stays byte-identical
+        # (this happened on 2026-08-15: a dependency install downgraded
+        # pandas, six always-refetched price files were rewritten with an
+        # ns index, and all 1,684 fits appeared to vanish). Trading-day
+        # indexes carry no sub-microsecond information, and the committed
+        # cache was historically keyed with us-resolution bytes, so "us"
+        # is the canonical unit that keeps every existing key reachable.
+        h.update(idx.as_unit("us").asi8.tobytes())
     else:
         h.update("|".join(map(str, idx)).encode())
     h.update(repr(sorted((discovery_kwargs or {}).items())).encode())
