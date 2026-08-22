@@ -605,6 +605,7 @@ def run_varlingam_joint_window(
             X, lags=lags, driver_idx=driver_idx, asset_idx=asset_idx, alpha=ridge_alpha
         )
         # Construct DirectLiNGAM with prior_knowledge.
+        # source code available at: https://github.com/cdt15/lingam
         from lingam.direct_lingam import DirectLiNGAM
 
         pk = make_prior_knowledge_asset_to_driver(driver_idx, asset_idx, d)

@@ -40,6 +40,7 @@ logger = logging.getLogger(__name__)
 # Defer torch imports so the module can be inspected without torch (e.g. in
 # read-only documentation contexts).
 def _torch():
+    # source code available at: https://github.com/pytorch/pytorch
     import torch
     return torch
 
@@ -73,6 +74,7 @@ def _build_mlp(input_dim: int, n_assets: int, depth: int, width: int):
     of multi-head training is sharing representations.
     """
     torch = _torch()
+    # source code available at: https://github.com/pytorch/pytorch
     import torch.nn as nn
 
     layers = []
@@ -241,6 +243,7 @@ def _compute_sensitivities(
     axis.
     """
     torch = _torch()
+    # source code available at: https://github.com/pytorch/pytorch
     from torch.func import jacrev
 
     model = model.to(device).eval()

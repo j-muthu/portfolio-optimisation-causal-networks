@@ -30,6 +30,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Iterator, Sequence
 
+# source code available at: https://github.com/networkx/networkx
 import networkx as nx
 import numpy as np
 import pandas as pd

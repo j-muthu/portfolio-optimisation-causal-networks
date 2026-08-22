@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import logging
 
+# source code available at: https://github.com/networkx/networkx
 import networkx as nx
 import numpy as np
 

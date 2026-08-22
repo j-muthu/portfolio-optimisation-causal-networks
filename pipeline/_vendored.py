@@ -81,6 +81,7 @@ def _load_causalnex() -> None:
     _register_namespace("causalnex.structure", _CAUSALNEX_PKG / "structure")
     # dynotears.py does ``from causalnex.structure import StructureModel`` -- the
     # name must be an attribute of our stub package before that import runs.
+    # source code available at: https://github.com/quantumblacklabs/causalnex
     from causalnex.structure.structuremodel import StructureModel  # noqa: E402
 
     sys.modules["causalnex.structure"].StructureModel = StructureModel  # type: ignore[attr-defined]
@@ -99,11 +100,14 @@ _load_causalnex()
 _load_lingam()
 
 # These imports resolve against the stub packages registered above.
+# source code available at: https://github.com/quantumblacklabs/causalnex
 from causalnex.structure.dynotears import (  # noqa: E402
     from_numpy_dynamic,
     from_pandas_dynamic,
 )
+# source code available at: https://github.com/quantumblacklabs/causalnex
 from causalnex.structure.structuremodel import StructureModel  # noqa: E402
+# source code available at: https://github.com/cdt15/lingam
 from lingam.var_lingam import VARBootstrapResult, VARLiNGAM  # noqa: E402
 
 __all__ = [

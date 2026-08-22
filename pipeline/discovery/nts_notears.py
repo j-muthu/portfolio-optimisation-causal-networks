@@ -41,6 +41,7 @@ def _import_nts():
     and the torch import at module load."""
     if str(_NTS_DIR) not in sys.path:
         sys.path.insert(0, str(_NTS_DIR))
+    # source code available at: https://github.com/xiangyu-sun-789/NTS-NOTEARS
     import nts_notears as _nts  # noqa: E402
     return _nts
 
@@ -75,6 +76,7 @@ def run_nts_notears_joint_window(
     kernel-norms, ``W[i, j]`` = i->j) so downstream Stage-A / block accessors
     are unchanged."""
     nts = _import_nts()
+    # source code available at: https://github.com/pytorch/pytorch
     import torch
 
     columns = list(joint_window.columns)

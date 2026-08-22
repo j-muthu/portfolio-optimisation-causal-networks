@@ -301,6 +301,7 @@ def fetch_yahoo_series(
 
     import warnings
 
+    # source code available at: https://github.com/ranaroussi/yfinance
     import yfinance as yf
 
     with warnings.catch_warnings():

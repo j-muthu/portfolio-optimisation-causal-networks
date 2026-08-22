@@ -169,6 +169,7 @@ def fetch_from_yfinance(
     """Return auto-adjusted close from yfinance or ``None`` on empty/missing."""
     import warnings
 
+    # source code available at: https://github.com/ranaroussi/yfinance
     import yfinance as yf
 
     try:
@@ -372,6 +373,7 @@ def fetch_shares_outstanding(
 
     missing = [t for t in requested if t not in cached.index]
     if missing:
+        # source code available at: https://github.com/ranaroussi/yfinance
         import yfinance as yf
 
         logger.info("Fetching shares-outstanding for %d new tickers", len(missing))

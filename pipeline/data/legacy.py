@@ -289,6 +289,7 @@ def download_prices(
     ticker.  Tickers that yfinance could not return (delisted, bad symbol) are
     logged and omitted -- the plan calls for try/except around delisted names.
     """
+    # source code available at: https://github.com/ranaroussi/yfinance
     import yfinance as yf
 
     tickers = [normalise_ticker(t) for t in tickers]

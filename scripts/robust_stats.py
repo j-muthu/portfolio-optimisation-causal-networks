@@ -252,6 +252,7 @@ def run_spa(returns: pd.DataFrame, benchmark: str, candidates: list[str],
     bench = -returns[benchmark].to_numpy(dtype=float)
     models = -returns[candidates].to_numpy(dtype=float)
     try:
+        # source code available at: https://github.com/bashtage/arch
         from arch.bootstrap import SPA
         spa = SPA(bench, models, block_size=block_size, reps=reps, seed=seed)
         spa.compute()
@@ -293,6 +294,7 @@ def run_mcs(returns: pd.DataFrame, configs: list[str], size: float = 0.10,
     """Model Confidence Set over ``configs`` at confidence ``1-size`` (loss =
     negative return). Returns ``(included_names, pvalue_frame)``.
     """
+    # source code available at: https://github.com/bashtage/arch
     from arch.bootstrap import MCS
     losses = -returns[configs]
     mcs = MCS(losses, size=size, block_size=block_size, reps=reps, seed=seed, method="R")

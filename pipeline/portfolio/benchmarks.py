@@ -41,6 +41,7 @@ def min_variance(
     max_weight: float | None = None,
 ) -> pd.Series:
     """Long-only minimum-variance via cvxpy with Ledoit-Wolf shrunk covariance."""
+    # source code available at: https://github.com/cvxpy/cvxpy
     import cvxpy as cp
 
     asset_names = asset_names or list(returns_window.columns)
@@ -68,6 +69,7 @@ def mean_variance(
     max_weight: float | None = None,
 ) -> pd.Series:
     """Markowitz MVO ``min_w  γ wᵀΣw - μᵀw`` with shrunk covariance + sample mean."""
+    # source code available at: https://github.com/cvxpy/cvxpy
     import cvxpy as cp
 
     asset_names = asset_names or list(returns_window.columns)

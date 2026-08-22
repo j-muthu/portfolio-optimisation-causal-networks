@@ -52,6 +52,7 @@ def trading_calendar(
     end_ts = pd.Timestamp(end).normalize()
     if use_market_calendars:
         try:
+            # source code available at: https://github.com/rsheftel/pandas_market_calendars
             import pandas_market_calendars as mcal  # type: ignore
 
             nyse = mcal.get_calendar("NYSE")
@@ -67,6 +68,7 @@ def trading_calendar(
     # Fallback: derive from SPY.
     import warnings
 
+    # source code available at: https://github.com/ranaroussi/yfinance
     import yfinance as yf
 
     with warnings.catch_warnings():
