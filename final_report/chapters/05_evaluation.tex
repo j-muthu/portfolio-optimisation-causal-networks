@@ -476,7 +476,11 @@ with its unpruned $B_0$ saturating in the thin-sample regime (density
 $32\%$ against DYNOTEARS' stable $6$--$7\%$;
 Section~\ref{sec:asset-graph}),
 so its short-window graphs carry little usable orientation signal either.
-The magnitude-degraded ridge-Granger control then localises where inside
+A DYNOTEARS graph supplies two things at once, the direction of each
+edge and a fitted magnitude for it, so its cells alone cannot show which
+of the two the orientation effect consumes; the ridge-Granger control
+separates them, preserving a usable ordering while degrading the
+magnitudes. It thereby localises where inside
 the orientation the value sits: causal-ordered bisection survives on its
 graphs (\orientsamp{} $=0.393$ vs DYNOTEARS' $0.399$) while the
 SEM-covariance

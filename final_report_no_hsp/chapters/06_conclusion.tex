@@ -20,24 +20,24 @@ Requirement 2) and answered
 it under multiplicity-, distribution- and stability-aware inference (A3).
 
 The answer, in summary: \emph{the causal graph's gain over the
-correlation matrix is stable across estimation horizons, but its source
+correlation matrix is stable across estimation windows, but its source
 shifts: against the primary skeleton control, the skeleton pays most
 clearly near the conventional one-year window, while orientation pays at
-every horizon and, robustly to the choice of orientation-blind control,
+every estimation window and, robustly to the choice of orientation-blind control,
 from one year out. The between-window differences are about one standard
 error, and the window grid was widened partway through, so the shapes
 carry that uncertainty. Orientation buys robustness to the estimation
-horizon, not level, and a direction-free de-factored covariance
+window, not level, and a direction-free de-factored covariance
 reproduces that robustness, so its mechanism is market-factor removal
 rather than directional content. Family-wise, nothing rejects over the
 full allocator grid; support reaches conventional significance
-only under the narrower reported family, at the longest horizons,
+only under the narrower reported family, at the longest estimation windows,
 marginally, where the point estimates also peak.} In detail (net annualised Sharpe, 2007--2024,
 monthly
 rebalancing, 5\,bps costs, windows of 189/252/378/504 trading days):
 
 \begin{enumerate}[itemsep=2pt]
-  \item \textbf{The total gain is stable across horizons.} Replacing the
+  \item \textbf{The total gain is stable across estimation windows.} Replacing the
         correlation matrix with the DYNOTEARS graph is worth $+0.018$ to
         $+0.032$ (\skelsem{} $-$ \HRP{}; $p=0.43$--$0.11$) at every window,
         rising to $+0.036$ for \orientsem{} at two years; 36 of 40
@@ -48,7 +48,7 @@ rebalancing, 5\,bps costs, windows of 189/252/378/504 trading days):
         everywhere and U-shaped ($+0.021$, $+0.009$, $+0.012$, $+0.023$;
         pairwise $p=0.08$/$0.45$/$0.31$/$0.048$), largest where
         the sample moments are weakest. Orientation buys robustness
-        to the estimation horizon, not level: \skelsem{}
+        to the estimation window, not level: \skelsem{}
         ($0.395$--$0.415$) and
         \orientsem{} ($0.399$--$0.419$) are strong at every window while
         the
@@ -69,7 +69,7 @@ rebalancing, 5\,bps costs, windows of 189/252/378/504 trading days):
         primary skeleton control; under the per-edge orientation-blind
         symmetrisation the skeleton contribution is flat and the nine-month
         orientation contribution slightly negative, so the anchor-robust arm is
-        the long-horizon one
+        the one at long estimation windows
         (Section~\ref{sec:decomposition}); the between-window
         differences are about one standard error, and the grid was
         widened partway through. The direct
@@ -149,12 +149,12 @@ it:
         new; the closest prior work \cite{howard2025causal} never sets
         weights from its graphs.
   \item \textbf{Empirical (what the instrument found):} the decomposition itself, traced across four
-        estimation horizons (a stable total; skeleton hump-shaped and
+        estimation windows (a stable total; skeleton hump-shaped and
         peaking at the one-year convention against the primary anchor;
         orientation positive at every
-        horizon against that anchor and robustly so from one year out;
+        estimation window against that anchor and robustly so from one year out;
         family-wise support absent under the full grid and
-        marginal, confined to the longest horizons, under the narrowed
+        marginal, confined to the longest estimation windows, under the narrowed
         family), the identification of its covariance-channel mechanism
         as market-factor removal by a direct control, and its
         method- and
@@ -197,7 +197,7 @@ snapshot union, with mild residual survivorship effects. \textbf{(v)} The
 asset-block SEM marginalises over the macro drivers, so the structural
 shocks' assumed independence is an approximation. \textbf{(vi)} The choice
 of research question was informed by the first phase's
-results, the window grid was widened to four horizons partway through
+results, the window grid was widened to four estimation windows partway through
 the study, and the family-wise comparison set was narrowed from the
 full seven-allocator grid to five after the results were seen
 (Section~\ref{sec:believe}); all three are disclosed, both families'

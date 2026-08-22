@@ -120,7 +120,7 @@ family's absolute edge on this universe as modest.
 \section{The decomposition: skeleton versus orientation}
 \label{sec:decomposition}
 
-\subsection{The decomposition across estimation horizons}
+\subsection{The decomposition across estimation windows}
 
 Figure~\ref{fig:gradient} is the thesis's central result:
 the two components of the decomposition traced across the four estimation
@@ -130,7 +130,7 @@ allocator--method matrix. Three features carry the answer to the research
 question. First, the
 total causal-graph gain is stable: $+0.018$ to $+0.032$ (\skelsem{}) at
 every
-horizon, rising to $+0.036$ for \orientsem{} at two years. Second, the
+estimation window, rising to $+0.036$ for \orientsem{} at two years. Second, the
 skeleton contribution is hump-shaped ($-0.003$ at nine months, peaking at
 $+0.022$ at the one-year convention, decaying to $+0.009$ at two years) and
 never individually significant ($p \geq 0.14$). Third, the
@@ -160,12 +160,12 @@ becomes $-0.003$/$+0.013$/$+0.006$/$+0.012$ for \skelsem{}
 ($-0.003$/$+0.008$/$+0.010$/$+0.016$ for \orientsem{}; point estimates,
 not formally tested). The two anchors agree that orientation's increment
 is positive at every window from one year out and largest at the longer
-horizons; they disagree at nine months, where the symmetrisation choice
+estimation windows; they disagree at nine months, where the symmetrisation choice
 itself moves the controls by as much as the contributions do (the $+0.025$,
 $p=0.013$ control-versus-control divergence reported under robustness
 below). The hump and the U are therefore \skelsamp{}-anchored
 descriptions; the anchor-robust findings are the flat-to-positive
-skeleton gain, the long-horizon orientation increment, and the
+skeleton gain, the orientation increment at long estimation windows, and the
 narrowed-family rejections (Section~\ref{sec:believe-rigour}), which
 land on the anchor-robust region.
 
@@ -248,7 +248,7 @@ land on the anchor-robust region.
 \subsection{What orientation contributes}
 \label{sec:orientation-role}
 
-Orientation contributes robustness to the estimation horizon rather than
+Orientation contributes robustness to the estimation window rather than
 level. The skeleton
 allocator's performance is window-fragile ($0.372$--$0.403$ across the four
 windows, and below the control at nine months); \skelsem{}
@@ -273,11 +273,11 @@ the window moves the graph and the sample moments together (both are
 estimated on the same lookback), so the gradient cannot by itself
 separate moment degradation from graph degradation; the stability of the
 discovered graphs across windows (density $6.3$--$6.9\%$ at every
-horizon; Section~\ref{sec:asset-graph}) supports, but does not prove, the
+estimation window; Section~\ref{sec:asset-graph}) supports, but does not prove, the
 reading that the moments degrade faster. Second, the nine-month arm of
 the U is anchor-dependent (Section~\ref{sec:decomposition}), so the
 regulariser mechanism is asserted with confidence only on its
-long-horizon arm, where both anchors agree.
+arm at long estimation windows, where both anchors agree.
 
 \paragraph{An alternative explanation, tested directly.} The
 contrast $\skelsem{}-\skelsamp{}$ compares the SEM-implied covariance
@@ -296,7 +296,7 @@ regressed on the window's equal-weight market return, allocation on the
 residual covariance), neither of which sees an edge direction. The
 shrinkage account fails: the Ledoit--Wolf control sits below the plain
 skeleton at every window ($\rsDlwSharpeWone$, $\rsDlwSharpe$,
-$\rsDlwSharpeWthree$, $\rsDlwSharpeWfive$ across the four horizons), and
+$\rsDlwSharpeWthree$, $\rsDlwSharpeWfive$ across the four estimation windows), and
 \skelsem{} beats it by $+0.018$ to $+0.042$ ($p=0.05$ at two years, its
 strongest window; $p \geq 0.08$ elsewhere).
 The de-factoring account succeeds: the de-factored control
@@ -395,7 +395,11 @@ with its unpruned $B_0$ saturating in the thin-sample regime (density
 $32\%$ against DYNOTEARS' stable $6$--$7\%$;
 Section~\ref{sec:asset-graph}),
 so its short-window graphs carry little usable orientation signal either.
-The magnitude-degraded ridge-Granger control then localises where inside
+A DYNOTEARS graph supplies two things at once, the direction of each
+edge and a fitted magnitude for it, so its cells alone cannot show which
+of the two the orientation effect consumes; the ridge-Granger control
+separates them, preserving a usable ordering while degrading the
+magnitudes. It thereby localises where inside
 the orientation the value sits: causal-ordered bisection survives on its
 graphs (\orientsamp{} $=0.393$ vs DYNOTEARS' $0.399$) while the
 SEM-covariance
@@ -561,7 +565,7 @@ family against the one-year control.
 
 In sum: under the full grid nothing rejects. Every
 window-level rejection quoted in this report
-($p=\rsSpaSkelWthree$--$\rsSpaDirWfive$, the longest horizons of
+($p=\rsSpaSkelWthree$--$\rsSpaDirWfive$, the longest estimation windows of
 families (i) and (ii)) exists only under the post-hoc narrowing.
 The pooled column completes the multiplicity accounting on the axis the
 per-window tests leave unpriced, and it is decisive in the deflationary
@@ -586,7 +590,7 @@ separating treatments from controls.
 
 \paragraph{Verdict on the research question, with uncertainty stated.} The decomposition's
 point estimates are clear and internally consistent: a stable total
-gain whose composition shifts with the horizon (skeleton hump-shaped and
+gain whose composition shifts with the estimation window (skeleton hump-shaped and
 peaking at the one-year convention, orientation positive at every window
 and largest at the extremes), with the orientation-aware allocators
 topping the study-wide DSR table. Its statistical support is
@@ -595,7 +599,7 @@ graph-versus-correlation cells
 positive; one pairwise-significant orientation cell among twelve
 ($p=0.048$) and one suggestive one ($p=0.08$); no family-wise rejection
 anywhere under the full grid; under the post-hoc narrowed
-family only, marginal rejections confined to the longest horizons
+family only, marginal rejections confined to the longest estimation windows
 (Requirement 1 at 18 months and two years,
 $p=\rsSpaSkelWthree$ and $\rsSpaSkelWfive$; orientation at two years,
 $p=\rsSpaDirWfive$), coinciding with the peaks of the point
@@ -612,9 +616,9 @@ concentrated in the skeleton at the conventional window. The
 largest defensible claim is therefore conditional and modest: if one
 replaces the correlation matrix with a DYNOTEARS graph, the skeleton pays
 only near the conventional one-year window; keeping the orientations
-costs nothing and improves robustness to the estimation-horizon choice,
+costs nothing and improves robustness to the estimation-window choice,
 though the same improvement is available from de-factoring the
-covariance with no graph at all; and the long-horizon edge is suggestive
+covariance with no graph at all; and the edge at long estimation windows is suggestive
 under the narrowed family, unsupported under the full grid, and
 dissolves when the window search is priced jointly with the strategy
 search.
@@ -705,7 +709,7 @@ certified effects about double the size actually observed, and that cuts
 both ways: the
 rejections that do occur are marginal and narrowed-family only
 ($p=\rsSpaSkelWthree$--$\rsSpaDirWfive$), and the absence of rejection at
-the shorter horizons is not evidence of absence. At the pairwise level, one
+the shorter estimation windows is not evidence of absence. At the pairwise level, one
 $p=0.048$ cell among twelve orientation contrasts is close to what
 multiplicity predicts under the null, which is why no single cell is
 claimed as a discovery. The orientation effect earns its standing not from
@@ -719,7 +723,7 @@ landing on that anchor-robust region.
 \paragraph{Forking-paths risk.} Three design choices were informed by
 earlier results, and this section is their record. The choice of question
 was informed by results from an earlier phase of the project. The window grid reached its
-four-horizon form in two stages: the conventional 252- and 504-day windows
+four-window form in two stages: the conventional 252- and 504-day windows
 were evaluated first, and the 189- and 378-day windows were added when the
 initial results suggested a composition shift that a two-point design
 cannot distinguish from noise. Three disciplines bound the associated
@@ -786,11 +790,11 @@ in markets is allocatively valuable''.
 
 \paragraph{What the evidence supports, and does not.} It supports: the
 graph's consistent, modest improvement over the correlation matrix (36 of
-40 cells); the horizon-dependent composition of that gain (skeleton
+40 cells); the estimation-window dependence of that gain's composition (skeleton
 hump-shaped, orientation U-shaped and positive throughout); the
 regulariser role of the SEM covariance, now identified by the direct
 controls as de-factoring rather than directional content; and a
-narrowed-family edge over the stronger controls at the longest horizons,
+narrowed-family edge over the stronger controls at the longest estimation windows,
 marginal and reported as such.
 It does not support: any family-wise rejection under the full
 allocator grid; family-wise significance near the one-year
