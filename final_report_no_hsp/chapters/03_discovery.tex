@@ -11,9 +11,8 @@ Section~\ref{sec:data} describes the data; Section~\ref{sec:discovery-run} the
 rolling discovery, the directional prior, and its empirical verification;
 Section~\ref{sec:asset-graph} the extraction chokepoint through which every
 allocator receives the identical graph, and what those graphs look like;
-Section~\ref{sec:comparators} the two comparator graphs;
-Section~\ref{sec:selection} the driver-selection arm retained from the
-project's starting framework; and Section~\ref{sec:cache} the engineering
+Section~\ref{sec:comparators} the two comparator graphs; and
+Section~\ref{sec:cache} the engineering
 that makes the whole programme tractable and reproducible.
 
 \section{Data layer}
@@ -47,11 +46,8 @@ in Section~\ref{sec:limitations}.
 \paragraph{Driver pool.} Discovery runs on the \emph{joint} panel of assets
 and 33 plausibly exogenous macro-financial series from FRED and Yahoo Finance:
 Treasury rates and slopes, credit spreads, commodities, FX pairs, volatility
-indices, and international-equity ETFs. The drivers serve two purposes: they
-are the selection pool for the driver route
-(Section~\ref{sec:driver-route}) and, more importantly for the research
-question, their
-presence in the joint fit means the
+indices, and international-equity ETFs. The drivers' presence in the joint
+fit means the
 asset--asset block is estimated \emph{conditional on} the common macro
 environment, absorbing driver-explained co-movement that would otherwise
 masquerade as asset-to-asset edges. Series that fail exogeneity to a US
@@ -217,29 +213,6 @@ only modestly, indicating a distinct structural lens, but at
 ${\sim}10\times$ the fit
 cost a full backtest is future work.)
 
-\section{The driver-selection arm}
-\label{sec:selection}
-
-The project's starting framework (HSP) needs $K$ drivers selected per
-rebalance; the arm is retained as a supporting comparison
-(Section~\ref{sec:driver-route}), so its mechanics are summarised. Selection
-is two-stage on the discovered graph: Stage~A scores each driver by its
-aggregate outgoing influence on the assets and shortlists; Stage~B adds
-drivers greedily by marginal held-out predictive gain. The count $K$ is
-calibrated once on a burn-in window by the Kneedle elbow
-\cite{satopaa2011kneedle} ($K=17$ at full scale), alongside a permutation
-null with Benjamini--Hochberg false discovery rate (FDR) control
-\cite{benjamini1995fdr}, which
-shows that zero drivers clear 5\% significance
-against shuffled data: the per-driver causal signal at this universe size is
-weak, a caveat that foreshadows the arm's evaluation. Qualitatively the
-causal selector still does what the correlation selector cannot: it
-rotates across ${\sim}26$ regime-tracking drivers where cumulative
-correlation locks onto the same international-equity ETFs and rates-curve
-points at essentially every rebalance. The research question, however, does not
-rest on this
-arm.
-
 \section{Engineering for tractability and reproducibility}
 \label{sec:cache}
 
@@ -270,9 +243,8 @@ its 2003 inception fell inside the cache-coverage check's padding window,
 and auto-adjustment jittered its values by ${\approx}3\times10^{-7}$
 run-to-run, which the non-convex DYNOTEARS optimiser amplified into graph
 changes of ${\approx}0.14$ in $\lVert W\rVert$. The pipeline was therefore
-not reproducible at the bit level, and two previously-drawn conclusions (an
-apparent two-year edge for causal driver selection, and an apparently
-significantly-worse closed loop) did not survive the fix. The same fix left
+not reproducible at the bit level, and two conclusions previously drawn
+in an earlier phase of the project did not survive the fix. The same fix left
 the VARLiNGAM graphs essentially unchanged: independent component analysis
 (ICA) on VAR residuals is far
 less sensitive to input micro-jitter than non-convex L-BFGS, a small

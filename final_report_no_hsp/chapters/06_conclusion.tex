@@ -91,9 +91,7 @@ rebalancing, 5\,bps costs, windows of 189/252/378/504 trading days):
         is run over two families: the full grid of seven
         allocators, and the five-allocator family the report's taxonomy
         defines, a narrowing fixed after the four-window results were
-        seen. Under the full grid, Hansen's procedure rejects
-        only for the causal family against the weak HSP baseline
-        ($p=\rsSpaConsistent$); on the window axis nothing rejects
+        seen. Under the full grid, nothing rejects
         ($p=\rsSpaSkelWthreePre$, $\rsSpaSkelWfivePre$,
         $\rsSpaDirWfivePre$ at the strongest cells). Under the narrowed
         family, marginal rejections appear
@@ -106,8 +104,9 @@ rebalancing, 5\,bps costs, windows of 189/252/378/504 trading days):
         (Table~\ref{tab:spa}) rejects for neither family under either
         grid ($p=\rsSpaSkelPooled$ causal, $\rsSpaDirPooled$
         orientation, narrowed). The $90\%$
-        Model Confidence Set over \rsMcsUniverse\ one-year strategies
-        eliminates only the HSP baseline.
+        Model Confidence Set over the one-year strategies retains the
+        whole reported family and both graph-blind controls, declining
+        to separate treatments from controls.
   \item \textbf{The effect is method- and regime-specific, and its
         mechanism is identified.} Under VARLiNGAM
         graphs orientation adds nothing at any of the four windows; under
@@ -127,20 +126,6 @@ rebalancing, 5\,bps costs, windows of 189/252/378/504 trading days):
         such (Section~\ref{sec:decomposition}).
         Descriptively, the orientation edge concentrates in calm
         (bottom-VIX-quintile) regimes; the stress hypothesis is rejected.
-  \item \textbf{The incumbent driver route is dominated.} HSP-style
-        driver
-        selection is $K$-fragile; its monthly feedback loop is exactly inert
-        across the full hyperparameter grid, and could not learn in any
-        case
-        (reward signal-to-noise ${\approx}\,\rsRewardSNR$: the update
-        frequency is itself the measurement problem); and its neural
-        sensitivity step makes its Sharpe seed-dependent across
-        $[\rsSeedMin,\rsSeedMax]$ over \rsSeedN\ seeds, a range twice
-        its claimed edge, with the committed value at the $\rsSeedPct$th
-        percentile of its own seed distribution. The graph-based allocators
-        are deterministic, and the headline three (\skelsamp{},
-        \skelsem{}, \orientsem{}) exceed even
-        its luckiest seed.
 \end{enumerate}
 
 \section{Contributions}
@@ -171,17 +156,12 @@ it:
         family-wise support absent under the full grid and
         marginal, confined to the longest horizons, under the narrowed
         family), the identification of its covariance-channel mechanism
-        as market-factor removal by a direct control, its
+        as market-factor removal by a direct control, and its
         method- and
-        regime-dependence, and the finding that textbook HRP outperforms
-        the HSP
-        machinery built to improve on it.
-  \item \textbf{Meta-scientific:} a quantified seed audit substantiating
-        the
-        instability critique of neural sensitivity-based allocation; the
-        identification of a monthly feedback loop's measurement problem
-        (one ${\sim}95\%$-noise observation per update); and a
-        reproducible pipeline (including a data-determinism defect
+        regime-dependence.
+  \item \textbf{Meta-scientific:} a
+        reproducible, fully deterministic pipeline (including a
+        data-determinism defect
         whose fix overturned two previously-drawn conclusions), with
         every design extension disclosed as such, all cells
         cache-verified, and the
@@ -261,19 +241,14 @@ conventional one-year window, largely attributable to structure that
 cheap symmetrisation already captures. The label guarantees nothing; the
 decomposition, not the branding, is what carries information.
 
-\paragraph{For the field.} Three of this project's technical choices
-generalise into norms. The seed audit has an uncomfortable reading for
-published neural-pipeline results: an author free to choose among \rsSeedN\
-seeds could have reported $\rsSeedMax$ rather than $\rsSeedMin$, an
-entire claimed edge manufactured by one undisclosed decision, so
-deterministic constructions, or disclosed seed distributions, should be the
-default. The measurement problem generalises to any feedback trading
-system: a reward that is ${\sim}95\%$ noise per update cannot teach,
-whatever the learning rule sitting on top of it, and checking reward
-estimability at the design stage would spare the field repeated failures.
-The determinism episode of Section~\ref{sec:cache} (two conclusions
+\paragraph{For the field.} One of this project's technical choices
+generalises into a norm. The determinism episode of Section~\ref{sec:cache}
+(two conclusions
 overturned by a reproducibility fix) argues that reproducibility
-belongs among publication prerequisites rather than aspirations.
+belongs among publication prerequisites rather than aspirations; the
+deterministic, seed-free construction of the allocator family is the
+design corollary, and it is what makes every number in this report
+exactly replicable.
 
 \paragraph{Costs.} The content-keyed cache cut the marginal cost of a
 configuration from ${\sim}15$ hours to ${\sim}40$ seconds, which is what
@@ -291,22 +266,17 @@ is method-dependence: repeating the fixed-graph ablation on graphs from a
 different family (e.g.\ the non-linear NTS-NOTEARS, whose prior-transfer was
 verified in a reduced-scope probe but whose ${\sim}10\times$ fit cost
 deferred a full backtest) would test whether orientation value is a
-DYNOTEARS artefact. \textbf{(2) Fix the measurement problem, then revisit
-feedback.} The monthly loop failed for a measurement reason, not a learning
-one: a higher update frequency would give the learner more reward
-observations to average over, and a longer reward window would raise the
-signal-to-noise of each one. Only after one of these changes is any feedback
-rule worth re-testing. \textbf{(3)}
+DYNOTEARS artefact. \textbf{(2)}
 \textbf{Signed structural allocation.} Equalising risk contributions over
 structural shock origins (where risk enters the causal system)
 rather than over correlated returns is the natural next use of
 $\Sigma_{\mathrm{SEM}}$; but exact per-shock parity generally requires
 shorting, so a long--short mandate, not the long-only setting studied here,
-is its natural home. \textbf{(4) Richer universes}, where cross-asset
+is its natural home. \textbf{(3) Richer universes}, where cross-asset
 causal chains are plausibly longer-lived than among 99 co-moving
 large-caps:
 multi-asset-class portfolios are where the skeleton/orientation split
-could materially differ. \textbf{(5) Orientation-aware risk attribution.}
+could materially differ. \textbf{(4) Orientation-aware risk attribution.}
 The
 total-effect matrix $B$ supports ex-post decompositions, attributing a
 month's loss to the shocks that drove it, that the correlation toolkit

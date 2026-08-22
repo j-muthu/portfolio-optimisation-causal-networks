@@ -13,9 +13,8 @@ Requirement 2: without it, the value of orientation cannot be measured at
 all. Section~\ref{sec:symm} states the problem;
 Section~\ref{sec:sem} derives the structural quantities the treatments
 consume; Sections~\ref{sec:controls}--\ref{sec:d-family} define the
-allocators; Section~\ref{sec:ablation-design} assembles them into the
-fixed-graph ablation; and Section~\ref{sec:driver-route} summarises the
-driver-based route the project began from, retained as a supporting arm.
+allocators; and Section~\ref{sec:ablation-design} assembles them into the
+fixed-graph ablation.
 
 \section{The symmetric-clustering problem}
 \label{sec:symm}
@@ -199,7 +198,7 @@ not just
 whether orientation carries value but where. All three are long-only,
 fully invested, deterministic and seed-free; all take the identical
 $(M,\ \text{returns window})$ inputs as the controls; none has an analogue in
-the HRP/HSP literature.
+the hierarchical-allocation literature.
 
 \paragraph{\skelsem{} (SEM-implied covariance).} Clustering is as in
 \skelsamp{}: the
@@ -287,7 +286,7 @@ by an exact repeat of a 378-day cell).
 
 \begin{table}[t]
   \centering
-  \caption{The allocator family and the supporting driver route. All share
+  \caption{The allocator family. All share
     the universe, calendar, transaction costs and rebalance schedule.}
   \label{tab:variants}
   \small
@@ -302,44 +301,6 @@ by an exact repeat of a 378-day cell).
     \skelsem{}            & graph embedding      & $\Sigma_{\mathrm{SEM}}$ & allocation step \\
     \orientsamp{}            & topological order    & sample & ordering step \\
     \orientsem{}           & topological order    & $\Sigma_{\mathrm{SEM}}$ & both steps \\
-    \midrule
-    HSP family    & driver sensitivities & sample & via driver selection \\
     \bottomrule
   \end{tabular}
 \end{table}
-
-\section{The incumbent driver route (the HSP family)}
-\label{sec:driver-route}
-
-The project began from HSP's driver route, and it is retained as a
-supporting
-arm, both because it supplies the seed-audit and measurement-problem
-evidence of Chapter~\ref{chap:evaluation} and because its failure motivated
-the present question. Its mechanics are as follows. At each rebalance $K{=}17$ drivers are
-selected from the pool, by cumulative correlation with the assets
-(\hspbase{}, HSP as published) or by the causal scores of
-Section~\ref{sec:selection} (\hspcausal{}),
-and a per-asset feed-forward network maps the selected drivers to asset
-returns; the Jacobian sensitivity vectors $s_i$ embed assets in driver space,
-and HRP runs on $\lVert s_i - s_j\rVert_2$ with sample covariance.
-\hsploop{} closes
-a feedback loop: the realised holding-period reward, the excess Sharpe over
-equal-weight,
-\begin{equation}
-  R[t] = \mathrm{Sharpe}\big(\text{portfolio over } [t, t{+}21\text{d}]\big)
-       - \mathrm{Sharpe}\big(\tfrac{1}{N}\big),
-\end{equation}
-is attributed to drivers in proportion to $\sum_i |w_i s_{i,d}|$, smoothed by
-an exponential moving average (EMA) $U_d[t] = \gamma\,\mathrm{credit}_d[t] + (1-\gamma)U_d[t-1]$, and
-blended into the next selection score
-$\alpha\, z(\mathrm{causal}_d) + (1-\alpha)\, z(U_d)$, with lookahead
-discipline enforced by keying utility on holding-period-end dates and
-a tested leak canary. The update frequency is central: the loop learns from
-one
-21-observation Sharpe estimate per month, which is the root of the
-measurement
-problem analysed in Section~\ref{sec:r1}. Unlike the graph-based
-allocators, this route is
-not deterministic: the network initialisation seed changes the
-sensitivities and hence the weights, as quantified by the 20-seed audit of
-Section~\ref{sec:seed-audit}.

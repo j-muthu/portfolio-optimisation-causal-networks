@@ -25,8 +25,7 @@ indistinguishable from two assets that are causally linked
 \cite{simon1954spurious,
 lopezdeprado2023causal}. The second is a deficit of \emph{interface}:
 hierarchical clustering accepts only symmetric matrices, so even if a
-directed description of the market were available, HRP and its descendants,
-including Hierarchical Sensitivity Parity (HSP) \cite{rodriguez2023hsp},
+directed description of the market were available, HRP and its descendants
 could not represent it. If asset $A$ drives asset $B$ but not conversely,
 neither the correlation matrix nor the dendrogram built from it can say so.
 These deficits are separable, and this thesis treats them separately: the
@@ -210,14 +209,13 @@ against the research question.
     consumes symmetric matrices.} Hierarchical clustering requires a
     symmetric distance; naive symmetrisation discards exactly the
     orientations in question. Exploiting them requires allocation machinery
-    with no analogue in the HRP/HSP literature, and an experimental design
+    with no analogue in the hierarchical-allocation literature, and an
+    experimental design
     in which orientation is the only treatment variable.
   \item \emph{Attributing small performance differences credibly.} The
     candidate effects are $0.01$--$0.03$ Sharpe on heavy-tailed returns,
-    produced by a study that evaluated \rsNtrials\ configurations; the
-    framework this project began from adds two further hazards:
-    seed-dependent neural sensitivity estimates, and a monthly feedback
-    signal whose sampling noise dwarfs it.
+    produced by a study that evaluated \rsNtrials\ configurations, so
+    the search itself, if unpriced, could manufacture the whole effect.
 \end{enumerate}
 
 \begin{enumerate}[label=\textbf{A\arabic*}, itemsep=2pt, topsep=3pt]
@@ -240,13 +238,10 @@ against the research question.
     correlation controls on the identical graphs.
   \item \emph{A multiplicity-, distribution- and stability-aware evaluation}
     (addresses C3; Chapter~\ref{chap:evaluation}): stationary-block-bootstrap
-    contrasts for every pairwise step of the decomposition; the
+    contrasts for every pairwise step of the decomposition; and the
     PSR/DSR/Reality-Check/SPA/MCS battery (the DSR deflating against all
     \rsNtrials\ trials, the family-wise tests over their stated
-    per-question families); a
-    \rsSeedN-seed audit quantifying the neural instability of the incumbent
-    HSP route; and a quantified account of why its monthly feedback loop
-    cannot learn (the measurement problem).
+    per-question families).
 \end{enumerate}
 
 \section{Quantified benefits}
@@ -299,30 +294,16 @@ Chapter~\ref{chap:evaluation}.
     method-dependent (absent under VARLiNGAM graphs at all four windows)
     and, descriptively, concentrates in calm regimes (the bottom quintile
     of the Cboe Volatility Index, VIX) rather than stress.
-  \item \textbf{The incumbent driver route is dominated.} The HSP-style
-    driver-selection pipeline is $K$-fragile; its monthly feedback loop is
-    exactly inert across a $3{\times}3$ hyperparameter grid, because its
-    reward has signal-to-noise ${\approx}\,\rsRewardSNR$; and its neural
-    sensitivity step makes its Sharpe seed-dependent
-    ($\rsSeedMin$--$\rsSeedMax$ over \rsSeedN\ seeds, a range twice the
-    $+0.010$ edge it claims over its own baseline). The headline graph-based
-    allocators (\skelsamp{}, \skelsem{}, \orientsem{}) are deterministic and exceed its best seed, and
-    the 90\% Model Confidence Set over the 17 distinct one-year (252-day)
-    strategies excludes exactly one configuration: the
-    correlation-selection baseline of the framework's published form.
   \item \textbf{Novelty relative to the closest published work.} Howard et
     al.\ \cite{howard2025causal} build causal graphs on the S\&P~500 but
-    never set weights from them; Rodr\'iguez-Dom\'inguez
-    \cite{rodriguez2023hsp} allocates hierarchically but from
-    correlation-selected driver sensitivities. Setting hierarchical weights
+    never set weights from them. Setting hierarchical weights
     directly from a causal graph, decomposing skeleton from orientation on
     fixed graphs, and the orientation-aware allocator family itself are, to
     my knowledge, new. Because no published configuration sets hierarchical
     weights from a discovered graph, no external number exists for a direct
-    comparison; the closest published configuration evaluated here, HSP's
-    correlation-selected form, is outperformed by textbook HRP itself
-    ($0.371$ vs $\rsCorrSharpe$ at one year) before any causal structure is
-    added.
+    comparison; the external benchmark is therefore the \HRP{} control
+    itself, L\'opez de Prado's published textbook construction, evaluated
+    on the identical protocol.
 \end{itemize}
 
 In summary: \emph{the causal graph's value to hierarchical allocation is
@@ -337,9 +318,9 @@ Chapter~\ref{chap:conclusion} restates the full answer with its caveats.
 \section{Report structure}
 \label{sec:structure}
 
-Chapter~\ref{chap:background} analyses the three works this study builds
-on (HRP and the backtest-rigour agenda, causal graphs in equity markets,
-and HSP) and locates the gap. Chapter~\ref{chap:discovery} (A1) presents the
+Chapter~\ref{chap:background} analyses the two works this study builds
+on (HRP and the backtest-rigour agenda, and causal graphs in equity
+markets) and locates the gap. Chapter~\ref{chap:discovery} (A1) presents the
 discovery pipeline that produces the graphs. Chapter~\ref{chap:sensitivity}
 (A2) develops the allocator family and the fixed-graph ablation that make the
 research question
