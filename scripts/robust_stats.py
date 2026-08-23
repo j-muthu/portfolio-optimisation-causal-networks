@@ -23,7 +23,10 @@ metric helpers of ``pipeline.evaluation.metrics``.
 Outputs:
   * ``results/robust_stats.csv``                     — the per-variant table;
   * ``final_report/_generated/robust_stats.tex`` — \\newcommand macros that
-    the report \\input's, so no number is transcribed by hand.
+    the report \\input's, so no number is transcribed by hand;
+  * ``final_report_no_hsp/_generated/robust_stats.tex`` — the same macros for
+    the no-HSP report variant, with ``rsMcsExcluded`` emitted empty (its value
+    names an HSP allocator, and the macro is unused in that variant).
 
 Run:  python -m scripts.robust_stats
 """
@@ -49,6 +52,7 @@ log = logging.getLogger("robust_stats")
 REPO = pathlib.Path(__file__).resolve().parent.parent
 RESULTS = REPO / "results"
 GEN = REPO / "final_report" / "_generated"
+GEN_NO_HSP = REPO / "final_report_no_hsp" / "_generated"
 
 # ----------------------------------------------------------------------------
 # The configuration universe (the "trials" whose multiplicity the DSR corrects).
@@ -735,6 +739,12 @@ def main(argv: list[str] | None = None) -> None:
     write_macros(GEN / "robust_stats.tex", macros)
     print(f"\nsaved → {out_csv}")
     print(f"saved → {GEN}/robust_stats.tex (report macros, unified battery)")
+    if GEN_NO_HSP.parent.is_dir():
+        # Same battery, one intentional difference: rsMcsExcluded names an HSP
+        # allocator and is unused in the no-HSP report, so it is emitted empty.
+        write_macros(GEN_NO_HSP / "robust_stats.tex",
+                     {**macros, "rsMcsExcluded": ""})
+        print(f"saved → {GEN_NO_HSP}/robust_stats.tex (no-HSP variant)")
 
 
 if __name__ == "__main__":
