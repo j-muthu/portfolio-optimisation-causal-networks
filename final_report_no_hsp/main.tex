@@ -43,8 +43,7 @@
 \begin{abstract}
 \noindent Hierarchical portfolio allocators typically use 
 the return correlation matrix as an input to their allocation. 
-However, this lacks any notion of causality, and is therefore
-vulnerable to spurious correlation.
+However, this lacks any notion of directionality or causality.
 Causal discovery algorithms ameliorate this, producing
 a directed graph (DAG) which can be decomposed into a skeleton
 (which assets are linked) and edge orientations
@@ -65,40 +64,6 @@ to HRP as a baseline. I estimate this decomposition over
 (9 months to 2 years), on a 99-asset subset of the S\&P~500. 
 I use DYNOTEARS and VARLiNGAM as causal discovery algorithms,
 with ridge-Granger as a robustness check.
-
-I find that replacing the correlation matrix with a causal graph
-yields a positive but statistically insignificant performance
-improvement. I run 40 comparisons to the correlational HRP baseline
-(covering 5 causal allocators, 2 causal discovery algorithms, 
-and 4 estimation windows), with performance gains ranging 
-from $-0.025$ to $+0.036$, with 36 out of the 40 comparisons 
-yielding a positive gain. Hansen's SPA test does not reject the
-null hypothesis of no performance gain across the full set of
-7 (the 5 mentioned above, plus 2 robustness checks) allocators
-at any of the 4 estimation windows, nor when accounting for
-the search across the windows. The relative contributions of the
-skeleton and the edge orientations depend on the estimation window.
-Around the 1-year window, the skeleton is responsible for most of 
-the graph-based allocators' performance gain. Edge orientations
-make a positive contribution from the 1-year window and longer, with
-the largest contribution at the longest windows, but this is
-sensitive to the causal discovery method: only DYNOTEARS yields
-this positive contribution, VARLiNGAM does not.
-To test whether the performance contribution of the skeleton-based
-allocator is truly attributable to the skeleton of the causal DAG,
-I also test whether there is a similar performance gain from a
-graph-free skeleton from a partial correlation network; I find no
-such gain at the 1-year window, indicating that the performance 
-gain is truly from the causal DAG's skeleton. 
-Similarly, I test whether the performance 
-contribution from the allocators using the graph's edge orientations
-is simply due to the fact that the graph removes the 
-common market factor, as the graph treats underlying shocks as 
-independent. I find this is indeed the case: providing a de-factored
-covariance matrix as an input to the allocators reproduces the
-performance gain from the edge orientations, indicating that
-the gain was from de-factoring rather than from knowledge of
-edge orientations.
 
 I find that replacing the correlation matrix with a causal DAG
 yields a positive but statistically insignificant increase 
