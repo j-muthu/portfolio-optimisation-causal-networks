@@ -22,6 +22,8 @@
 
 % Robust-stats macros (PSR/DSR/SPA/MCS)
 \input{_generated/robust_stats}
+% Out-of-sample slice macros (tab:oos)
+\input{_generated/oos_stats}
 
 % Document metadata
 \title{Portfolio Optimisation with Causal Networks}
@@ -44,7 +46,7 @@ the return correlation matrix as an input to their allocation.
 However, this lacks any notion of causality, and is therefore
 vulnerable to spurious correlation.
 Causal discovery algorithms ameliorate this, producing
-a directed graph which can be decomposed into a skeleton
+a directed graph (DAG) which can be decomposed into a skeleton
 (which assets are linked) and edge orientations
 (which assets causally affect others).
 This thesis addresses the following question: when the
@@ -53,45 +55,61 @@ replaced by a causal graph, is there a performance
 improvement, and how much of any improvement is attributable
 to the graph's skeleton versus its edge orientations?
 
-I answer this question by providing an identical graph to
-two groups of allocators: one that only takes in the graph's
+I answer this question by providing an identical DAG to
+two classes of allocators: one that only takes in the graph's
 skeleton, and one that takes in the whole graph, including its
 edge orientations. This decomposes the performance gain into
-the two aspects of the graph. I then compare these allocators
+the two aspects of the DAG. I then compare these allocators
 to HRP as a baseline. I estimate this decomposition over 
-2007--2024, using four estimation windows 
-(nine months to two years), on a 99-asset subset of the S\&P~500. 
-DYNOTEARS is the primary causal discovery algorithm used, 
-with VARLiNGAM and ridge-Granger as comparators.
+2007--2024, using 4 estimation windows 
+(9 months to 2 years), on a 99-asset subset of the S\&P~500. 
+I use DYNOTEARS and VARLiNGAM as causal discovery algorithms,
+with ridge-Granger as a robustness check.
 
-The gain is small and stable in sign: the 40 graph-versus-control cells
-span $-0.025$ to $+0.036$ net Sharpe (median $+0.017$; 36 positive).
-Sign-stability is not significance: Hansen's SPA test rejects nowhere
-over the full allocator grid ($p \geq \rsSpaSkelWfivePre$), only
-marginally at the two longest estimation windows over a narrower family fixed
-after the results were seen ($p=\rsSpaSkelWthree$, $\rsSpaSkelWfive$),
-and nowhere once a pooled test prices the search across strategies and
-estimation windows jointly. The composition shifts with the estimation window: the
-skeleton carries most of the gain near the one-year convention, while
-orientation's increment is positive from one year out and largest at the
-longer estimation windows. Direct controls identify
-the mechanism: a de-factored covariance with no graph reproduces the
-orientation allocators' covariance-channel gain at every window, their
-Deflated Sharpe ratios near-tied at the top of the study, so that gain
-works through market-factor removal, not directional content; a
-graph-free skeleton of matched density fails the same test, so the
-skeleton's one-year gain does need the discovered graph. An
-out-of-sample slice on 2025--26 data, which post-dates
-every design choice, returns the same sign on every
-contrast its protocol specified in advance; at 19 months, signs are
-all it can certify.
+I find that replacing the correlation matrix with a causal graph
+yields a positive but statistically insignificant performance
+improvement. I run 40 comparisons to the correlational HRP baseline
+(covering 5 causal allocators, 2 causal discovery algorithms, 
+and 4 estimation windows), with performance gains ranging 
+from $-0.025$ to $+0.036$, with 36 out of the 40 comparisons 
+yielding a positive gain. Hansen's SPA test does not reject the
+null hypothesis of no performance gain across the full set of
+7 (the 5 mentioned above, plus 2 robustness checks) allocators
+at any of the 4 estimation windows, nor when accounting for
+the search across the windows. The relative contributions of the
+skeleton and the edge orientations depend on the estimation window.
+Around the 1-year window, the skeleton is responsible for most of 
+the graph-based allocators' performance gain. Edge orientations
+make a positive contribution from the 1-year window and longer, with
+the largest contribution at the longest windows, but this is
+sensitive to the causal discovery method: only DYNOTEARS yields
+this positive contribution, VARLiNGAM does not.
+To test whether the performance contribution of the skeleton-based
+allocator is truly attributable to the skeleton of the causal DAG,
+I also test whether there is a similar performance gain from a
+graph-free skeleton from a partial correlation network; I find no
+such gain at the 1-year window, indicating that the performance 
+gain is truly from the causal DAG's skeleton. 
+Similarly, I test whether the performance 
+contribution from the allocators using the graph's edge orientations
+is simply due to the fact that the graph removes the 
+common market factor, as the graph treats underlying shocks as 
+independent. I find this is indeed the case: providing a de-factored
+covariance matrix as an input to the allocators reproduces the
+performance gain from the edge orientations, indicating that
+the gain was from de-factoring rather than from knowledge of
+edge orientations.
 
-The answer is therefore conditional and modest: replacing correlation
-with a DYNOTEARS graph pays, and most of what it pays is available from
-the skeleton alone near the one-year convention. Orientation buys
-robustness to the estimation window, but what it adds is reproducible
-by de-factoring alone, and its statistical support is marginal,
-family-dependent, and absent under joint multiplicity pricing.
+I find that replacing the correlation matrix with a causal DAG
+yields a positive but statistically insignificant increase 
+in the Sharpe ratio. Around the 1-year estimation window,
+the graph's skeleton accounts for most of the performance gain,
+while the edge orientations contribute most at the extremes
+(9 month and 2 year windows). However, the edge orientations'
+contribution is due to the DAG's removal of the common
+market factor, as providing a de-factored covariance matrix
+as an allocator input reproduces the performance gain from the
+edge orientations.
 \end{abstract}
 
 \begin{acknowledgements}

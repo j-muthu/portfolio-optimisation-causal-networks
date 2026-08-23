@@ -24,28 +24,28 @@ covariance matrix that, for a 100-asset universe estimated on a one-year
 window, is noisy and near-singular; the optimiser amplifies the estimation
 error and produces concentrated, unstable weights. Hierarchical Risk Parity
 \cite{lopezdeprado2016hrp} avoids the inversion with a three-step scheme.
-\textbf{(i) Clustering:} convert the correlation matrix $\rho$ into the
+(i) Clustering: convert the correlation matrix $\rho$ into the
 distance $d_{ij} = \sqrt{\tfrac{1}{2}(1-\rho_{ij})}$ and build a
-single-linkage dendrogram. \textbf{(ii) Quasi-diagonalisation:} reorder assets
+single-linkage dendrogram. (ii) Quasi-diagonalisation: reorder assets
 by the dendrogram's leaf order, concentrating large covariances near the
-diagonal. \textbf{(iii) Recursive bisection:} split the ordered list in half,
+diagonal. (iii) Recursive bisection: split the ordered list in half,
 allocate between halves in inverse proportion to their cluster variances, and
 recurse. Because no matrix is inverted, HRP is robust to ill-conditioning and
 beats mean--variance and inverse-variance portfolios out of sample in
 the paper's Monte Carlo experiments \cite{lopezdeprado2016hrp}.
 
-Two structural observations drive this thesis. First, \emph{the dendrogram
-exists only to produce an ordering}: allocation itself (step iii) consumes an
+Two structural observations drive this thesis. First, the dendrogram
+exists only to produce an ordering: allocation itself (step iii) consumes an
 ordered list plus cluster variances, not the tree. Any procedure that yields
 an economically meaningful asset ordering can therefore replace the
 clustering step wholesale; this observation motivates causal-ordered
-bisection (Section~\ref{sec:d2}). Second, \emph{every input to steps
-(i)--(ii) is symmetric by necessity}, not by accident: linkage clustering
+bisection (Section~\ref{sec:d2}). Second, every input to steps
+(i)--(ii) is symmetric by necessity, not by accident: linkage clustering
 merges clusters by comparing distances, and a distance is symmetric by
 definition, so the pipeline is structurally blind to directionality. If the
 true data-generating process contains one-way influence ($A$ moves $B$ with
 a sign and magnitude that $B$ does not reciprocate), no correlation-fed
-hierarchical allocator can represent that fact. This is the \emph{interface} deficit of
+hierarchical allocator can represent that fact. This is the interface deficit of
 Section~\ref{sec:motivation}: not a flaw of correlation estimation but of
 what the clustering step can accept. Making that interface accept directional
 information, without breaking what makes HRP work, is challenge C2.
@@ -61,7 +61,7 @@ that interface therefore speaks to the family, not to one algorithm; HRP
 is used here as its simplest and most-studied representative, so that any
 effect found is attributable to the input rather than to allocator
 elaborations. The interface claim is structural; whether the
-\emph{measured} decomposition also transfers across the family's
+measured decomposition also transfers across the family's
 tree-reading rules is an empirical question, tested on a second member
 (a HERC variant \cite{raffinot2018herc}) in
 Section~\ref{sec:decomposition}, with a mixed outcome reported there.
@@ -84,21 +84,21 @@ claim of the backtest-overfitting agenda \cite{bailey2014deflated,
 lopezdeprado2023causal} is that the hard problem in quantitative finance is
 not finding a configuration that looks good in a backtest, but establishing
 that its performance is not an artefact of the search that found it. Two
-instruments follow. The \emph{Probabilistic Sharpe Ratio} \cite{bailey2012psr}
+instruments follow. The Probabilistic Sharpe Ratio \cite{bailey2012psr}
 replaces the Gaussian sampling theory of the Sharpe ratio, untenable at the
 excess kurtosis of ${\approx}\,\rsKurtosis$ measured here, with a version
 that corrects for the sample's skewness, kurtosis and length; the
-\emph{Deflated Sharpe Ratio} \cite{bailey2014deflated} then raises the
+Deflated Sharpe Ratio \cite{bailey2014deflated} then raises the
 benchmark from zero to the best Sharpe expected from $N$ independent trials
 under the null of no skill, directly discounting selection bias. For
 family-wise comparison against a benchmark, White's Reality Check
 \cite{white2000reality} and Hansen's SPA test \cite{hansen2005spa} bootstrap
-the null that \emph{no} candidate beats it, and the Model Confidence Set
+the null that no candidate beats it, and the Model Confidence Set
 \cite{hansen2011mcs} returns the subset of strategies statistically
 indistinguishable from the best. This battery is applied to every claim in
 Chapter~\ref{chap:evaluation}: the Deflated Sharpe Ratio deflates each
 headline Sharpe against all \rsNtrials\ configurations this project
-evaluated, while the Reality Check, SPA and MCS run over the smaller family
+evaluated, while the SPA and MCS run over the smaller family
 of candidates relevant to each question. Several headline-looking effects do
 not survive it, and reporting that is treated as part of the result rather
 than a failure.
@@ -112,12 +112,13 @@ large-scale application of DYNOTEARS to S\&P~500 constituents over
 1989--2022 (${\approx}\,357$ names per estimated network), re-estimated on
 a rolling basis, structurally the same discovery machinery as
 Chapter~\ref{chap:discovery}. Three of their empirical findings shape this
-study's design. First, \emph{lagged edges are negligible} at daily-to-monthly
+study's design. First, lagged edges are negligible at daily-to-monthly
 horizons: the contemporaneous block $W$ contains essentially all the
 structure, which justifies this project's use of the contemporaneous
-asset--asset block as ``the graph'' and its lag-1 truncation elsewhere.
-Second, causal networks carry \emph{regime information that correlation
-misses}: rising network density precedes lower returns and flags recessions,
+asset--asset block as ``the graph'' and the lag-1 truncation of
+Section~\ref{sec:asset-graph}.
+Second, causal networks carry regime information that correlation
+misses: rising network density precedes lower returns and flags recessions,
 and their centrality-based signal earns its alpha in stable rather than
 stressed periods. This motivates the regime-conditional evaluation of
 Section~\ref{sec:regimes}, where the orientation effect is found to echo
@@ -143,8 +144,8 @@ cache (Section~\ref{sec:cache}) rather than by shrinking the experiment.
 \label{sec:cd-tools}
 
 The pipeline needs three facts from the causal-discovery literature
-\cite{spirtes2000causation,kaddour2022causalml}. \textbf{(i) Score-based
-discovery scales and accepts priors.} Constraint-based methods (PC, FCI)
+\cite{spirtes2000causation,kaddour2022causalml}. (i) Score-based
+discovery scales and accepts priors. Constraint-based methods (PC, FCI)
 scale poorly with dimension and lean on faithfulness, an assumption that is
 fragile in markets,
 where offsetting mechanisms can leave causally-connected pairs with near-zero
@@ -156,22 +157,20 @@ structural VAR $X = XW + \sum_p Y_p A_p + Z$ with acyclicity on the
 contemporaneous $W$ only, and natively supports forbidden-edge lists, which
 is how the directional prior of C1 is enforced. It is the primary method
 here.
-\textbf{(ii) Non-Gaussianity identifies direction.} The LiNGAM family
+(ii) Non-Gaussianity identifies direction. The LiNGAM family
 \cite{shimizu2006lingam} exploits non-Gaussian residuals to identify a unique
 causal ordering; VARLiNGAM \cite{hyvarinen2010varlingam} is its SVAR form and
 serves as the robustness comparator: its identification rests on an
 assumption (heavy-tailed residuals) that financial returns satisfy at short
 windows but progressively lose at longer ones as aggregation pulls residuals
 toward Gaussianity, a mechanism the results repeatedly exhibit.
-\textbf{(iii) A directed graph without trustworthy magnitudes exists in
-closed form.} A ridge-regularised VAR(1) coefficient matrix is a
+(iii) A directed graph without trustworthy magnitudes exists in
+closed form. A ridge-regularised VAR(1) coefficient matrix is a
 Granger-causal \cite{granger1969investigating} directed graph: it carries a
-defensible directional \emph{ordering}, but its shrunken one-lag
+defensible directional ordering, but its shrunken one-lag
 coefficients are not structural effect sizes. That combination makes it a
 natural control for dissociating what ``orientation'' contains: the
-arrows themselves versus magnitudes fit to propagate shocks. (A non-linear extension, NTS-NOTEARS \cite{sun2023ntsnotears},
-was probed at reduced scale and left as future work: its prior-knowledge
-mechanism transfers, but a full backtest costs ${\sim}10\times$ DYNOTEARS.)
+arrows themselves versus magnitudes fit to propagate shocks.
 
 \section{Research gap}
 \label{sec:gap}

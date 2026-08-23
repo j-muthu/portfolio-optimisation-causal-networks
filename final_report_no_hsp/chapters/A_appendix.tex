@@ -71,8 +71,39 @@ of Section~\ref{sec:decomposition} (pre-committed in
 \texttt{PREDICTIONS\_HERC.md}), net Sharpe across the four windows:
 correlation-distance control $0.325/0.320/0.292/0.245$; skeleton member
 (\skelsamp{}'s distance) $0.122/0.128/0.303/0.205$; orientation member
-($\Sigma_{\mathrm{SEM}}$) $0.240/0.259/0.322/0.297$. All twelve cells
+($\Sigma_{\mathrm{SEM}}$) $0.240/0.259/0.321/0.297$. The orientation
+contrast (orientation member $-$ skeleton member) is positive at every
+window: $+0.119$, $+0.131$, $+0.018$, $+0.092$ (unadjusted bootstrap
+$p=0.03$, $0.03$, $0.81$, $0.21$); the skeleton contrast (skeleton
+member $-$ control) is not: $-0.203$, $-0.193$, $+0.011$, $-0.040$
+($p \geq 0.16$). A mechanical reading of the level shortfall is an
+interface interaction: under the house single-linkage pattern the
+dendrogram is deeply chained, and walking its topology compounds
+roughly a hundred sequential budget splits, which HRP's balanced
+bisection never does; Raffinot's cluster-cut variant, which prunes the
+walk, is the natural next member to test. All twelve cells
 join the deflation universe and neither SPA family.
+
+\begin{figure}[tbp]
+  \centering
+  \includegraphics[width=0.99\textwidth]{figures/phase_ii_decomposition.png}
+  \caption{The per-window levels behind Figure~\ref{fig:gradient}
+    (DYNOTEARS graphs, net annualised Sharpe): \HRP{} $\to$ \skelsamp{}
+    ($+$skeleton) $\to$ \skelsem{}/\orientsem{} ($+$orientation) at each estimation window,
+    steps annotated with the pairwise bootstrap $\Delta$ and $p$-value.
+    Section~\ref{sec:believe-rigour} adjudicates these steps family-wise.}
+  \label{fig:decomp}
+\end{figure}
+
+\begin{figure}[tbp]
+  \centering
+  \includegraphics[width=0.7\textwidth]{figures/returns_distribution.png}
+  \caption{Distribution of daily net returns (pooled across variants) against
+    a fitted normal, log-density axis. The heavy tails (excess kurtosis
+    ${\approx}\,\rsKurtosis$) are why the plain Sharpe ratio is supplemented
+    by the Probabilistic and Deflated Sharpe ratios throughout.}
+  \label{fig:retdist}
+\end{figure}
 
 \section{Headline configurations in return terms}
 
@@ -125,13 +156,10 @@ Table~\ref{tab:matrix-full} for orientation.
 
 \begin{table}[h]
   \centering
-  \caption{Transaction-cost sweep (DYNOTEARS): net Sharpe by one-way cost.
-    The covariance-channel increment (\skelsem{}$-$\skelsamp{}) is
-    cost-invariant at both windows; the ordering-route increment
-    (\orientsem{}$-$\skelsamp{}) is cost-invariant at two years but erodes
-    from $+0.004$ to $0.000$ across the sweep at the one-year window,
-    \orientsem{} carrying the family's highest turnover.
-    Turnover is mean one-way per rebalance.}
+  \caption{Transaction-cost sweep (DYNOTEARS): net Sharpe by one-way
+    cost at the one-year and two-year windows. Turnover is mean one-way
+    per rebalance; Section~\ref{sec:decomposition} draws the
+    conclusions.}
   \label{tab:cost}
   \begin{tabular}{l c c c c c}
     \toprule
@@ -148,6 +176,17 @@ Table~\ref{tab:matrix-full} for orientation.
 \end{table}
 
 \section{Regime-conditional Sharpe (one-year window)}
+
+\begin{figure}[tbp]
+  \centering
+  \includegraphics[width=0.9\textwidth]{figures/phase_ii_regime.png}
+  \caption{Regime-conditional Sharpe excess over the \HRP{} control
+    (one-year window).
+    The
+    orientation-aware edge concentrates in the VIX bottom quintile (calm
+    markets), not in stress: the stress hypothesis is rejected.}
+  \label{fig:regime}
+\end{figure}
 
 \begin{table}[h]
   \centering
@@ -199,18 +238,18 @@ excluded, as in Phase I.)
 
 \section{Hyperparameters}
 
-For reproducibility, the operative settings. \emph{Discovery:} DYNOTEARS lag
+For reproducibility, the operative settings. Discovery: DYNOTEARS lag
 $p=1$, $\lambda_W=\lambda_A=0.05$, fit-time edge threshold $0.01$ (the
 extraction threshold $\tau$ of Section~\ref{sec:asset-graph} defaults to $0$
 on top of this); VARLiNGAM with lingam pruning disabled (adaptive lasso
 fails at $d>n$); ridge-Granger ridge $\lambda=10^{-2}$ scaled by window length,
 density-matched per window to the paired DYNOTEARS graph.
-\emph{Allocators:} single-linkage where clustering is used;
+Allocators: single-linkage where clustering is used;
 $\Sigma_{\mathrm{SEM}}$ with diagonal shock variances from fit-window
 residuals, nearest-PSD projection and ridge load
 $10^{-6}\operatorname{tr}(\Sigma)/N$; topological tie-break by
 total downstream influence then name.
-\emph{Protocol:} 5\,bps one-way (swept $\{0,5,10,20\}$); windows
+Protocol: 5\,bps one-way (swept $\{0,5,10,20\}$); windows
 189/252/378/504 trading days; holding and step 21 trading days; 215
 (189- and 252-day windows) / 209 (378-day) / 203 (504-day) rebalances,
 2007-01--2024-11
@@ -230,6 +269,19 @@ rebalances; re-verified on the four-window grid by an exact repeat
 of a 378-day cell). The ablation ran on 1{,}684 cache-verified graph fits
 with a 100\% hit rate; each backtest regenerates in ${\approx}40$ seconds
 from the cache.
+
+\paragraph{Cache mechanics and the determinism defect.} The discovery
+cache is keyed by the exact window bytes, column set, method and
+hyperparameters, with atomic writes; a key miss halts the run rather
+than silently refitting a subtly different graph. The data-determinism
+defect of Section~\ref{sec:cache} arose because EEM's 2003 inception
+fell inside the cache-coverage check's padding window, triggering a
+silent re-download whose auto-adjustment jittered values by
+${\approx}3\times10^{-7}$ run-to-run; the non-convex DYNOTEARS
+optimiser amplified this into graph changes of ${\approx}0.14$ in
+$\lVert W\rVert$, while VARLiNGAM's ICA-on-residuals fits were
+essentially unchanged by the same jitter, a small robustness result in
+its own right.
 
 \paragraph{Environment and data access.} Python~3.13 in the repository's
 virtual environment; \texttt{causalnex} and \texttt{lingam} are vendored

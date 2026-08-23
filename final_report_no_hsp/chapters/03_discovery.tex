@@ -43,24 +43,24 @@ truncating every other series' history. The top-by-market-cap construction
 remains an approximation of the official index and is noted as a limitation
 in Section~\ref{sec:limitations}.
 
-\paragraph{Driver pool.} Discovery runs on the \emph{joint} panel of assets
+\paragraph{Driver pool.} Discovery runs on the joint panel of assets
 and 33 plausibly exogenous macro-financial series from FRED and Yahoo Finance:
 Treasury rates and slopes, credit spreads, commodities, FX pairs, volatility
 indices, and international-equity ETFs. The drivers' presence in the joint
 fit means the
-asset--asset block is estimated \emph{conditional on} the common macro
+asset--asset block is estimated conditional on the common macro
 environment, absorbing driver-explained co-movement that would otherwise
 masquerade as asset-to-asset edges. Series that fail exogeneity to a US
 large-cap portfolio (sector ETFs, US index returns, factor portfolios)
 are excluded from the pool.
 
 \paragraph{Stationarity and transforms.} SVAR-based discovery assumes weakly
-stationary inputs. Each series is transformed \emph{by type}: log-returns for
+stationary inputs. Each series is transformed by type: log-returns for
 price-like series; first differences for yields and spreads, which cross zero,
 so logs are undefined; year-on-year changes for monthly macro levels, which
 also removes seasonality; level pass-through for the already-stationary
 volatility indices. A uniform ``log everything'' rule would break on the
-rates block. The per-type transforms are fixed \emph{a priori} rather than
+rates block. The per-type transforms are fixed a priori rather than
 chosen by test per window, so each variable means the same thing in every
 rolling window, a prerequisite for comparing graphs across time.
 Stationarity is then checked with both the augmented Dickey--Fuller (ADF)
@@ -75,7 +75,7 @@ series.
 The primary discovery method is chosen against three requirements, not by
 default: it must scale to the ${\sim}132$-variable joint panel at every
 rebalance of a sweepable grid; it must accept the directional prior of C1
-\emph{natively}, rather than by post-hoc edge deletion; and it must return
+natively, rather than by post-hoc edge deletion; and it must return
 a DAG, because the allocators of Chapter~\ref{chap:sensitivity} rely
 on exact nilpotent total-effect algebra. DYNOTEARS meets all three; the
 comparators of Section~\ref{sec:comparators} each relax one requirement and
@@ -104,11 +104,13 @@ projection.
 it has a measurable effect. Refitting DYNOTEARS with and without the prior
 on
 six windows spanning distinct regimes (2008, 2011, 2014, 2018Q4, 2020, 2022)
-shows that, unconstrained, the optimiser spends \textbf{35--48\%} of total
+shows that, unconstrained, the optimiser spends 35--48\% of total
 edge mass on economically implausible asset$\to$driver edges; admitting them
 distorts the legitimate driver$\to$asset block by 52--72\% in $L_1$ and
-shifts the selected driver set in a meaningful minority of windows (top-$K$
-Jaccard 0.62--1.00, lowest in the 2008 and 2022 stress regimes;
+shifts the composition of the highest-edge-mass drivers in a meaningful
+minority of windows (a graph-content diagnostic: Jaccard overlap of the
+top drivers by edge mass, $0.62$--$1.00$, lowest in the 2008 and 2022
+stress regimes;
 Figure~\ref{fig:prior}). The prior is consequential rather than cosmetic:
 it removes a large block of spurious reverse-causation mass at negligible
 cost and, because the asset--asset block is estimated jointly, it protects
@@ -120,8 +122,9 @@ the graph that the study's allocators consume.
   \caption{Verification of the asset$\to$driver directional prior. Bars: the
     fraction of total DYNOTEARS edge mass that would fall on implausible
     asset$\to$driver edges if the prior were removed (35--48\% across regime
-    windows). Line (right axis): top-$K$ driver-set Jaccard with versus
-    without the prior. The prior removes a large block of spurious
+    windows). Line (right axis): Jaccard overlap of the top drivers by
+    edge mass with versus
+    without the prior (a graph-content diagnostic). The prior removes a large block of spurious
     reverse-causation mass, and matters most in the 2008 and 2022 stress
     regimes.}
   \label{fig:prior}
@@ -153,10 +156,8 @@ rather than a shallow hub-and-spoke structure. The graphs therefore contain
 substantial orientation structure for the treatment allocators to exploit;
 whatever the evaluation finds, it will not be attributable to trivially
 symmetric graphs. One diagnostic is absent: month-to-month edge
-persistence between adjacent rebalances was not quantified, so the graphs'
-stability over time is attested only by the determinism of the fits and
-the stability of these aggregate diagnostics, a gap recorded in
-Section~\ref{sec:limitations}. (The
+persistence was not quantified
+(Section~\ref{sec:limitations}). (The
 same diagnostic flags a comparator limitation: VARLiNGAM's unpruned $B_0$
 saturates to $32\%$ density at the 189-day window ($n=189$ observations
 against $d=132$ variables), where DYNOTEARS' $\ell_1$ objective holds
@@ -185,14 +186,14 @@ are true.
 Because the research question hinges on what the orientations contribute, the design
 carries two further graph sources that perturb precisely that ingredient;
 both feed the same chokepoint, so every allocator runs unchanged on them.
-\textbf{VARLiNGAM} \cite{hyvarinen2010varlingam} supplies
-\emph{differently-identified} orientations: its instantaneous matrix $B_0$
+VARLiNGAM \cite{hyvarinen2010varlingam} supplies
+differently-identified orientations: its instantaneous matrix $B_0$
 is identified through non-Gaussianity rather than a score, LiNGAM's causal
 order makes the asset block a DAG by construction, and its identification
 assumption (heavy-tailed residuals) weakens mechanically at longer
 windows, the window-fragility Chapter~\ref{chap:background} anticipated and
-Chapter~\ref{chap:evaluation} observes. \textbf{ridge-Granger} supplies
-\emph{magnitude-degraded} orientations: a ridge-regularised VAR(1) on the
+Chapter~\ref{chap:evaluation} observes. ridge-Granger supplies
+magnitude-degraded orientations: a ridge-regularised VAR(1) on the
 asset panel, in closed form, with
 $M[i,j] = |{\rm coef}(x_{i,t-1}\!\to\!x_{j,t})|$, thresholded per window
 to match the paired DYNOTEARS graph's edge density so the comparison is at
@@ -202,16 +203,12 @@ is not guaranteed acyclic, which the allocators handle explicitly
 (truncated-Neumann total effects; minimal feedback-arc removal before
 topological ordering). The two controls therefore split ``orientation''
 into its parts: if an effect needs DYNOTEARS' specific arrows, VARLiNGAM
-should not reproduce it; if it needs trustworthy edge \emph{magnitudes}
+should not reproduce it; if it needs trustworthy edge magnitudes
 rather than arrows alone, ridge-Granger's ordering should survive where its
 shock propagation fails, which is the dissociation
-Section~\ref{sec:decomposition} observes. (A
-non-linear extension, NTS-NOTEARS \cite{sun2023ntsnotears}, was probed at
-reduced scale: its prior-knowledge mechanism drives the asset$\to$driver
-block to exactly zero and its discovered structure agrees with DYNOTEARS
-only modestly, indicating a distinct structural lens, but at
-${\sim}10\times$ the fit
-cost a full backtest is future work.)
+Section~\ref{sec:decomposition} observes. (A non-linear extension,
+NTS-NOTEARS \cite{sun2023ntsnotears}, was probed at reduced scale and
+is left as future work; Section~\ref{sec:future}.)
 
 \section{Engineering for tractability and reproducibility}
 \label{sec:cache}
@@ -220,38 +217,34 @@ Two engineering results underwrite the credibility of every number in
 Chapter~\ref{chap:evaluation}.
 
 \paragraph{The discovery cache.} The graph fit is the dominant cost
-(${\approx}4$ minutes per window at $d\approx132$; ${\approx}15$ hours per
-215-rebalance backtest), yet it depends only on the window data and discovery
+(${\approx}4$ minutes per window at $d\approx132$; ${\approx}15$ hours
+per backtest), yet it depends only on the window data and discovery
 hyperparameters, not on anything downstream. A content-keyed disk cache
-(keyed by the exact window bytes, column set, method and hyperparameters,
-with atomic writes) therefore lets every configuration at a given window
-reuse one fit. The effect is decisive: the full ablation grid (every
-allocator--method--window cell, plus the sparsity, cost and comparator
-sweeps) ran against 1{,}684 cached graph fits with a verified 100\% hit
-rate and zero refits (a key miss halts the run rather than silently
-refitting a subtly different graph), at ${\approx}40$ seconds per backtest
-instead of ${\approx}15$ hours; populating a new estimation window costs
-one overnight run rather than weeks. The cache also
-guarantees the ablation's
-premise: allocators cannot see different graphs, because there is exactly
-one graph per (method, window, data) key.
+therefore lets every configuration at a given window reuse one fit: the
+full ablation grid ran against 1{,}684 cached graph fits with a
+verified 100\% hit rate and zero refits, at ${\approx}40$ seconds per
+backtest. The cache also guarantees the ablation's premise: allocators
+cannot see different graphs, because there is exactly one graph per
+(method, window, data) key. The cache mechanics are recorded in
+Appendix~\ref{app:tables}.
 
 \paragraph{A data-determinism defect, found and fixed.} Building the cache
 exposed a latent reproducibility bug: one driver series (the
-emerging-markets ETF EEM) was silently re-downloaded on every call because
-its 2003 inception fell inside the cache-coverage check's padding window,
-and auto-adjustment jittered its values by ${\approx}3\times10^{-7}$
-run-to-run, which the non-convex DYNOTEARS optimiser amplified into graph
-changes of ${\approx}0.14$ in $\lVert W\rVert$. The pipeline was therefore
-not reproducible at the bit level, and two conclusions previously drawn
-in an earlier phase of the project did not survive the fix. The same fix left
-the VARLiNGAM graphs essentially unchanged: independent component analysis
-(ICA) on VAR residuals is far
-less sensitive to input micro-jitter than non-convex L-BFGS, a small
-robustness result in its own right. All numbers in this report come from
-the corrected, deterministic pipeline: two independent runs now produce
-identical windows, weights and NAVs, verified end-to-end by the
+emerging-markets ETF EEM) was silently re-downloaded on every call, and
+the resulting micro-jitter, amplified by the non-convex DYNOTEARS
+optimiser, made the pipeline irreproducible at the bit level. Two
+conclusions previously drawn in the project's first phase did not
+survive the fix. (That first phase, an exploratory precursor on the
+same panel and protocol, evaluated earlier causal allocators including
+the skeleton variant this study anchors on; its configurations are
+priced into the \rsNtrials-trial deflation universe of
+Chapter~\ref{chap:evaluation}, and its committed skeleton result is the
+target of the replication gate below.) All numbers in this report come
+from the corrected, deterministic pipeline: two independent runs now
+produce identical windows, weights and NAVs, verified end-to-end by the
 replication gate of Section~\ref{sec:ablation-design}. A result that does
 not survive a determinism fix was never real; treating reproducibility as a
 prerequisite rather than an afterthought is part of the method
-\cite{lopezdeprado2023causal}.
+\cite{lopezdeprado2023causal}. The defect's mechanism, and the
+observation that VARLiNGAM's ICA-based fits were robust to the same
+jitter, are recorded in Appendix~\ref{app:tables}.

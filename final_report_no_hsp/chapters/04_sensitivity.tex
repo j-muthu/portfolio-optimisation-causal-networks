@@ -6,7 +6,7 @@
 This chapter presents the allocation machinery (A2, addressing C2) that makes
 the research question answerable: a family of allocators fed the identical
 per-window graph, split
-into \emph{controls} that can see only the skeleton and \emph{treatments}
+into controls that can see only the skeleton and treatments
 that can see the orientations. The family is the construction that
 discharges
 Requirement 2: without it, the value of orientation cannot be measured at
@@ -25,17 +25,12 @@ this asymmetry is the object of study. The naive fix, symmetrising the
 adjacency as
 $\tfrac{1}{2}(|M| + |M^\top|)$, discards the very orientations the research
 question asks
-about. A more principled alternative also fails: the
-bipartite double cover of the directed graph (equivalently the Hermitian
-dilation, the symmetric $2N{\times}2N$ block matrix with $M$ and $M^{\top}$
-in its off-diagonal blocks) embeds the directed matrix losslessly
-in a symmetric object, at the price of doubling the node set, so that every
-asset appears once in its source role and once in its sink role.
-Hierarchical allocation then produces weights over $2N$ pseudo-assets, and
-recombining each asset's two role-weights into a single holding re-poses
-precisely the upstream-versus-downstream question the construction was meant
-to absorb: the asymmetry is relocated, not resolved. This route was
-investigated and abandoned, and it sets the design conclusion for the
+about. A more principled alternative, embedding the directed matrix
+losslessly in the symmetric bipartite double cover, was investigated
+and abandoned: it doubles the node set into source and sink roles, and
+recombining each asset's two role-weights into one holding re-poses
+precisely the upstream-versus-downstream question the construction was
+meant to absorb. That failure sets the design conclusion for the
 chapter: the
 symmetric interface cannot be made to carry orientation, so the
 allocation steps themselves must change. The challenge is therefore not to
@@ -44,9 +39,9 @@ interface but to build allocation steps that consume the directed
 matrix natively, while changing as little else as possible, so that any
 performance difference is attributable to orientation and nothing else. The
 two structural observations of Section~\ref{sec:hrp-theme} open the way.
-First, HRP's dendrogram exists only to produce a leaf \emph{ordering} for
+First, HRP's dendrogram exists only to produce a leaf ordering for
 recursive bisection, and a DAG carries a natural ordering for free.
-Second, HRP's bisection step consumes cluster \emph{variances} from a
+Second, HRP's bisection step consumes cluster variances from a
 covariance matrix, and a DAG implies one.
 
 \section{The structural model: total effects and the implied covariance}
@@ -62,7 +57,7 @@ written in the $i\to j$ convention, define the structural equation model
 \end{equation}
 where $x$ is the vector of (standardised) asset returns and $\varepsilon$ the
 vector of structural shocks. Because the asset block is a DAG, its adjacency
-is nilpotent, so the \emph{total-effect matrix}
+is nilpotent, so the total-effect matrix
 $B = \sum_{k\ge 0} (M^\top)^k$ terminates in at most $N$ terms and exists
 exactly, with no spectral-radius assumption. $B_{ij} = \partial x_i / \partial
 \varepsilon_j$ aggregates the influence of a unit shock at asset $j$ on asset
@@ -76,7 +71,7 @@ The SEM of Eq.~\eqref{eq:sem} implies a covariance. With $\Sigma_\varepsilon =
 \operatorname{diag}(\sigma^2_{\varepsilon,i})$ (diagonality is the SEM's
 own independent-shocks assumption, and estimating a dense
 $\Sigma_\varepsilon$ would reintroduce sample correlation into a treatment
-meant to isolate the graph), the \emph{SEM-implied covariance} in return
+meant to isolate the graph), the SEM-implied covariance in return
 units is
 \begin{equation}
   \Sigma_{\mathrm{SEM}}
@@ -122,14 +117,14 @@ transposing $M$
 pairwise distances, and hence the dendrogram and the weights, unchanged;
 the property is enforced by unit test. The guarantee is exactly that and
 no more: because $e_i$ keeps outgoing and incoming edges in separate
-halves, reversing an \emph{individual} edge can move mass between halves
+halves, reversing an individual edge can move mass between halves
 and change distances, so \skelsamp{} retains each asset's source/sink
 role profile, which is information the undirected skeleton alone does not
 carry. The control with the stronger guarantee is \skelalt{} below, and
 the decomposition is read against both anchors in
 Chapter~\ref{chap:evaluation}. \skelsamp{} coincides with
-the
-asset-only Causal-HRP variant of the project's first phase, which allows the
+the skeleton allocator evaluated in the project's first phase
+(Section~\ref{sec:cache}), which allows the
 new harness to be validated against a
 committed historical result (Section~\ref{sec:ablation-design}).
 
@@ -159,8 +154,8 @@ Chapter~\ref{chap:evaluation} reports where the two anchors disagree.
 
 Section~\ref{sec:symm} left hierarchical allocation with exactly two moving
 parts, and that fact bounds the design space. The clustering step exists only
-to emit an \emph{ordering}; the allocation step consumes only a
-\emph{covariance}. Nothing else crosses between them: recursive bisection
+to emit an ordering; the allocation step consumes only a
+covariance. Nothing else crosses between them: recursive bisection
 receives the ordering and the covariance and no third object, and it splits
 the ordered list by position rather than by the dendrogram's own branches. A
 causal graph therefore has exactly two entry points into HRP, the ordering
@@ -253,8 +248,10 @@ without remainder. The reported grid is five graph-consuming allocators $\times$
 \{DYNOTEARS, VARLiNGAM\} $\times$ \{189, 252, 378, 504\}-day windows, plus
 the magnitude-degraded ridge-Granger control arm, a sparsity sweep and a cost
 sweep. The evaluated grid is wider: seven allocators in the original
-experiment plan, plus two direction-free
-covariance controls added during
+experiment plan, plus the mechanism controls (two direction-free
+covariance controls and a graph-free partial-correlation skeleton
+control), a second hierarchical family (HERC) and the naive anchors,
+all added during
 evaluation; the narrowing to five and the provenance of every extension
 are disclosed in Section~\ref{sec:believe}, and every evaluated cell is
 priced into the deflation universe. The window axis is a
@@ -269,20 +266,18 @@ operates with $n=189$ observations against $d=132$ variables: valid
 ($n>d$) but thin, a caveat carried through to the results.
 
 \paragraph{Verification before results.} Three gates preceded the grid.
-The \emph{unit-test gate}: 60+ tests written first, including the
+The unit-test gate: 60+ tests written first, including the
 orientation-blindness of the controls, the orientation-sensitivity of every
 treatment, total-effect and SEM-covariance identities against
 hand-computed cases, and topological-order properties on random
-DAGs. The \emph{cache gate}: all 1,684 (method, window) graph fits
-verified
-as cache hits with zero refits, so no allocator can have seen a different
-graph. The \emph{replication gate}: \skelsamp{} run through the new
-harness reproduces
-the committed first-phase bundle with $\Delta\text{Sharpe}=0$ and
-maximum per-rebalance weight difference $0.0$ across all 215 rebalances,
-establishing both that the new machinery is faithful and that
-the pipeline is deterministic end-to-end (re-verified on the extended grid
-by an exact repeat of a 378-day cell).
+DAGs. The cache gate: every graph fit verified
+as a cache hit with zero refits, so no allocator can have seen a different
+graph. The replication gate: \skelsamp{} run through the new
+harness exactly reproduces
+the committed first-phase bundle, establishing both that the new
+machinery is faithful and that
+the pipeline is deterministic end-to-end. The gates' figures are
+archived in Appendix~\ref{app:tables}.
 
 \begin{table}[t]
   \centering
