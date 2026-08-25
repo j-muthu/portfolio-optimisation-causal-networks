@@ -1,28 +1,7 @@
-"""Cumulative-correlation driver selection — Rodriguez-Dominguez 2023 (HSP).
-
-This is the **V0 baseline** driver-selection method. For each candidate
-driver ``d``, score it by summed absolute correlation with the asset block:
-
-    score_d = Σ_{lag ∈ lags} Σ_{asset i} | corr(d_{t-lag}, asset_i_t) |
-
-Take the top ``K``. No causal inference involved — just classical
-correlation. The contrast with our :func:`pipeline.factor_selection.select_drivers`
-(causal greedy + utility blend) is exactly the experimental contribution of
-the thesis.
-
-Ported from the inline cum-corr block in
-``thesis/HSP/Full_Project_Notebook.ipynb`` ("Correlation window for drivers
-selection" → "Rank the previous results and select the top n=N_Drivers
-largest value names for the lag 0, 1 and both cases"). The notebook handles
-three lag configurations: lag-0 only, lag-1 only, or both summed; we expose
-the same via the ``lags`` tuple parameter.
-
-Entry points
-------------
-* :func:`cumulative_correlation_score` -- per-driver score over a window.
-* :func:`select_top_k_corr` -- top-K names; mirrors the signature of
-  :func:`pipeline.factor_selection.select_drivers` so the V0 path in
-  ``stage1_pipeline.py`` can swap selection methods with a one-line change.
+"""Cumulative-correlation driver selection (Rodriguez-Dominguez 2023), the V0
+baseline. Each driver is scored by summed absolute correlation with the asset
+block over the given lags; take the top K. No causal inference involved.
+Ported from the HSP notebook's cum-corr block.
 """
 
 from __future__ import annotations
@@ -37,32 +16,16 @@ import pandas as pd
 logger = logging.getLogger(__name__)
 
 
-# ============================================================================
 # Score
-# ============================================================================
 def cumulative_correlation_score(
     driver_window: pd.DataFrame,
     asset_window: pd.DataFrame,
     lags: Sequence[int] = (0, 1),
 ) -> pd.Series:
-    """``Σ_{lag} Σ_{asset} |corr(driver_{t-lag}, asset_t)|`` per driver.
+    """Sum of |corr(driver_{t-lag}, asset_t)| over lags and assets, per driver.
 
-    Parameters
-    ----------
-    driver_window:
-        Driver panel for the selection window (one column per candidate).
-    asset_window:
-        Asset panel, same index as ``driver_window``.
-    lags:
-        Lags to sum over. ``(0,)`` is contemporaneous-only; ``(0, 1)`` is
-        the paper's default; ``(1,)`` is lagged-only (closest analogue to
-        our Stage A causal score which excludes contemporaneous edges).
-
-    Returns
-    -------
-    ``pd.Series`` indexed by driver name, sorted ascending by name (caller
-    sorts by value to pick the top-K). NaN-safe: pairs with insufficient
-    overlap contribute zero.
+    ``(0, 1)`` is the paper's default lag set. Returns a Series indexed by
+    driver name; pairs with insufficient overlap contribute zero.
     """
     scores: dict[str, float] = {}
     for d in driver_window.columns:
@@ -85,13 +48,11 @@ def cumulative_correlation_score(
     return pd.Series(scores, name="cumcorr_score")
 
 
-# ============================================================================
 # Top-K selection
-# ============================================================================
 @dataclass
 class CorrelationSelectionResult:
-    """Output of :func:`select_top_k_corr` — mirrors :class:`SelectionResult`
-    just enough for downstream code to consume."""
+    """Output of :func:`select_top_k_corr`; mirrors :class:`SelectionResult`
+    just enough for downstream code."""
 
     rebalance_date: pd.Timestamp
     selected: list[str]
@@ -111,11 +72,10 @@ def select_top_k_corr(
     rebalance_date: pd.Timestamp | str | None = None,
     lags: Sequence[int] = (0, 1),
 ) -> CorrelationSelectionResult:
-    """Top-``K`` drivers by cumulative correlation. Vanilla-HSP (V0) selector.
+    """Top-``K`` drivers by cumulative correlation (the V0 selector).
 
-    The signature mirrors :func:`pipeline.factor_selection.select_drivers`'s
-    contract so ``stage1_pipeline.run_stage1`` can route through either
-    selector with the same call shape (causal vs cum-corr).
+    Signature mirrors :func:`select_drivers` so Stage 1 can route through
+    either selector with the same call shape.
     """
     scores = cumulative_correlation_score(driver_window, asset_window, lags=lags)
     sorted_desc = scores.sort_values(ascending=False)

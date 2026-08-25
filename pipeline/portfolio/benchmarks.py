@@ -1,13 +1,7 @@
-"""Benchmark portfolios for the Stage 2 ablation.
+"""Benchmark portfolios: 1/N, min-variance, MVO, cap-weighted.
 
-* :func:`equal_weight` — 1/N. Naive but a notoriously hard benchmark.
-* :func:`min_variance` — long-only minimum-variance via cvxpy + Ledoit-Wolf.
-* :func:`mean_variance` — Markowitz MVO with risk-aversion ``γ_RA``.
-* :func:`cap_weighted` — market-cap-weighted (proxy for the S&P-100 index;
-  drawn from the supplied shares × price snapshot).
-
-All return ``pd.Series`` of weights summing to 1, indexed by asset name,
-matching the HRP/HSP signature so the backtest can swap strategies in.
+All return a name-indexed pd.Series of weights summing to 1, matching the
+HRP/HSP signature.
 """
 
 from __future__ import annotations
@@ -98,9 +92,8 @@ def cap_weighted(
 ) -> pd.Series:
     """Market-cap weights from ``price × shares_outstanding``.
 
-    The cap proxy uses *current* shares-outstanding (yfinance) by default —
-    documented as an approximation, replaced by CRSP historical shares once
-    WRDS access lands.
+    Uses current shares-outstanding (yfinance) as an approximation until
+    CRSP historical shares are available.
     """
     caps = (
         prices_at_rebalance.reindex(asset_names)

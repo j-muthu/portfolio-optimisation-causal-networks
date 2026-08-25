@@ -1,22 +1,8 @@
 """Integration tests for ``pipeline.closed_loop.run_closed_loop``.
 
-Three tests verify the V2 closed-loop machinery built in Phase F.1:
-
-* **t1**: the loop genuinely feeds back — after burn-in, the selector's
-  ``utility_lookup_timestamp`` is populated (i.e. U from completed rebalances
-  is actually being read into selection of the next rebalance).
-* **t2**: with ``alpha=1.0`` the closed-loop strategy degenerates to the
-  V1 open-loop path. Per-rebalance weights match a direct
-  ``run_stage1 → run_stage2(variants=["V1"])`` run to ≤ 1e-8.
-* **t3**: swapping ``utility_lookup`` for the deliberately-broken
-  ``leak_canary.make_leaky_lookup`` produces a *different* sequence of
-  per-rebalance weights — confirming both that the leak canary is exercising
-  the feedback path and that the lookahead guard is doing meaningful work.
-
-The fixture is intentionally tiny (4 assets, 6 drivers, ~300 trading days,
-8 rebalances) so the full Stage 1 + backtest cycle runs in seconds. Two of
-the six drivers are planted with deterministic correlation to the assets so
-the selector has signal to find.
+t1: the loop genuinely feeds back; t2: alpha=1 degenerates to the V1
+open-loop path; t3: the leak canary actually leaks. Tiny fixture
+(4 assets, 6 drivers, 8 rebalances) so the full cycle runs in seconds.
 """
 
 from __future__ import annotations
@@ -29,12 +15,10 @@ import pandas as pd
 import pytest
 
 
-# ============================================================================
 # Fixture
-# ============================================================================
 @pytest.fixture(scope="module")
 def synthetic_fixture(tmp_path_factory):
-    """Build a small synthetic joint panel with two planted-signal drivers."""
+    """Small synthetic joint panel with two planted-signal drivers."""
     rng = np.random.default_rng(seed=11)
     T = 280  # trading days
     asset_cols = [f"A{i}" for i in range(4)]
@@ -43,10 +27,8 @@ def synthetic_fixture(tmp_path_factory):
 
     cal = pd.bdate_range("2020-01-02", periods=T)
 
-    # Two planted drivers carry a shared "factor" signal correlated with
-    # every asset; the other four are pure i.i.d. Gaussian noise. The signal
-    # is strong enough that DYNOTEARS reliably picks up the planted-driver
-    # → asset edges and the selector picks the planted drivers.
+    # Two planted drivers share a factor with the assets; the other four are
+    # noise. Signal is strong enough for DYNOTEARS to find reliably.
     shared = rng.standard_normal(T) * 1.0
     planted = np.stack([
         0.8 * shared + 0.4 * rng.standard_normal(T),
@@ -63,12 +45,11 @@ def synthetic_fixture(tmp_path_factory):
     assets_df = pd.DataFrame(assets, index=cal, columns=asset_cols)
     joint = pd.concat([drivers_df, assets_df], axis=1)
 
-    # Convert asset levels to "returns" for the backtest layer. Scale down
-    # so the backtest engine sees realistic-magnitude daily returns.
+    # Levels -> returns, scaled to realistic daily magnitudes.
     asset_returns = assets_df.diff().fillna(0.0) * 0.01
 
     rebalance_dates = pd.DatetimeIndex(
-        [cal[120 + 20 * i] for i in range(8)]  # 8 rebalances spaced ~21 trading days apart
+        [cal[120 + 20 * i] for i in range(8)]  # ~monthly spacing
     )
 
     def universe_at(t):
@@ -86,7 +67,7 @@ def synthetic_fixture(tmp_path_factory):
 
 
 def _common_kwargs(tmp_dir: Path) -> dict:
-    """Shared kwargs that keep the per-test runtime small."""
+    """Shared kwargs that keep per-test runtime small."""
     return dict(
         K=3,
         window_size=100,
@@ -107,22 +88,14 @@ def _common_kwargs(tmp_dir: Path) -> dict:
     )
 
 
-# ============================================================================
-# t1 — closed loop genuinely feeds back (U from t affects t+1)
-# ============================================================================
+# t1: closed loop genuinely feeds back
 def test_t1_closed_loop_feeds_back(synthetic_fixture, caplog):
-    """After burn-in, the selector receives a populated utility lookup row.
-
-    Before burn-in completes, ``selection.utility_lookup_timestamp`` is
-    ``None`` and ``alpha_effective == 1.0`` (selector forces causal-only).
-    After burn-in, the timestamp is populated and points at a row whose
-    holding-period-end satisfies the lookahead gap (``≤ t - 21 calendar days``).
-    """
+    """After burn-in, the selector sees a populated utility lookup that respects the lookahead gap."""
     caplog.set_level(logging.WARNING)
     from pipeline.closed_loop import run_closed_loop
 
     fix = synthetic_fixture
-    burn_in = 2  # small so we see post-burn-in behaviour within 8 rebalances
+    burn_in = 2
 
     result = run_closed_loop(
         joint_frame=fix["joint_frame"],
@@ -141,16 +114,15 @@ def test_t1_closed_loop_feeds_back(synthetic_fixture, caplog):
     assert len(result.stage1_cache) == n
     assert len(result.backtest.rebalances) == n
 
-    # Burn-in: α forced to 1, no lookup performed.
+    # Burn-in: alpha forced to 1, no lookup.
     for i in range(burn_in):
         sel = result.stage1_cache[fix["rebalance_dates"][i]].selection
         assert sel.metadata["burn_in_active"] is True, f"rebalance {i} should be in burn-in"
         assert sel.alpha_effective == 1.0
         assert sel.utility_lookup_timestamp is None
 
-    # Post-burn-in: at least one rebalance must have a non-None lookup
-    # timestamp. (Early post-burn-in calls may still find no eligible row
-    # if no holding period has ended yet by ``t - 21 calendar days``.)
+    # Post-burn-in: at least one rebalance must have a populated lookup
+    # (early ones may find no eligible row yet).
     post_lookups = [
         result.stage1_cache[fix["rebalance_dates"][i]].selection.utility_lookup_timestamp
         for i in range(burn_in, n)
@@ -161,9 +133,7 @@ def test_t1_closed_loop_feeds_back(synthetic_fixture, caplog):
         "populated U lookup. Per-rebalance interleaving is broken."
     )
 
-    # Every populated lookup_timestamp must respect the 21-day lookahead
-    # gap — the strict assertion in UtilityStore.lookup_utility would have
-    # raised otherwise; we re-verify here as a belt-and-braces check.
+    # Belt and braces: every populated lookup respects the 21-day gap.
     for i in range(burn_in, n):
         sel = result.stage1_cache[fix["rebalance_dates"][i]].selection
         if sel.utility_lookup_timestamp is None:
@@ -176,17 +146,9 @@ def test_t1_closed_loop_feeds_back(synthetic_fixture, caplog):
         )
 
 
-# ============================================================================
-# t2 — α=1 degenerates to V1 open-loop
-# ============================================================================
+# t2: alpha=1 degenerates to V1 open-loop
 def test_t2_alpha_one_matches_v1_openloop(synthetic_fixture):
-    """``run_closed_loop(alpha=1.0)`` per-rebalance weights == V1 weights from
-    a direct ``run_stage1 + run_stage2(variants=['V1'])`` pipeline.
-
-    With α=1 the selector ignores U entirely, so the closed-loop path must
-    produce the same Stage 1 outputs (modulo deterministic FFNN seed) and
-    the same allocation as the V1 open-loop variant. Matches to ≤ 1e-8.
-    """
+    """alpha=1 closed-loop weights match a direct V1 open-loop run to 1e-8."""
     from pipeline.closed_loop import run_closed_loop
     from pipeline.stage1_pipeline import run_stage1
     from pipeline.stage2_pipeline import run_stage2
@@ -195,7 +157,7 @@ def test_t2_alpha_one_matches_v1_openloop(synthetic_fixture):
     kw = _common_kwargs(fix["tmp_dir"] / "t2_closed")
     kw_open = _common_kwargs(fix["tmp_dir"] / "t2_open")
 
-    # Closed-loop with α=1: utility is read but never weighted in.
+    # Closed-loop with alpha=1: utility read but never weighted in.
     cl = run_closed_loop(
         joint_frame=fix["joint_frame"],
         asset_returns=fix["asset_returns"],
@@ -209,7 +171,6 @@ def test_t2_alpha_one_matches_v1_openloop(synthetic_fixture):
         **kw,
     )
 
-    # Equivalent V1 open-loop path.
     s1 = run_stage1(
         joint_frame=fix["joint_frame"],
         driver_columns=fix["driver_columns"],
@@ -233,7 +194,7 @@ def test_t2_alpha_one_matches_v1_openloop(synthetic_fixture):
         holding_days=kw_open["holding_days"],
         transaction_cost_bps=kw_open["transaction_cost_bps"],
         gamma_ema=0.3,
-        bootstrap_resamples=0,  # skip the bootstrap for speed
+        bootstrap_resamples=0,  # skip bootstrap for speed
         tag="t2_open",
         output_dir=kw_open["output_dir"],
     )
@@ -244,7 +205,7 @@ def test_t2_alpha_one_matches_v1_openloop(synthetic_fixture):
 
     for cl_rec, v1_rec in zip(cl_recs, v1_recs):
         assert cl_rec.rebalance_date == v1_rec.rebalance_date
-        # Pad both to the union universe before comparing element-wise.
+        # Pad to the union universe before comparing.
         union = sorted(set(cl_rec.weights.index) | set(v1_rec.weights.index))
         w_cl = cl_rec.weights.reindex(union).fillna(0.0).to_numpy()
         w_v1 = v1_rec.weights.reindex(union).fillna(0.0).to_numpy()
@@ -255,26 +216,13 @@ def test_t2_alpha_one_matches_v1_openloop(synthetic_fixture):
         )
 
 
-# ============================================================================
-# t3 — leak canary actually fires
-# ============================================================================
+# t3: leak canary actually fires
 def test_t3_leak_canary_fires(synthetic_fixture):
-    """The leak canary exposes future U rows that the lookahead-safe lookup
-    correctly hides.
+    """The leaky lookup returns future U rows the safe lookup hides.
 
-    The canary's job is to expose *one rebalance of cheating*: a row that
-    was written at holding-period-end *after* the rebalance date ``t``
-    becomes visible to the selector as if it had been known at ``t``. We
-    verify this directly at the lookup layer (rather than at the weights
-    layer) because on a small fixture, even when the lookup returns
-    different U vectors, the downstream selection can be sticky enough
-    that weights coincide. The *lookup* difference is the canary's
-    correctness property; the downstream-propagation strength is a
-    separate empirical question for the real backtest.
-
-    Also re-confirms that the strict lookahead guard in
-    :func:`UtilityStore.lookup_utility` would have raised on the row the
-    leaky lookup admitted.
+    Verified at the lookup layer, not the weights layer: on a small
+    fixture the downstream selection can be sticky enough that weights
+    coincide even when the lookups differ.
     """
     from pipeline.closed_loop import run_closed_loop
     from pipeline.feedback import UtilityStore
@@ -282,7 +230,7 @@ def test_t3_leak_canary_fires(synthetic_fixture):
 
     fix = synthetic_fixture
 
-    # Run a normal closed-loop pass and let it populate a UtilityStore.
+    # Normal closed-loop pass to populate a UtilityStore.
     store = UtilityStore.load_or_empty(fix["tmp_dir"] / "t3_safe" / "u.parquet")
     run_closed_loop(
         joint_frame=fix["joint_frame"],
@@ -299,10 +247,7 @@ def test_t3_leak_canary_fires(synthetic_fixture):
     )
     assert not store.frame.empty, "fixture didn't produce any U rows"
 
-    # Now probe the two lookups at every rebalance date and compare what
-    # they return. At least one rebalance must yield a strictly different
-    # row (different timestamp or different values) for the canary to be
-    # actually leaking.
+    # Probe both lookups at every rebalance; at least one must differ.
     n_rows_seen_diff = 0
     leak_examples = []
     for t in fix["rebalance_dates"]:
@@ -311,9 +256,7 @@ def test_t3_leak_canary_fires(synthetic_fixture):
         if ts_safe != ts_leaky:
             n_rows_seen_diff += 1
             leak_examples.append((t.date(), ts_safe, ts_leaky))
-            # When the rows differ, the leaky row's end_date must be
-            # *strictly after* the strict-guard cutoff — i.e. precisely
-            # the leak the guard is designed to refuse.
+            # The leaky row must sit strictly past the strict-guard cutoff.
             cutoff = t - pd.Timedelta(days=21)
             assert ts_leaky is not None and ts_leaky > cutoff, (
                 f"leaky lookup at {t.date()} returned {ts_leaky} which is "
@@ -332,13 +275,9 @@ def test_t3_leak_canary_fires(synthetic_fixture):
     )
 
 
-# ============================================================================
-# F.2 — selection_method / discovery_method switches
-# ============================================================================
+# F.2: selection_method / discovery_method switches
 def test_f2_v0_correlation_skips_discovery(synthetic_fixture):
-    """V0 path: ``selection_method='correlation'`` runs end-to-end with
-    ``Stage1Rebalance.discovery is None`` for every rebalance, and recovers
-    the planted-signal drivers."""
+    """V0 path skips discovery entirely and still recovers the planted drivers."""
     from pipeline.closed_loop import run_closed_loop
     from pipeline.factor_selection.correlation_selector import (
         CorrelationSelectionResult,
@@ -361,7 +300,6 @@ def test_f2_v0_correlation_skips_discovery(synthetic_fixture):
         discovery_kwargs={},  # ignored on V0 but passed for API stability
     )
 
-    # Every rebalance: no discovery object, correlation-result type, non-empty selection.
     for t in fix["rebalance_dates"]:
         s1 = result.stage1_cache[t]
         assert s1.discovery is None, f"V0 must skip discovery at {t.date()}"
@@ -371,8 +309,7 @@ def test_f2_v0_correlation_skips_discovery(synthetic_fixture):
             len(fix["asset_columns"]), len(s1.selection.selected)
         )
 
-    # On the planted fixture, the cum-corr score ranks the two planted drivers
-    # at the top of its sorted-desc score series.
+    # Cum-corr should rank the two planted drivers top.
     sel0 = result.stage1_cache[fix["rebalance_dates"][0]].selection
     top2 = sel0.scores.sort_values(ascending=False).index[:2].tolist()
     planted = {"d_planted_0", "d_planted_1"}
@@ -382,15 +319,12 @@ def test_f2_v0_correlation_skips_discovery(synthetic_fixture):
 
 
 def test_f2_varlingam_discovery_runs(synthetic_fixture):
-    """V1-VARLiNGAM path: ``discovery_method='varlingam'`` returns
-    ``JointVarLingamWindow`` for every rebalance and Stage A's method-aware
-    scoring uses the VARLiNGAM branch (i.e. no exception, non-empty pool)."""
+    """VARLiNGAM path produces JointVarLingamWindow at every rebalance and routes Stage A's varlingam branch."""
     from pipeline.closed_loop import run_closed_loop
     from pipeline.discovery.varlingam import JointVarLingamWindow
 
     fix = synthetic_fixture
 
-    # VARLiNGAM uses different kwargs than DYNOTEARS.
     common = {k: v for k, v in _common_kwargs(fix["tmp_dir"] / "f2_var").items()
               if k != "discovery_kwargs"}
 
@@ -416,19 +350,11 @@ def test_f2_varlingam_discovery_runs(synthetic_fixture):
             f"VARLiNGAM path must produce JointVarLingamWindow; got "
             f"{type(s1.discovery).__name__} at {t.date()}"
         )
-        # Stage A "varlingam" branch routed; selector populates the method
-        # in its metadata.
         assert s1.selection.metadata.get("method") == "varlingam"
 
 
 def test_f2_v0_and_v1_select_differently(synthetic_fixture):
-    """On the planted fixture, V0 (cum-corr) and V1 (causal-greedy +
-    DYNOTEARS) should pick at least one different driver across the run.
-
-    This is a sanity check that the two paths are genuinely independent — if
-    they always picked identical sets, the switch would be effectively a
-    no-op and the ablation matrix would be meaningless.
-    """
+    """V0 and V1 pick at least one different driver across the run (the switch is real)."""
     from pipeline.closed_loop import run_closed_loop
 
     fix = synthetic_fixture

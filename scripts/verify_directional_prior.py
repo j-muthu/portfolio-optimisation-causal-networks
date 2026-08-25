@@ -1,24 +1,9 @@
-"""J1 — directional-prior verification (interim-report §4.2, Stage-1 check 3).
+"""J1: directional-prior verification.
 
-The Causal-HSP pipeline enforces a directional prior in discovery: drivers may
-cause assets, but assets may not cause drivers (the asset->driver block of W
-and every A_p is forbidden via DYNOTEARS ``tabu_edges``). This script quantifies
-how much that prior actually changes what gets discovered, by refitting a
-sample of windows **with** and **without** the mask and comparing.
-
-Two questions, per the report:
-
-1. Does forbidding asset->driver edges change the legitimate **driver->asset**
-   structure (the block we actually use for selection + sensitivities)? If the
-   unconstrained fit "spends" explanatory weight on asset->driver edges, the
-   driver->asset block will shift when we forbid them.
-2. How much mass does the prior suppress (the asset->driver edges that appear
-   when unforbidden), and does the prior change *which* drivers Stage A ranks
-   at the top?
-
-Reuses the exact Phase I data build (same 99-ticker universe, 33-driver pool,
-``drop_na='drivers_only'`` joint matrix) so the windows match the headline run.
-Pure analysis: a handful of windows, no full backtest. Cache-only, no WRDS.
+Refits a sample of windows with and without the asset->driver mask and
+compares: how much the driver->asset block shifts, how much asset->driver
+mass the prior suppresses, and whether Stage-A top-K selection changes.
+Uses the exact Phase I data build. Cache-only, no WRDS.
 
 Run:  python -m scripts.verify_directional_prior
 """
@@ -36,7 +21,7 @@ from pipeline.data.drivers import DRIVER_CATALOGUE, build_driver_pool
 from pipeline.discovery.dynotears import run_dynotears_joint_window
 from pipeline.factor_selection.prune import stage_a_score
 
-# Reuse Phase I's exact configuration so windows line up with the headline run.
+# Reuse Phase I's config so windows line up with the headline run.
 from scripts.run_phase_i import (
     DATA_END,
     DATA_START,
@@ -46,9 +31,7 @@ from scripts.run_phase_i import (
 
 log = logging.getLogger("verify_prior")
 
-# Window length (trading days) and the rebalance dates to sample — one calm
-# year plus the major stress regimes, so we see the prior's effect across
-# market conditions rather than at a single arbitrary date.
+# Sample dates: one calm year plus the major stress regimes.
 WINDOW = 252
 SAMPLE_DATES = [
     "2008-10-01",  # GFC core
@@ -58,9 +41,9 @@ SAMPLE_DATES = [
     "2020-03-02",  # COVID crash
     "2022-06-01",  # rate-hike drawdown
 ]
-# DYNOTEARS hyperparameters — match the Phase I run defaults.
+# DYNOTEARS hyperparameters, matching the Phase I defaults.
 DISC_KWARGS = dict(p=1, lambda_w=0.05, lambda_a=0.05, w_threshold=0.01, max_iter=100)
-TOP_K = 17  # the calibrated Phase I K, for the top-K driver-overlap check
+TOP_K = 17  # the calibrated Phase I K
 
 
 def _jaccard(a: list[str], b: list[str]) -> float:
@@ -71,7 +54,7 @@ def _jaccard(a: list[str], b: list[str]) -> float:
 def main() -> None:
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
 
-    # --- Build the joint matrix exactly as Phase I does -------------------
+    # Build the joint matrix exactly as Phase I does.
     universe = UNIVERSE_FILE.read_text().strip().split(",")
     driver_specs = [s for s in DRIVER_CATALOGUE if s.name not in DROP_DRIVERS]
     start_ts, end_ts = pd.Timestamp(DATA_START), pd.Timestamp(DATA_END)

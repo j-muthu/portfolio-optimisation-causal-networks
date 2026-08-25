@@ -1,25 +1,7 @@
-"""Plan A -- rolling-window DYNOTEARS on S&P 500 log-returns.
+"""Rolling-window DYNOTEARS on S&P 500 log-returns.
 
-DYNOTEARS assumes the causal structure is *fixed* over its input window.  For
-financial data that only holds locally, so we slide a window across the series
-and learn one causal graph per window (the plan's Step 1).
-
-Each window yields:
-
-* ``W`` -- the ``d x d`` contemporaneous (intra-slice) weighted adjacency
-  matrix.  ``W[i, j]`` is the same-day causal effect of asset ``i`` on asset
-  ``j``.
-* ``A`` -- one ``d x d`` lagged (inter-slice) matrix per lag.  ``A[k][i, j]`` is
-  the effect of asset ``i`` at lag ``k+1`` on asset ``j`` today.
-
-Per Howard et al., the lagged weights are nearly always ~0 for daily returns,
-so the contemporaneous ``W`` carries the signal -- but we extract both.
-
-Entry points
-------------
-* :func:`run_dynotears_window` -- fit one window.
-* :func:`select_lambdas` -- cross-validate the L1 penalties on a held-out tail.
-* :func:`run_rolling_dynotears` -- slide the window across a :class:`Dataset`.
+One causal graph per window: ``W`` is the d x d contemporaneous adjacency
+(``W[i, j]`` = same-day effect of i on j), ``A`` is one lagged matrix per lag.
 """
 
 from __future__ import annotations
@@ -42,15 +24,12 @@ from pipeline.data import Dataset
 logger = logging.getLogger(__name__)
 
 
-# ============================================================================
 # Result containers
-# ============================================================================
 @dataclass
 class DynotearsWindow:
     """Causal graph learned from a single rolling window.
 
-    Matrix convention: ``W[i, j]`` / ``A[k][i, j]`` is the causal effect of the
-    asset at column index ``i`` on the asset at column index ``j`` (``i -> j``).
+    Convention: ``W[i, j]`` / ``A[k][i, j]`` is the effect of i on j.
     """
 
     index: int
@@ -112,24 +91,17 @@ class RollingDynotearsResult:
         )
 
 
-# ============================================================================
 # Windowing
-# ============================================================================
 def rolling_windows(n_rows: int, window: int, step: int) -> Iterator[tuple[int, int]]:
-    """Yield ``(start, end)`` row-index pairs for each rolling window.
-
-    ``end`` is exclusive, so a window has exactly ``window`` rows.  The last
-    partial window (fewer than ``window`` rows) is skipped.
-    """
+    """Yield ``(start, end)`` row-index pairs, end exclusive; partial last
+    window skipped."""
     start = 0
     while start + window <= n_rows:
         yield start, start + window
         start += step
 
 
-# ============================================================================
 # StructureModel -> matrix extraction
-# ============================================================================
 def _split_node(name: str) -> tuple[str, int]:
     """``"AAPL_lag1"`` -> ``("AAPL", 1)``.  Splits on the *last* ``_lag``."""
     var, lag = name.rsplit("_lag", 1)
@@ -163,14 +135,9 @@ def structure_model_to_matrices(
 def enforce_dag(W: np.ndarray) -> tuple[np.ndarray, int]:
     """Drop the weakest edge on each cycle until the matrix is acyclic.
 
-    DYNOTEARS's continuous acyclicity constraint is only satisfied up to
-    ``h_tol``, so a thresholded ``W`` can retain tiny residual cycles (usually
-    weak 2-cycles where ``W[i, j]`` and ``W[j, i]`` both survive the
-    threshold).  This greedily removes the lowest-magnitude edge lying on a
-    detected cycle until the contemporaneous graph is a genuine DAG -- the
-    matrix-level analogue of causalnex's ``StructureModel.threshold_till_dag``.
-
-    Returns the acyclic matrix and the number of edges removed.
+    The continuous acyclicity constraint only holds up to ``h_tol``, so a
+    thresholded ``W`` can retain tiny residual cycles. Returns the acyclic
+    matrix and the number of edges removed.
     """
     W = W.copy()
     removed = 0
@@ -187,9 +154,7 @@ def enforce_dag(W: np.ndarray) -> tuple[np.ndarray, int]:
         removed += 1
 
 
-# ============================================================================
 # Single-window fit
-# ============================================================================
 def run_dynotears_window(
     window_df: pd.DataFrame,
     p: int = 1,
@@ -200,32 +165,11 @@ def run_dynotears_window(
     enforce_acyclic: bool = True,
     tabu_edges: list[tuple[int, str, str]] | None = None,
 ) -> tuple[np.ndarray, list[np.ndarray], bool, int]:
-    """Fit DYNOTEARS on one window.
+    """Fit DYNOTEARS on one window; returns ``(W, A, converged, edges_removed)``.
 
-    The window is re-indexed to a sequential ``RangeIndex`` (the transformer
-    requires integer, gap-free indices).
-
-    Parameters
-    ----------
-    enforce_acyclic:
-        If ``True`` (default), post-process ``W`` with :func:`enforce_dag` so
-        the contemporaneous graph is a genuine DAG.  The lagged matrices ``A``
-        are inter-slice and may legitimately contain cycles, so they are left
-        untouched.
-    tabu_edges:
-        Optional list of ``(lag, from_col_name, to_col_name)`` tuples to
-        forbid. ``lag == 0`` is an intra-slice (W) constraint; ``lag >= 1`` is
-        an inter-slice (A[lag-1]) constraint. ``causalnex.from_pandas_dynamic``
-        translates these into ``(0, 0)`` L-BFGS-B bounds on the corresponding
-        cells, giving an exact hard constraint with no optimiser surgery
-        (see :mod:`pipeline.discovery.dynotears_joint`).
-
-    Returns
-    -------
-    ``(W, A, converged, edges_removed)`` -- see :class:`DynotearsWindow` for the
-    matrix conventions.  ``converged`` is ``False`` if the optimiser hit
-    ``max_iter`` without the acyclicity constraint reaching tolerance;
-    ``edges_removed`` is how many edges :func:`enforce_dag` had to drop.
+    ``tabu_edges`` are ``(lag, from, to)`` tuples to forbid; they become
+    ``(0, 0)`` L-BFGS-B bounds, an exact hard constraint. ``enforce_acyclic``
+    post-processes ``W`` only (lagged blocks may legitimately have cycles).
     """
     df = window_df.reset_index(drop=True)
     columns = list(df.columns)
@@ -249,16 +193,10 @@ def run_dynotears_window(
     return W, A, converged, removed
 
 
-# ============================================================================
 # Hyper-parameter selection (cross-validation)
-# ============================================================================
 def _make_x_xlags(values: np.ndarray, p: int) -> tuple[np.ndarray, np.ndarray]:
-    """Build the DYNOTEARS design matrices from a contiguous data block.
-
-    Mirrors ``causalnex``'s ``DynamicDataTransformer``: ``X`` is the data from
-    row ``p`` onward, ``Xlags`` stacks the ``p`` lagged copies horizontally
-    as ``[shift(1) | shift(2) | ... | shift(p)]``.
-    """
+    """Build the DYNOTEARS design matrices, mirroring causalnex's
+    ``DynamicDataTransformer``: X from row p onward, Xlags the stacked lags."""
     X = values[p:]
     lags = [values[p - i - 1 : len(values) - i - 1] for i in range(p)]
     Xlags = np.concatenate(lags, axis=1)
@@ -268,11 +206,8 @@ def _make_x_xlags(values: np.ndarray, p: int) -> tuple[np.ndarray, np.ndarray]:
 def reconstruction_error(
     values: np.ndarray, p: int, W: np.ndarray, A: list[np.ndarray]
 ) -> float:
-    """Frobenius norm of the DYNOTEARS residual ``X(I - W) - Xlags A``.
-
-    This is the (unregularised) fit term of the DYNOTEARS objective; the plan
-    recommends scoring held-out data with exactly this quantity.
-    """
+    """Frobenius norm of the DYNOTEARS residual ``X(I - W) - Xlags A`` (the
+    unregularised fit term of the objective)."""
     X, Xlags = _make_x_xlags(values, p)
     d = W.shape[0]
     A_stacked = np.vstack(A) if A else np.zeros((0, d))
@@ -288,13 +223,9 @@ def select_lambdas(
     w_threshold: float = 0.01,
     max_iter: int = 100,
 ) -> tuple[float, float, pd.DataFrame]:
-    """Grid-search ``(lambda_w, lambda_a)`` on a held-out tail of the window.
+    """Grid-search ``(lambda_w, lambda_a)`` on a held-out chronological tail.
 
-    The window is split chronologically into a training head and a validation
-    tail (``val_frac``).  For each grid pair we fit on the head and score the
-    tail with :func:`reconstruction_error`.  The pair with the lowest validation
-    error wins.  ``lambda_w`` and ``lambda_a`` share the same grid.
-
+    Lowest validation reconstruction error wins; both lambdas share the grid.
     Returns ``(best_lambda_w, best_lambda_a, scores_df)``.
     """
     df = window_df.reset_index(drop=True)
@@ -320,9 +251,7 @@ def select_lambdas(
     return best[1], best[2], scores
 
 
-# ============================================================================
 # Rolling driver
-# ============================================================================
 def _fit_one(
     args: tuple[int, int, int],
     returns: pd.DataFrame,
@@ -389,29 +318,12 @@ def run_rolling_dynotears(
     n_jobs: int = 1,
     checkpoint_dir: str | Path | None = None,
 ) -> RollingDynotearsResult:
-    """Slide DYNOTEARS across a :class:`Dataset` (the plan's Step 1).
+    """Slide DYNOTEARS across a :class:`Dataset`.
 
-    Parameters
-    ----------
-    window, step:
-        Window length and stride in trading days.  Defaults: ~2 years, 1 month.
-    p:
-        Lag order.  Howard et al. find ``p=1`` sufficient for daily returns.
-    lambda_w, lambda_a:
-        Fixed L1 penalties, used when ``lambda_grid`` is ``None``.
-    lambda_grid:
-        If given, each window cross-validates its penalties over this grid via
-        :func:`select_lambdas` instead of using the fixed values.
-    n_jobs:
-        Process-level parallelism (``joblib``).  Each window is independent.
-    checkpoint_dir:
-        If set, each completed window is pickled there and an interrupted run
-        resumes from the checkpoints instead of recomputing.  Keyed by window
-        index only -- use a fresh directory when parameters change.
-
-    Returns
-    -------
-    RollingDynotearsResult
+    ``lambda_grid``, if given, cross-validates the penalties per window
+    instead of using the fixed values. ``checkpoint_dir`` enables resume;
+    it is keyed by window index only, so use a fresh directory when
+    parameters change.
     """
     returns = dataset.returns
     dates = dataset.dates
@@ -450,22 +362,14 @@ def run_rolling_dynotears(
     )
 
 
-# ============================================================================
-# Stage 1 joint-matrix path: drivers + assets with asset→driver tabu_edges
-# ============================================================================
+# Stage 1 joint-matrix path: drivers + assets with asset->driver tabu_edges
 def make_tabu_edges_asset_to_driver(
     driver_columns: Sequence[str],
     asset_columns: Sequence[str],
     p: int,
 ) -> list[tuple[int, str, str]]:
-    """Enumerate the (lag, from, to) tuples forbidding asset → driver edges.
-
-    Encodes the directional hypothesis that within the analysis timescale
-    drivers cause assets, not vice versa. Returns ~|assets| × |drivers| × (p+1)
-    entries (e.g. 100 × 50 × 2 ≈ 10 k for the primary backtest configuration);
-    the cost is paid once per window and the optimiser only sees ``(0, 0)``
-    bounds on the masked cells.
-    """
+    """Enumerate the (lag, from, to) tuples forbidding asset -> driver edges,
+    encoding the prior that drivers cause assets and not vice versa."""
     out: list[tuple[int, str, str]] = []
     for lag in range(p + 1):
         for asset in asset_columns:
@@ -478,10 +382,8 @@ def make_tabu_edges_asset_to_driver(
 class JointDynotearsWindow:
     """DYNOTEARS output for one window of the joint ``[D | A]`` panel.
 
-    Stage 1's per-window output, persisted to Parquet downstream. The matrix
-    convention matches :class:`DynotearsWindow` (``W[i, j]`` is ``i -> j``),
-    but here columns include drivers and assets; ``driver_idx`` /
-    ``asset_idx`` carry the block layout.
+    Same matrix convention as :class:`DynotearsWindow`; columns include
+    drivers and assets, with ``driver_idx`` / ``asset_idx`` giving the layout.
     """
 
     index: int
@@ -515,17 +417,17 @@ class JointDynotearsWindow:
         return len(self.asset_columns)
 
     def driver_to_asset_block(self, lag: int) -> np.ndarray:
-        """``M[d, a]`` for ``M ∈ {W, A[lag-1]}`` — the block that should be non-trivial."""
+        """``M[d, a]``: the block that should be non-trivial."""
         mat = self.W if lag == 0 else self.A[lag - 1]
         return mat[np.ix_(self.driver_idx, self.asset_idx)]
 
     def asset_to_driver_block(self, lag: int) -> np.ndarray:
-        """``M[a, d]`` — the block masked to zero by the tabu_edges constraint."""
+        """``M[a, d]``: the block masked to zero by tabu_edges."""
         mat = self.W if lag == 0 else self.A[lag - 1]
         return mat[np.ix_(self.asset_idx, self.driver_idx)]
 
     def asset_to_asset_block(self, lag: int) -> np.ndarray:
-        """``M[a, a]`` — the asset-only causal block (used by V0′ Causal-HRP)."""
+        """``M[a, a]``: the asset-only causal block."""
         mat = self.W if lag == 0 else self.A[lag - 1]
         return mat[np.ix_(self.asset_idx, self.asset_idx)]
 
@@ -586,16 +488,9 @@ def run_dynotears_joint_window(
 ) -> JointDynotearsWindow:
     """Fit DYNOTEARS on one window of the joint ``[D | A]`` panel.
 
-    Steps:
-
-    1. Per-window z-score normalisation (mean and std stored on the output).
-    2. Build the asset → driver tabu mask if ``enforce_tabu`` is set.
-    3. Call :func:`run_dynotears_window` with the mask.
-    4. Compute the residual fit loss (Frobenius of the DYNOTEARS objective on
-       the normalised window) for diagnostics.
-
-    ``index`` / ``start_row`` / ``end_row`` / dates are filled with placeholder
-    values; the rolling driver overwrites them.
+    Z-scores per window, applies the asset -> driver tabu mask, fits, and
+    records the residual fit loss. Row/index fields are placeholders that the
+    rolling driver overwrites.
     """
     columns = list(joint_window.columns)
     driver_columns = list(driver_columns)
@@ -676,22 +571,8 @@ def run_rolling_dynotears_joint(
 ) -> RollingJointDynotearsResult:
     """Slide DYNOTEARS over the joint ``[D | A]`` matrix.
 
-    Parameters
-    ----------
-    joint:
-        A ``JointMatrix`` (from :func:`pipeline.data.alignment.build_joint_matrix`)
-        carrying the column-role indices and the trading-day panel.
-    window, step:
-        Window length and stride in trading days. Defaults match the discovery
-        plan: 504 (≈ 2y) and 21 (1 month).
-    enforce_tabu:
-        If ``True`` (default), forbid asset → driver edges. Set ``False`` for
-        the prior-knowledge verification step (refit without the constraint
-        and compare the driver → asset block).
-
-    Returns
-    -------
-    RollingJointDynotearsResult
+    ``enforce_tabu=False`` refits without the asset -> driver constraint,
+    for the prior-knowledge verification step.
     """
     frame = joint.frame
     if frame.shape[0] < window:

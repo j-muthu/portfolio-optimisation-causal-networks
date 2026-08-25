@@ -1,12 +1,5 @@
-"""Causal-discovery wrappers.
-
-* ``dynotears`` -- rolling DYNOTEARS with native ``tabu_edges`` enforcement of
-  the asset → driver mask.
-* ``varlingam`` -- rolling VARLiNGAM with optional ridge/LASSO Stage 1, native
-  ``prior_knowledge`` for B₀ and post-fit projection for the lagged blocks.
-* ``diagnostics`` -- per-window stationarity flags, fit-quality summaries, and
-  network-density time series (reused by ``evaluation.regime``).
-"""
+"""Causal-discovery wrappers: rolling DYNOTEARS and VARLiNGAM, plus
+per-window diagnostics."""
 
 from __future__ import annotations
 

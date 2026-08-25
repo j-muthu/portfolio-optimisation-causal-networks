@@ -1,27 +1,8 @@
 """Hierarchical Risk Parity (López de Prado 2016) with pluggable distance
 and covariance.
 
-The HRP algorithm has two stages:
-
-1. **Clustering** — hierarchical clustering on a *distance* matrix, followed
-   by quasi-diagonalisation to recover a sensible asset ordering.
-2. **Allocation** — recursive bisection over the ordering using sample
-   inverse-variance weights *within* each cluster, weighted between clusters
-   by inverse cluster-variance.
-
-The two inputs (distance, covariance) are decoupled and pluggable:
-
-* Pure HRP: distance from correlation, covariance from sample returns.
-* HSP (Rodriguez-Dominguez): distance from sensitivity vectors, same sample
-  covariance.
-* Causal-HRP (V0'): distance from asset-asset causal embedding.
-
-Per ``Closed-Loop Causal-HSP Portfolio.md``, the allocation stage stays
-identical across variants — only the *distance* changes.
-
-Entry point
------------
-* :func:`hrp_weights` -- returns a ``pd.Series`` of weights summing to 1.
+The distance drives clustering, the covariance drives allocation; the two
+are decoupled so variants can swap either in.
 """
 
 from __future__ import annotations
@@ -35,9 +16,7 @@ import pandas as pd
 logger = logging.getLogger(__name__)
 
 
-# ============================================================================
 # Quasi-diagonalisation + recursive bisection
-# ============================================================================
 def quasi_diagonal_order(linkage: np.ndarray, n_items: int) -> list[int]:
     """Leaf order that quasi-diagonalises the linkage tree (López de Prado 2016)."""
     linkage = linkage.astype(int)
@@ -85,33 +64,14 @@ def recursive_bisection(cov: np.ndarray, order: list[int]) -> np.ndarray:
     return weights
 
 
-# ============================================================================
 # Top-level HRP
-# ============================================================================
 def hrp_weights(
     distance: pd.DataFrame,
     covariance: pd.DataFrame,
     linkage_method: str = "single",
 ) -> pd.Series:
-    """Return HRP weights given a (distance, covariance) pair.
-
-    Parameters
-    ----------
-    distance:
-        ``(N, N)`` symmetric non-negative DataFrame with zero diagonal. The
-        index and columns are asset names; both inputs must agree on the
-        asset universe and ordering.
-    covariance:
-        ``(N, N)`` sample-or-shrunk covariance DataFrame on the same asset
-        universe.
-    linkage_method:
-        SciPy linkage method. HRP's default ``"single"`` is outlier-sensitive;
-        the closed-loop plan sweeps over alternatives ``{"single", "average",
-        "complete", "ward"}``.
-
-    Returns
-    -------
-    ``pd.Series`` of weights indexed by asset name, summing to 1.
+    """HRP weights from a (distance, covariance) pair sharing the same
+    asset index. Returns a name-indexed Series summing to 1.
     """
     from scipy.cluster.hierarchy import linkage as scipy_linkage
     from scipy.spatial.distance import squareform
@@ -122,7 +82,7 @@ def hrp_weights(
     N = len(assets)
 
     dist_arr = distance.to_numpy()
-    # squareform expects exact symmetry — enforce.
+    # squareform expects exact symmetry.
     dist_arr = (dist_arr + dist_arr.T) / 2.0
     np.fill_diagonal(dist_arr, 0.0)
     condensed = squareform(dist_arr, checks=False)
@@ -133,29 +93,18 @@ def hrp_weights(
     return pd.Series(weights, index=assets, name="weight")
 
 
-# ============================================================================
 # HERC (Raffinot 2018), full-recursion variant
-# ============================================================================
 def herc_weights(
     distance: pd.DataFrame,
     covariance: pd.DataFrame,
     linkage_method: str = "single",
 ) -> pd.Series:
-    """Hierarchical Equal Risk Contribution weights (full-recursion variant).
+    """Hierarchical Equal Risk Contribution weights (Raffinot 2018),
+    full-recursion variant.
 
-    Same clustering stage as :func:`hrp_weights` (same distance input, same
-    linkage), but the allocation stage walks the dendrogram's ACTUAL
-    topology top-down: at every internal node the budget splits between the
-    two child clusters in inverse proportion to their inverse-variance
-    portfolio variances (the same cluster-risk measure HRP's bisection
-    uses), recursing until every leaf carries its budget. This is the
-    dendrogram-topology counterpart of HRP's recursive bisection, which
-    reads the tree only through the quasi-diagonal leaf ordering — exactly
-    the interface property the allocator family varies. Raffinot's original
-    HERC additionally cuts the tree at an optimal cluster count and offers
-    other risk measures; this variant fixes full recursion and
-    inverse-cluster-variance splits so the only change from HRP is *how*
-    the tree is read.
+    Same clustering stage as :func:`hrp_weights`, but allocation walks the
+    dendrogram's actual topology top-down, splitting each node's budget by
+    inverse cluster variance. The only change from HRP is how the tree is read.
     """
     from scipy.cluster.hierarchy import linkage as scipy_linkage
     from scipy.spatial.distance import squareform

@@ -1,21 +1,8 @@
 """Causal-ordered bisection: DAG utilities + the D2/D2s allocators (Phase II).
 
-HRP's dendrogram exists only to produce a quasi-diagonalising leaf order for
-recursive bisection. A DAG carries an ordering for free: sort assets
-upstream → downstream (a topological order), then run the *existing*
-``recursive_bisection`` on that order. This replaces the clustering step
-entirely — the supervisor's "current portfolio optimisers cluster on
-symmetric matrices" critique — at near-zero implementation cost, and it is
-the purest test of whether edge *direction* carries allocation value: the
-order is meaningless for a symmetrised matrix.
-
-Determinism: Kahn's algorithm with a fixed tie-break — among the available
-zero-in-degree nodes pick the one with the largest total downstream
-influence ``Σᵣ |B[r, i]|`` (the column sum of the total-effect matrix:
-how much a unit shock at ``i`` moves the whole system), ties broken by
-asset name ascending. Non-DAG inputs (the GRANGER comparator) go through a
-greedy minimum-|edge| feedback-arc removal first, with the dropped count
-logged and recorded.
+Replaces HRP's clustering step with a deterministic topological order of the
+DAG, then runs the existing ``recursive_bisection`` on that order. Non-DAG
+inputs (GRANGER) go through greedy feedback-arc removal first.
 """
 
 from __future__ import annotations
@@ -39,15 +26,11 @@ class CyclicGraphError(ValueError):
     """Raised when a topological order is requested for a cyclic graph."""
 
 
-# ============================================================================
 # Feedback-arc removal (non-DAG fallback, GRANGER only)
-# ============================================================================
 def remove_feedback_arcs(M: np.ndarray) -> tuple[np.ndarray, int]:
-    """Zero the smallest-|M| edges until the graph is acyclic.
+    """Greedily zero the smallest-|M| edges until the graph is acyclic.
 
-    Greedy: while a Kahn pass gets stuck, delete the minimum-magnitude edge
-    among the still-cyclic remainder and retry. Returns the cleaned matrix
-    and the number of edges dropped.
+    Returns the cleaned matrix and the number of edges dropped.
     """
     M = M.copy()
     dropped = 0
@@ -77,20 +60,16 @@ def remove_feedback_arcs(M: np.ndarray) -> tuple[np.ndarray, int]:
     return M, dropped
 
 
-# ============================================================================
 # Deterministic topological order
-# ============================================================================
 def topological_order(
     M: np.ndarray,
     asset_names: list[str] | None = None,
 ) -> list[int]:
     """Kahn topological order of ``M`` (i → j), upstream first.
 
-    Tie-break among available roots: total downstream influence
-    ``Σᵣ |B[r, i]|`` descending, then asset name ascending — fully
-    deterministic under any permutation of the input labelling. Raises
-    :class:`CyclicGraphError` on a cyclic graph (callers pre-clean GRANGER
-    graphs with :func:`remove_feedback_arcs`).
+    Tie-break: total downstream influence ``Σᵣ |B[r, i]|`` descending, then
+    asset name ascending, so the order is fully deterministic. Raises
+    :class:`CyclicGraphError` on cyclic graphs.
     """
     N = M.shape[0]
     if not is_dag_matrix(M):
@@ -115,9 +94,7 @@ def topological_order(
     return order
 
 
-# ============================================================================
-# D2 / D2s — causal-ordered bisection
-# ============================================================================
+# D2 / D2s: causal-ordered bisection
 def d2_weights(
     graph: AssetGraphWindow,
     returns_window: pd.DataFrame,
@@ -143,8 +120,7 @@ def d2_weights(
         from pipeline.portfolio.directed import _sample_cov
 
         cov = _sample_cov(graph, returns_window)
-        # Align to the graph's asset order (dropna() keeps column order, but
-        # be explicit — recursive_bisection indexes positionally).
+        # recursive_bisection indexes positionally; align to the graph's order.
         cov = cov.loc[graph.asset_names, graph.asset_names]
     else:
         raise ValueError(f"covariance must be 'sample' or 'structural', got {covariance!r}")
@@ -154,9 +130,7 @@ def d2_weights(
     return pd.Series(weights, index=graph.asset_names, name="weight")
 
 
-# ============================================================================
 # Diagnostics (E3/E6 inputs)
-# ============================================================================
 def dag_diagnostics(graph: AssetGraphWindow) -> dict:
     """Edge density, DAG depth (longest path), roots/leaves — per window."""
     M = graph.M

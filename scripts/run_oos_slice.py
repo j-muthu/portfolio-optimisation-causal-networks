@@ -1,19 +1,10 @@
-"""2025-26 out-of-sample slice (PREDICTIONS_OOS.md).
+"""Run the 2025-26 out-of-sample slice (PREDICTIONS_OOS.md).
 
-Runs the Phase-II harness unchanged on 2025-01 -> 2026-08, DYNOTEARS only,
-for the decomposition family and the de-factored control. The protocol and
-the interpretations of every outcome were committed in
-``PREDICTIONS_OOS.md`` before any out-of-sample price was fetched.
-
-Cache isolation (IMPORTANT): the in-sample price/driver caches hold the
-CRSP and driver series the whole report regenerates from, and the cache
-writer REPLACES a ticker's parquet wholesale. This runner therefore
-redirects both caches to ``cache/prices_oos`` / ``cache/drivers_oos``
-before anything fetches, and disables the WRDS backend for the slice
-(CRSP daily ends 2024-12-31, verified 2026-08-15, so asset prices for
-the slice come from Yahoo Finance; the report discloses the source
-switch). The discovery cache is content-keyed, so new fits simply join
-it under new keys.
+Phase-II harness unchanged, DYNOTEARS only. Caches are redirected to
+cache/prices_oos and cache/drivers_oos before any fetch, because the cache
+writer replaces a ticker's parquet wholesale and must not clobber the
+in-sample series. WRDS is disabled (CRSP daily ends 2024-12-31); slice
+prices come from Yahoo Finance.
 
 Usage:  python -m scripts.run_oos_slice --allocator D1 --window 252
 """
@@ -25,7 +16,7 @@ import logging
 from pipeline._vendored import THESIS_ROOT
 from pipeline.data import assets, drivers
 
-# --- cache isolation + backend pin, BEFORE any fetch ---------------------
+# Cache isolation + backend pin, before any fetch.
 assets.PRICES_DIR = THESIS_ROOT / "cache" / "prices_oos"
 assets.PRICES_DIR.mkdir(parents=True, exist_ok=True)
 assets.fetch_from_wrds = lambda *a, **k: None  # CRSP daily ends 2024-12-31
@@ -37,8 +28,8 @@ from pipeline.portfolio.directed import ALLOCATORS          # noqa: E402
 from pipeline.shakedown import run_shakedown                # noqa: E402
 from scripts.run_phase_ii import DROP_DRIVERS, UNIVERSE_FILE  # noqa: E402
 
-# Fixed in PREDICTIONS_OOS.md (data start padded so the 504-day lookback
-# is fully burned in at the first 2025 rebalance).
+# Fixed in PREDICTIONS_OOS.md; data start padded so the 504-day lookback
+# is burned in at the first 2025 rebalance.
 DATA_START = "2022-07-01"
 BACKTEST_START = "2025-01-02"
 DATA_END = "2026-08-14"

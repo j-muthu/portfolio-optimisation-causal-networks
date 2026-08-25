@@ -1,27 +1,10 @@
-"""Phase-II figure set (F1–F7) — direction-aware allocation results.
+"""Phase-II figure set (F1-F7): direction-aware allocation results.
 
-Regenerated entirely from committed artefacts (``results/phase_ii_matrix.csv``,
-``results/phase_ii_contrasts.csv``, ``results/seed_audit.csv``, the regime
-tables and the gitignored bundles), so the figures always match FINDINGS.md.
-Saved to ``results/figures/``. House style: Okabe-Ito palette, matching
-``plot_thesis_figures.py``.
+Regenerated entirely from committed artefacts so the figures always match
+FINDINGS.md. Saved to results/figures/. Window sets come from the matrix
+CSV, so the same code renders two-window and four-window grids.
 
-F1 phase_ii_heatmap.png   allocator × method net-Sharpe heat-map, D0 column
-                          boxed (the direction effect at a glance), per window
-F2 phase_ii_forest.png    fixed-graph contrasts D* − D0: ΔSharpe ± 95% CI
-F3 phase_ii_nav.png       cumulative net NAV, w252: V0, D0, D1, D2s, V1
-F4 phase_ii_seed.png      E7 seed audit: causal-hsp Sharpe across FFNN seeds vs the
-                          deterministic D-variants
-F5 phase_ii_regime.png    regime-conditional Sharpe excess over hsp-baseline (w252),
-                          incl. the best direction-aware allocators
-F6 phase_ii_decomposition.png  CORR → +skeleton → +orientation bars per window
-F7 phase_ii_window_gradient.png  skeleton vs orientation additions as a
-                          function of estimation-window length (the gradient)
-
-Every figure derives its window set from the windows present in the matrix
-CSV, so the same code renders the two-window and four-window grids.
-
-Run order: collate_phase_ii → regime_analysis → this script.
+Run order: collate_phase_ii, regime_analysis, then this script.
 Run:  python -m scripts.plot_phase_ii_figures
 """
 from __future__ import annotations
@@ -43,27 +26,22 @@ FIG = RESULTS / "figures"
 # Okabe-Ito (consistent with plot_thesis_figures.py).
 C = {
     "V0": "#999999",
-    "D0": "#009E73",        # = V0' green
-    "D1": "#0072B2",        # blue — SEM-implied covariance
-    "D2s": "#D55E00",       # vermillion — causal-ordered bisection + Σ_SEM
-    "V1": "#E69F00",        # orange — the HSP machinery route
+    "D0": "#009E73",
+    "D1": "#0072B2",
+    "D2s": "#D55E00",
+    "V1": "#E69F00",
     "w189": "#56B4E9",
     "w252": "#0072B2",
     "w378": "#CC79A7",
     "w504": "#D55E00",
 }
-# The reported family: the 2x2 crossing {ordering source} x {bisection
-# covariance} plus the second-symmetrisation control D0s. D3/D4 were run but
-# fall outside the crossing and are not reported.
+# The reported family. D3/D4 were run but fall outside the crossing.
 ALLOC_ORDER = ["D0", "D0s", "D1", "D2", "D2s"]
 
-# Report display names: stem = where the ordering comes from, suffix = what
-# recursive bisection splits on. CSV tags stay D0/D0s/D1/D2/D2s throughout.
-# Mirrors the \HRP, \skelsamp, ... macros in final_report/main.tex -- keep the
-# two in step.
+# Report display names; CSV tags stay D0/D0s/D1/D2/D2s. Mirrors the \HRP,
+# \skelsamp, ... macros in final_report/main.tex; keep the two in step.
 DISPLAY = {"D0": "skeleton-hrp", "D0s": "alt-skeleton-hrp", "D1": "skeleton-sem-hrp",
            "D2": "ordered-hrp", "D2s": "ordered-sem-hrp", "CORR-HRP": "correlation-hrp",
-           # Driver-route (HSP) arm; CSV tags stay V0/V1/V2.
            "V0": "hsp-baseline", "V1": "causal-hsp",
            "V2": "causal-hsp-feedback"}
 METHOD_LABEL = {"dynotears": "DYNOTEARS", "varlingam": "VARLiNGAM", "granger": "ridge-Granger"}
@@ -83,9 +61,7 @@ def _nav(tag: str) -> pd.Series | None:
         return pickle.load(fh)["backtest"].nav_net
 
 
-# ============================================================================
-# F1 — Sharpe heat-map
-# ============================================================================
+# F1: Sharpe heat-map
 def f1_heatmap(matrix: pd.DataFrame) -> None:
     m = matrix[matrix.method != "phase_i"]
     methods = [x for x in ("dynotears", "varlingam", "granger") if x in set(m.method)]
@@ -125,9 +101,7 @@ def f1_heatmap(matrix: pd.DataFrame) -> None:
     plt.close(fig)
 
 
-# ============================================================================
-# F2 — fixed-graph contrast forest plot
-# ============================================================================
+# F2: fixed-graph contrast forest plot
 def f2_forest(contrasts: pd.DataFrame) -> None:
     sub = contrasts[contrasts.contrast.str.match(r"D.*-D0$")].copy()
     sub["alloc"] = sub.contrast.str.replace("-D0", "", regex=False)
@@ -159,8 +133,7 @@ def f2_forest(contrasts: pd.DataFrame) -> None:
         ax.set_yticks(range(len(allocs)), [DISPLAY[a] for a in allocs], fontsize=8)
         ax.set_title(METHOD_LABEL[m], fontsize=10)
         ax.set_xlabel("ΔSharpe vs skeleton control skeleton-hrp")
-        # Upper left: the lower-right corner holds the D0s/w189 significance
-        # star, which the legend would otherwise cover.
+        # Legend goes upper left; lower right holds the D0s/w189 star.
         ax.margins(y=0.14)
         ax.legend(loc="upper left", fontsize=8, framealpha=0.9)
     fig.suptitle("The direction effect, graph held fixed (Politis–Romano 95% CI; * p<0.05)",
@@ -169,9 +142,7 @@ def f2_forest(contrasts: pd.DataFrame) -> None:
     plt.close(fig)
 
 
-# ============================================================================
-# F3 — NAV curves (w252)
-# ============================================================================
+# F3: NAV curves (w252)
 def f3_nav() -> None:
     curves = {
         "correlation-hrp  correlation-distance HRP": ("phase_ii_corr_hrp_w252", "#000000", ":"),
@@ -194,9 +165,7 @@ def f3_nav() -> None:
     plt.close(fig)
 
 
-# ============================================================================
-# F4 — seed audit
-# ============================================================================
+# F4: seed audit
 def f4_seed(matrix: pd.DataFrame) -> None:
     audit = pd.read_csv(RESULTS / "seed_audit.csv")
     fig, ax = plt.subplots(figsize=(7.5, 3.8), constrained_layout=True)
@@ -210,7 +179,7 @@ def f4_seed(matrix: pd.DataFrame) -> None:
     committed = float(audit.loc[audit.seed == 0, "sharpe"].iloc[0])
     ax.annotate("committed value\n(seed 0)", (0.09, committed),
                 fontsize=8, color="#444444", va="center")
-    # Deterministic D-variants: single points, zero seed variance by design.
+    # D-variants are deterministic: single points, no seed variance.
     m = matrix[(matrix.method == "dynotears") & (matrix.window == 252)]
     for k, (a, color) in enumerate((("D0", C["D0"]), ("D1", C["D1"]), ("D2s", C["D2s"]))):
         val = float(m.loc[m.allocator == a, "sharpe"].iloc[0])
@@ -230,9 +199,7 @@ def f4_seed(matrix: pd.DataFrame) -> None:
     plt.close(fig)
 
 
-# ============================================================================
-# F5 — regime excess over hsp-baseline (w252)
-# ============================================================================
+# F5: regime excess over hsp-baseline (w252)
 def f5_regime() -> None:
     path = RESULTS / "regime_analysis" / "daily_metrics.csv"
     if not path.exists():
@@ -265,12 +232,9 @@ def f5_regime() -> None:
     plt.close(fig)
 
 
-# ============================================================================
-# F6 — the decomposition (the master question in one picture)
-# ============================================================================
+# F6: the decomposition
 def f6_decomposition(matrix: pd.DataFrame, contrasts: pd.DataFrame) -> None:
-    """Net Sharpe of CORR → D0 (+skeleton) → D1/D2s (+orientation), DYNOTEARS,
-    with the pairwise bootstrap Δ and p annotated on each step."""
+    """Net Sharpe of CORR, D0, D1/D2s with bootstrap deltas on each step."""
     def sharpe(method, alloc, w):
         m = matrix[(matrix.method == method) & (matrix.allocator == alloc)
                    & (matrix.window == w)]
@@ -298,7 +262,7 @@ def f6_decomposition(matrix: pd.DataFrame, contrasts: pd.DataFrame) -> None:
     axes = np.atleast_1d(axes).ravel()
     for ax in axes[len(ws):]:
         ax.set_visible(False)
-    # The step each bar adds relative to its reference (CORR for D0; D0 for D1/D2s).
+    # Each bar's step relative to its reference (CORR for D0; D0 for D1/D2s).
     steps = {1: ("D0-CORR", "+ skeleton"), 2: ("D1-D0", "+ orientation"),
              3: ("D2s-D0", "+ orientation")}
     for ax, w in zip(axes, ws):
@@ -328,18 +292,9 @@ def f6_decomposition(matrix: pd.DataFrame, contrasts: pd.DataFrame) -> None:
     plt.close(fig)
 
 
-# ============================================================================
-# F7 — skeleton vs orientation additions across estimation horizons
-# ============================================================================
+# F7: skeleton vs orientation additions across estimation horizons
 def f7_window_gradient(contrasts: pd.DataFrame) -> None:
-    """The decomposition as a function of estimation-window length.
-
-    Left: the two additions (skeleton = D0−CORR; orientation = D1−D0, D* fixed
-    to D1 for comparability) with Politis–Romano 95% CIs, DYNOTEARS, plus the
-    VARLiNGAM orientation series as the method-dependence contrast.
-    Right: the same two additions stacked per window, so their relative share
-    of the total D1−CORR gain is read directly.
-    """
+    """The decomposition as a function of estimation-window length."""
     def series(name: str, method: str):
         c = contrasts[(contrasts.contrast == name) & (contrasts.method == method)]
         c = c.sort_values("window")
@@ -371,12 +326,11 @@ def f7_window_gradient(contrasts: pd.DataFrame) -> None:
     ax.legend(fontsize=8.5)
     ax.set_title("The two additions vs horizon (95% CI)", fontsize=10)
 
-    # Right panel: stacked additions — the relative split of the total gain.
+    # Right panel: stacked additions, the split of the total gain.
     wsx = np.arange(len(skel[0]))
     width = 0.55
     axr.bar(wsx, skel[1], width, color=C["D0"], label="skeleton")
-    # Stack orientation on top of the skeleton bar from the skeleton's level
-    # (negative components simply extend below their own base).
+    # Negative components extend below their own base.
     base = np.where(np.sign(skel[1]) == np.sign(orient[1]), skel[1], 0.0)
     axr.bar(wsx, orient[1], width, bottom=base, color=C["D1"],
             label="orientation")

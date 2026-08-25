@@ -1,10 +1,8 @@
-"""Unit tests for the Phase-II direction-aware allocators (directed.py).
+"""Unit tests for the direction-aware allocators (directed.py).
 
-Verifies the B-matrix machinery against explicit series sums, the structural
-covariance against hand-computable anchors (M=0 reduction, chain-propagation
-monotonicity, de-standardisation scaling), the ERC solver's risk-contribution
-parity/determinism, and — the local replication anchor — that D0 reproduces
-``v0prime_asset_only_causal_hrp`` exactly on the same inputs.
+Checks the B-matrix maths, the structural covariance against hand-computed
+anchors, the ERC solver, and that D0 reproduces
+``v0prime_asset_only_causal_hrp`` exactly.
 """
 
 from __future__ import annotations
@@ -51,9 +49,7 @@ def _returns(names, T=260, seed=3):
     )
 
 
-# ============================================================================
 # total_effect_matrix
-# ============================================================================
 def test_total_effect_equals_neumann_sum_on_dag():
     M = np.zeros((4, 4))
     M[0, 1], M[1, 2], M[0, 3], M[3, 2] = 0.5, -0.3, 0.2, 0.7
@@ -68,16 +64,14 @@ def test_total_effect_equals_neumann_sum_on_dag():
 
 
 def test_total_effect_truncated_neumann_with_spectral_guard():
-    # A 2-cycle with ρ ≥ 1 must be rescaled, not diverge.
+    # A 2-cycle with spectral radius >= 1 must be rescaled, not diverge.
     M = np.array([[0.0, 1.2], [1.1, 0.0]])
     B = total_effect_matrix(M, is_dag=False, k_trunc=10)
     assert np.all(np.isfinite(B))
     assert B[0, 0] > 1.0  # feedback amplifies
 
 
-# ============================================================================
 # structural_covariance_v2
-# ============================================================================
 def test_sigma_struct_reduces_to_destandardised_diag_when_m_zero():
     g = _graph(np.zeros((3, 3)), std=[1.0, 1.0, 2.0])
     cov = structural_covariance_v2(g, ridge=0.0).to_numpy()
@@ -87,7 +81,7 @@ def test_sigma_struct_reduces_to_destandardised_diag_when_m_zero():
 
 def test_sigma_struct_variance_increases_down_a_chain():
     M = np.zeros((3, 3))
-    M[0, 1], M[1, 2] = 1.0, 1.0  # A → B → C, unit edges + unit shocks
+    M[0, 1], M[1, 2] = 1.0, 1.0  # A -> B -> C, unit edges and shocks
     cov = structural_covariance_v2(_graph(M), ridge=0.0).to_numpy()
     v = np.diag(cov)
     np.testing.assert_allclose(v, [1.0, 2.0, 3.0], rtol=1e-9)
@@ -110,9 +104,7 @@ def test_sigma_struct_warns_and_uses_unit_shocks_without_residuals(caplog):
     np.testing.assert_allclose(np.diag(cov), [1.0, 1.0], rtol=1e-10)
 
 
-# ============================================================================
 # ERC (Spinu CCD)
-# ============================================================================
 def test_erc_risk_contribution_parity_on_random_psd():
     N = 20
     A = RNG.standard_normal((N, N))
@@ -122,13 +114,10 @@ def test_erc_risk_contribution_parity_on_random_psd():
     assert w.sum() == pytest.approx(1.0, abs=1e-12)
     rc = w * (cov @ w)
     assert (rc.max() - rc.min()) / rc.mean() < 1e-8
-    # Determinism: identical output across calls.
-    np.testing.assert_array_equal(w, erc_weights(cov))
+    np.testing.assert_array_equal(w, erc_weights(cov))  # deterministic
 
 
-# ============================================================================
 # Allocators
-# ============================================================================
 def _random_dag(N, seed=11, density=0.3):
     rng = np.random.default_rng(seed)
     order = rng.permutation(N)
@@ -141,8 +130,7 @@ def _random_dag(N, seed=11, density=0.3):
 
 
 def test_d0_matches_v0prime_exactly():
-    """The local replication anchor: D0 through the new dispatch must equal
-    the committed V0′ allocator byte-for-byte on identical inputs."""
+    """D0 through the dispatch equals the committed V0' allocator exactly."""
     N = 8
     M = _random_dag(N)
     names = [f"A{i}" for i in range(N)]
@@ -162,13 +150,11 @@ def test_every_allocator_returns_valid_longonly_weights(name):
     assert list(w.index) == g.asset_names
     assert np.all(w.to_numpy() >= -1e-12)
     assert w.sum() == pytest.approx(1.0, abs=1e-9)
-    # Determinism (seed-free by construction).
-    pd.testing.assert_series_equal(w, dispatch_allocator(name, g, rets))
+    pd.testing.assert_series_equal(w, dispatch_allocator(name, g, rets))  # deterministic
 
 
 def test_corr_hrp_matches_hand_construction():
-    """CORR must equal hrp_weights on the textbook correlation distance,
-    routed through the same nearest-PSD house pattern as every D-variant."""
+    """CORR equals hrp_weights on the textbook correlation distance."""
     from pipeline.portfolio._old_v123 import correlation_distance, nearest_psd
     from pipeline.portfolio.hrp import hrp_weights
     from pipeline.portfolio.hsp import sample_covariance
@@ -186,8 +172,7 @@ def test_corr_hrp_matches_hand_construction():
 
 
 def test_corr_hrp_is_graph_blind():
-    """Two entirely different graphs must give identical CORR weights — the
-    control uses the graph only for its asset universe."""
+    """Different graphs give identical CORR weights (graph used only for the universe)."""
     rets = _returns([f"A{i}" for i in range(8)], seed=17)
     w_a = dispatch_allocator("CORR", _graph(_random_dag(8, seed=1)), rets)
     w_b = dispatch_allocator("CORR", _graph(_random_dag(8, seed=2)), rets)
@@ -201,24 +186,19 @@ def test_dispatch_rejects_unknown_allocator():
 
 
 def test_d4_identical_ancestry_gives_zero_distance_pair():
-    # Two sinks fed identically by the same parent inherit the same shock
-    # profile up to their own shock — with tiny own influence their D4
-    # co-ancestry similarity is near-maximal vs an unrelated asset.
+    # Two sinks fed identically by the same parent share a shock profile,
+    # so their D4 co-ancestry similarity is near-maximal.
     M = np.zeros((4, 4))
-    M[0, 1], M[0, 2] = 0.9, 0.9  # A0 → A1, A0 → A2 equally; A3 isolated
+    M[0, 1], M[0, 2] = 0.9, 0.9  # A0 -> A1 and A0 -> A2 equally; A3 isolated
     g = _graph(M)
     rets = _returns(g.asset_names, seed=9)
     w = dispatch_allocator("D4", g, rets)
     assert w.sum() == pytest.approx(1.0, abs=1e-9)
 
 
-# ============================================================================
-# HERC family (second family member; PREDICTIONS_HERC.md)
-# ============================================================================
+# HERC family
 def test_herc_budgets_conserved_and_tree_read():
-    """HERC weights sum to 1, are long-only, and differ generically from
-    HRP's on the same (distance, covariance) pair — the tree-reading rule
-    is a real degree of freedom, not a relabelling."""
+    """HERC weights are valid and differ from HRP's on the same inputs."""
     N = 12
     g = _graph(_random_dag(N, seed=41))
     rets = _returns(g.asset_names, seed=11)
@@ -230,9 +210,7 @@ def test_herc_budgets_conserved_and_tree_read():
 
 
 def test_herc0_is_orientation_blind():
-    """HERC0 must be invariant to transposing every edge (the same
-    orientation-blindness property D0 carries: the embedding distance is
-    permutation-of-coordinates invariant under transpose)."""
+    """HERC0 is invariant to transposing every edge, like D0."""
     N = 10
     M = _random_dag(N, seed=53)
     rets = _returns([f"A{i}" for i in range(N)], seed=29)
@@ -249,8 +227,7 @@ def test_hercc_is_graph_blind():
 
 
 def test_herc1_is_orientation_sensitive():
-    """HERC1 allocates on Σ_struct, so transposing the edges must change
-    its weights generically (the orientation-sensitivity counterpart)."""
+    """HERC1 allocates on the structural covariance, so transposing edges changes its weights."""
     N = 10
     M = _random_dag(N, seed=53)
     rets = _returns([f"A{i}" for i in range(N)], seed=29)

@@ -1,19 +1,9 @@
-"""Phase-II step 2 — graph-extraction dry-run + cache-hit gate.
+"""Graph-extraction dry-run plus cache-hit gate for Phase II.
 
-Rebuilds the exact Phase-I joint panel (same universe file, driver drop set,
-calendar and window slicing as ``run_shakedown``), computes the discovery-
-cache key for every rebalance window, and:
-
-1. **Asserts the cache-hit rate is 100%** for the requested (method, window)
-   combos. A miss means the rebuilt joint frame diverges from the one the
-   Phase-I fits were keyed on — STOP and reconcile before any backtest, or
-   the E1 grid would silently refit 4-minute graphs and decouple Phase II
-   from the Phase-I bundles.
-2. Loads each cached fit, extracts the asset–asset graph through the
-   Phase-II chokepoint, and writes per-window DAG diagnostics
-   (density, depth, roots/leaves) → ``results/phase_ii_dag_diagnostics.csv``.
-
-Zero WRDS calls — all data comes from cache/ (same guarantee as Phase I).
+Rebuilds the Phase-I joint panel, asserts every rebalance window hits the
+discovery cache (a miss means the panel diverged from the Phase-I fits),
+then writes DAG diagnostics to results/phase_ii_dag_diagnostics.csv.
+No WRDS calls; all data comes from cache/.
 
 Usage
 -----
@@ -50,7 +40,7 @@ RESULTS = THESIS_ROOT / "results"
 
 
 def build_phase_i_inputs():
-    """Reproduce run_shakedown's data-prep (steps 2–5) for the Phase-I config."""
+    """Reproduce run_shakedown's data prep for the Phase-I config."""
     universe = sorted(set(UNIVERSE_FILE.read_text().strip().split(",")))
     driver_specs = [s for s in DRIVER_CATALOGUE if s.name not in DROP_DRIVERS]
     start_ts, end_ts = pd.Timestamp(DATA_START), pd.Timestamp(DATA_END)

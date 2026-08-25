@@ -1,10 +1,5 @@
-"""Stage 1 sensitivity estimation.
-
-* :mod:`pipeline.sensitivities.ffnn` -- PyTorch multi-head FFNN with shared
-  hidden layers + autograd Jacobian (``torch.func.jacrev``) per window.
-* :mod:`pipeline.sensitivities.sensitivity_matrix` -- distance / correlation /
-  Lopez-de-Prado distance forms over the per-window ``S`` matrix, plus the
-  K-appropriateness diagnostics from the discovery plan.
+"""Stage 1 sensitivity estimation: per-window FFNN Jacobians (ffnn) and
+distance/diagnostic forms over the resulting S matrix (sensitivity_matrix).
 """
 
 from __future__ import annotations

@@ -1,11 +1,6 @@
 """Portfolio construction (HRP, HSP, Causal-HSP variants).
 
-Until the new HRP / HSP / Causal-HSP modules land in Phase 6, this package
-re-exports the legacy helpers from ``_old_v123`` (V1/V2/V3 sketches from the
-prior asset-only plan) so existing scripts keep working. Only the genuinely
-reusable helpers (``nearest_psd``, ``symmetrise``, ``causal_embedding_distance``)
-will survive the Phase 6 rewrite — they remain useful for the V0' asset-only
-Causal-HRP variant.
+Also re-exports the reusable legacy helpers from ``_old_v123``.
 """
 
 from __future__ import annotations

@@ -1,25 +1,5 @@
-"""Stage 1 orchestration: data → discovery → selection → sensitivities → Parquet.
-
-Drives the Causal Factor Discovery pipeline (per
-``Causal Factor Discovery Pipeline.md``) over a configured backtest period.
-
-For each rebalance date ``t``, this module produces and persists:
-
-* ``W[t]``, ``A_p[t]``, fit diagnostics — from DYNOTEARS joint-matrix discovery
-  with asset → driver ``tabu_edges`` enforcement.
-* ``selected_drivers[t]`` — ordered list of ≤ K driver names from
-  :func:`pipeline.factor_selection.select_drivers` (Stage A prune + Stage B
-  greedy + optional α-blend with ``U[t-1]``).
-* ``sensitivities[t]`` — per-asset sensitivity matrix from
-  :func:`pipeline.sensitivities.fit_sensitivities_window` (PyTorch multi-head
-  FFNN + autograd Jacobian).
-
-Outputs are written to ``results/<tag>/stage1/`` as Parquet (one file per
-artefact type), keyed by rebalance date.
-
-V2 (closed-loop) is enabled by passing a ``UtilityStore`` for both
-``selector_utility_lookup`` and ``feedback_store`` — Stage 2 wires this up
-explicitly, see :func:`pipeline.stage2_pipeline.run_stage2`.
+"""Stage 1 orchestration: discovery, driver selection and sensitivities per
+rebalance date, persisted under ``results/<tag>/stage1/``.
 
 Entry point: :func:`run_stage1`.
 """
@@ -58,17 +38,13 @@ logger = logging.getLogger(__name__)
 RESULTS_ROOT = THESIS_ROOT / "results"
 
 
-# ============================================================================
 # Per-rebalance result
-# ============================================================================
 @dataclass
 class Stage1Rebalance:
-    """Stage 1 output for one rebalance date — the §Interface contract.
+    """Stage 1 output for one rebalance date.
 
-    ``discovery`` is ``None`` on the V0 path (cum-corr selection skips the
-    causal-graph fitting step entirely). ``selection`` is either a
-    ``SelectionResult`` (causal-greedy) or a ``CorrelationSelectionResult``
-    (V0); both expose ``.selected`` and ``.K``.
+    ``discovery`` is ``None`` on the V0 path. ``selection`` is either kind of
+    selection result; both expose ``.selected`` and ``.K``.
     """
 
     rebalance_date: pd.Timestamp
@@ -99,19 +75,13 @@ class Stage1Output:
         return pd.DataFrame(rows)
 
 
-# ============================================================================
 # Helpers
-# ============================================================================
 def derive_rebalance_dates(
     calendar: pd.DatetimeIndex,
     burn_in_days: int,
     rebalance_step: int = 21,
 ) -> pd.DatetimeIndex:
-    """Rebalance every ``rebalance_step`` trading days starting after burn-in.
-
-    The default 21 trading days ≈ one calendar month and matches the
-    closed-loop plan's monthly cadence.
-    """
+    """Rebalance every ``rebalance_step`` trading days starting after burn-in."""
     if len(calendar) <= burn_in_days:
         raise ValueError(
             f"calendar has {len(calendar)} trading days but burn_in_days={burn_in_days}"
@@ -119,9 +89,7 @@ def derive_rebalance_dates(
     return calendar[burn_in_days::rebalance_step]
 
 
-# ============================================================================
 # Single-rebalance orchestrator
-# ============================================================================
 def fit_stage1_rebalance(
     rebalance_idx: int,
     rebalance_date: pd.Timestamp,
@@ -138,29 +106,14 @@ def fit_stage1_rebalance(
     correlation_kwargs: dict | None = None,
     discovery_cache: bool = False,
 ) -> Stage1Rebalance:
-    """Run discovery → selection → sensitivities on a single window.
+    """Run discovery, selection and sensitivities on a single window.
 
-    Public entry-point for one-rebalance Stage 1 work. Composed by both
-    :func:`run_stage1` (batch over all rebalances) and
-    :func:`pipeline.closed_loop.run_closed_loop` (just-in-time, per rebalance,
-    inside the V2 closed loop).
-
-    Parameters
-    ----------
-    selection_method:
-        ``"causal_greedy"`` (default; V1/V2 path — Stage A + Stage B + utility
-        blend per :func:`select_drivers`) or ``"correlation"`` (V0 path —
-        cumulative-correlation top-K per :func:`select_top_k_corr`). The
-        latter skips discovery entirely.
-    discovery_method:
-        ``"dynotears"`` (default) or ``"varlingam"``. Ignored (with a debug
-        log) when ``selection_method == "correlation"``.
-    correlation_kwargs:
-        Forwarded to ``select_top_k_corr`` (e.g. ``{"lags": (0, 1)}``).
-        Ignored on the causal-greedy path.
+    Used by both :func:`run_stage1` and the V2 closed loop.
+    ``selection_method="correlation"`` (V0) skips discovery entirely and
+    ignores ``discovery_method``.
     """
-    # Per-window z-score for both discovery (already done internally by
-    # run_dynotears_joint_window) and the selection / sensitivity steps.
+    # Per-window z-score for selection and sensitivities (discovery z-scores
+    # internally).
     zs, _, _ = zscore_window(joint_window)
     dw = zs[driver_columns]
     aw = zs[asset_columns]
@@ -175,15 +128,11 @@ def fit_stage1_rebalance(
     sel: SelectionResult | CorrelationSelectionResult
 
     if selection_method == "asset_only":
-        # V0′ / Phase-II path: run the SAME joint discovery V1 uses (drivers
-        # present, asset→driver edges masked), but use only the asset–asset
-        # block downstream — no driver selection, no FFNN. Return an empty
-        # selection so the shared "no selected drivers" branch yields an empty
-        # SensitivityWindow; the closed-loop strategy reads
-        # ``discovery.asset_to_asset_block`` instead. The discovery backend is
-        # selectable (Phase II runs the same D-allocators on DYNOTEARS,
-        # VARLiNGAM and the ridge-VAR(1) GRANGER comparator); the default
-        # stays "dynotears" so Phase-I V0′ reproductions are bit-identical.
+        # V0' path: same joint discovery as V1, but only the asset-asset block
+        # is used downstream. Empty selection yields an empty
+        # SensitivityWindow; the closed loop reads asset_to_asset_block.
+        # Default stays "dynotears" so Phase-I V0' reproductions are
+        # bit-identical.
         if discovery_method in (None, "dynotears"):
             disc = load_or_compute_discovery(
                 lambda: run_dynotears_joint_window(
@@ -207,12 +156,10 @@ def fit_stage1_rebalance(
         elif discovery_method == "granger":
             from pipeline.discovery.granger import run_granger_joint_window
 
-            # Per-window density matching: with the sentinel flag set, the
-            # paired DYNOTEARS window (a guaranteed cache hit in Phase-II
-            # runs) supplies the asset-block edge density so the cheap
-            # directed graph is compared at like-for-like sparsity. The
-            # resolved density enters the granger cache key, keeping keys
-            # honest per window.
+            # Density matching: the paired DYNOTEARS window supplies the
+            # asset-block edge density so the granger graph is compared at
+            # like-for-like sparsity. The resolved density enters the cache
+            # key.
             g_kwargs = dict(discovery_kwargs)
             if g_kwargs.pop("density_match_dynotears", False):
                 dyno = load_or_compute_discovery(
@@ -250,8 +197,7 @@ def fit_stage1_rebalance(
             selected=[], scores=pd.Series(dtype=float), K=0, lags=(),
         )
     elif selection_method == "correlation":
-        # V0 path: skip discovery entirely; just rank drivers by cum-corr
-        # with the asset block and take the top K.
+        # V0 path: rank drivers by cum-corr with the asset block, take top K.
         if discovery_method is not None:
             logger.debug(
                 "selection_method='correlation': ignoring discovery_method=%r "
@@ -263,7 +209,7 @@ def fit_stage1_rebalance(
             rebalance_date=rebalance_date, **corr_kw,
         )
     else:
-        # V1/V2 path: discovery → Stage A + Stage B + utility blend.
+        # V1/V2 path: discovery then Stage A + Stage B + utility blend.
         if discovery_method == "varlingam":
             disc = load_or_compute_discovery(
                 lambda: run_varlingam_joint_window(
@@ -290,9 +236,8 @@ def fit_stage1_rebalance(
                 f"selection_method='causal_greedy', got {discovery_method!r}"
             )
 
-        # Thread the method choice through so Stage A applies the right
-        # stability mask (DYNOTEARS magnitude threshold vs VARLiNGAM
-        # bootstrap probabilities, when available).
+        # Thread the method through so Stage A applies the right stability
+        # mask.
         sel_kw = dict(selector_kwargs)
         sel_kw.setdefault("method", discovery_method)
         sel = select_drivers(
@@ -308,8 +253,7 @@ def fit_stage1_rebalance(
 
     # Sensitivities on the selected drivers (shared across V0/V1/V2).
     if not sel.selected:
-        # No drivers selected (e.g. ε early-stop or empty pool); return an
-        # empty placeholder so the loop can carry on.
+        # Empty placeholder so the loop can carry on.
         N = len(asset_columns)
         sens = SensitivityWindow(
             rebalance_date=rebalance_date,
@@ -335,9 +279,7 @@ def fit_stage1_rebalance(
     )
 
 
-# ============================================================================
 # Top-level orchestrator
-# ============================================================================
 def run_stage1(
     joint_frame: pd.DataFrame,
     driver_columns: list[str],
@@ -356,51 +298,19 @@ def run_stage1(
     output_dir: Path | None = None,
     progress_log_every: int = 6,
 ) -> Stage1Output:
-    """Drive Stage 1 over a sequence of rebalance dates.
+    """Drive Stage 1 over a sequence of rebalance dates; returns Stage1Output.
 
-    Parameters
-    ----------
-    joint_frame:
-        Aligned trading-day panel (rows = trading days, columns = drivers +
-        assets) from :func:`pipeline.data.alignment.build_joint_matrix`.
-    driver_columns, asset_columns:
-        The two column subsets. The intersection of their union with
-        ``joint_frame.columns`` must equal ``joint_frame.columns``.
-    rebalance_dates:
-        Sequence of rebalance timestamps; each gets ``window_size`` lookback
-        days ending at that timestamp.
-    window_size:
-        Lookback length in trading days (default 504 ≈ 2 years).
-    K:
-        Selected-driver count target.
-    discovery_kwargs:
-        Forwarded to :func:`run_dynotears_joint_window`. Typical values:
-        ``{"p": 1, "lambda_w": 0.05, "lambda_a": 0.05, "w_threshold": 0.01}``.
-    selector_kwargs:
-        Forwarded to :func:`select_drivers`. Typical:
-        ``{"alpha": 0.6, "burn_in_rebalances": 6}``.
-    sensitivities_kwargs:
-        Forwarded to :func:`fit_sensitivities_window`.
-    utility_lookup:
-        Lookahead-safe callable from
-        :func:`pipeline.feedback.UtilityStore.as_lookup`. ``None`` (or the
-        burn-in handling inside the selector) yields V1 open-loop behaviour.
-    output_dir:
-        If provided, the run is pickled to ``output_dir / stage1_<tag>.pkl``.
-        Default writes to ``results/<tag>/stage1/``.
-
-    Returns
-    -------
-    :class:`Stage1Output`. The caller (Stage 2) consumes the per-rebalance
-    triple of (W, selected_drivers, S).
+    Each rebalance gets ``window_size`` lookback days ending at its date.
+    ``utility_lookup`` is a lookahead-safe callable from
+    ``UtilityStore.as_lookup``; ``None`` gives V1 open-loop behaviour.
     """
     discovery_kwargs = dict(discovery_kwargs or {})
     selector_kwargs = dict(selector_kwargs or {})
     sensitivities_kwargs = dict(sensitivities_kwargs or {})
     correlation_kwargs = dict(correlation_kwargs or {})
 
-    # Embed the method choices in the output dir so V0 / V1-DYNO / V1-VAR
-    # runs with the same tag don't clobber each other.
+    # Embed the method in the output dir so runs with the same tag don't
+    # clobber each other.
     method_suffix = (
         "v0_corr" if selection_method == "correlation"
         else f"causal_{discovery_method}"

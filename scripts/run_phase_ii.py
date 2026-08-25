@@ -1,27 +1,16 @@
-"""Phase II — direction-aware allocation from asset–asset causal graphs.
+"""Run one (method, allocator, window, tau) cell of the Phase-II ablation.
 
-Runs one (method × allocator × window × τ) cell of the Phase-II fixed-graph
-ablation (see PHASE_II_PLAN.md). Everything upstream of the allocator is the
-*identical* Phase-I protocol — same universe, drivers, joint matrix, window
-slicing, rebalance dates, costs — reached through the same
-``run_shakedown → run_closed_loop`` path with ``selection_method="asset_only"``,
-so the discovery cache hits the 836 Phase-I graph fits and the D0 cell
-replicates the committed V0′ bundle structurally.
-
-Per-rebalance cost with a warm cache is linear algebra (~ms) plus a pickle
-load, so a full 215-rebalance run is minutes. All data is pre-cached — this
-makes ZERO WRDS calls.
+Everything upstream of the allocator is the identical Phase-I protocol, so
+the discovery cache hits the Phase-I graph fits. All data pre-cached; no
+WRDS calls.
 
 Usage
 -----
-    # Replication gate (must reproduce phase_i_v0prime_w252 to ≤1e-3):
+    # Replication gate (must reproduce phase_i_v0prime_w252 to <=1e-3):
     python -m scripts.run_phase_ii --method dynotears --allocator D0 --window 252
 
     # A direction-aware cell:
     python -m scripts.run_phase_ii --method dynotears --allocator D2 --window 252
-
-    # GRANGER comparator (density-matched to the paired DYNOTEARS window):
-    python -m scripts.run_phase_ii --method granger --allocator D2 --window 252
 
     # E3 sparsity sweep:
     python -m scripts.run_phase_ii --method dynotears --allocator D2 \\
@@ -38,8 +27,7 @@ from pipeline.data.drivers import DRIVER_CATALOGUE
 from pipeline.portfolio.directed import ALLOCATORS
 from pipeline.shakedown import run_shakedown
 
-# Same exclusions as Phase I (scripts/run_phase_i.py) — mandatory for the
-# joint matrix (and therefore the discovery-cache keys) to match byte-for-byte.
+# Same exclusions as Phase I, mandatory for the discovery-cache keys to match.
 DROP_DRIVERS = {"hyg_lqd_logret", "vvix"}
 
 _TRACKED_UNIVERSE = pathlib.Path(__file__).resolve().parent / "phase_i_universe.txt"
@@ -77,9 +65,8 @@ def main(argv: list[str] | None = None) -> None:
     universe = UNIVERSE_FILE.read_text().strip().split(",")
     driver_specs = [s for s in DRIVER_CATALOGUE if s.name not in DROP_DRIVERS]
 
-    # Discovery kwargs must match Phase I exactly for the cache keys to hit:
-    # {} for DYNOTEARS, {"prune": False} for VARLiNGAM. GRANGER windows are
-    # new fits (seconds each, closed-form) density-matched to DYNOTEARS.
+    # Discovery kwargs must match Phase I exactly for the cache keys to hit.
+    # GRANGER windows are new fits, density-matched to DYNOTEARS.
     if args.method == "varlingam":
         discovery_kwargs: dict | None = {"prune": False}
     elif args.method == "granger":
@@ -90,15 +77,12 @@ def main(argv: list[str] | None = None) -> None:
     else:
         discovery_kwargs = None
 
+    # CORR, EW/IVP and HERCC are graph-blind, so their tags are method-independent.
     if args.allocator == "CORR":
-        # The plain correlation-distance HRP control is graph-blind, so it is
-        # method-independent: one tag regardless of --method.
         tag = f"phase_ii_corr_hrp_w{args.window}"
     elif args.allocator in ("EW", "IVP"):
-        # Naive anchors are graph-blind and method-independent too.
         tag = f"phase_ii_{args.allocator.lower()}_w{args.window}"
     elif args.allocator == "HERCC":
-        # The correlation-distance HERC control is graph-blind as well.
         tag = f"phase_ii_herc_corr_w{args.window}"
     else:
         tag = f"phase_ii_{args.method}_{args.allocator}_w{args.window}"
@@ -120,7 +104,7 @@ def main(argv: list[str] | None = None) -> None:
         universe_override=universe,
         driver_specs=driver_specs,
         K_default=10,                 # unused on the asset_only path
-        use_k_calibration=False,      # no drivers selected → nothing to calibrate
+        use_k_calibration=False,      # no drivers selected, nothing to calibrate
         window_size=args.window,
         lookback_days=args.window,
         holding_days=21,
@@ -141,7 +125,7 @@ def main(argv: list[str] | None = None) -> None:
     try:
         bt = res.closed_loop.backtest
         print(f"final NAV (gross/net): {bt.nav_gross.iloc[-1]:.4f} / {bt.nav_net.iloc[-1]:.4f}")
-    except Exception as exc:  # never let a cosmetic print abort a run
+    except Exception as exc:  # cosmetic print must not abort a run
         log.warning("Could not print final NAV (%s); results are persisted regardless.", exc)
     print("=" * 70)
 

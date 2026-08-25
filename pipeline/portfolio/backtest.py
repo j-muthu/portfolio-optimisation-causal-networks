@@ -1,18 +1,7 @@
-"""Walk-forward backtest simulator (Stage 2).
+"""Walk-forward backtest simulator, strategy-agnostic.
 
-Each rebalance ``t``:
-
-1. Caller supplies the strategy function ``strategy(t) -> weights``.
-2. Backtester records the new ``w[t]`` and the realised daily returns from
-   ``t`` to ``t + holding_days``.
-3. Transaction costs are charged on one-way turnover at rebalance time.
-4. After the holding period: realised excess Sharpe vs equal-weight is
-   computed (the V2 reward signal).
-
-The simulator is intentionally strategy-agnostic — it doesn't care whether
-the strategy is HRP, HSP, Causal-HSP, MVO, or 1/N.
-
-Entry point: :func:`run_backtest`.
+Charges transaction costs on one-way turnover at rebalance and records the
+excess Sharpe vs equal-weight over each holding period (the V2 reward).
 """
 
 from __future__ import annotations
@@ -27,9 +16,7 @@ import pandas as pd
 logger = logging.getLogger(__name__)
 
 
-# ============================================================================
 # Result containers
-# ============================================================================
 @dataclass
 class RebalanceRecord:
     """One rebalance event."""
@@ -68,9 +55,7 @@ class BacktestResult:
         return pd.DataFrame(rows)
 
 
-# ============================================================================
 # Helpers
-# ============================================================================
 def _annualised_sharpe(returns: pd.Series, periods_per_year: int = 252) -> float:
     r = returns.dropna()
     if r.empty:
@@ -89,9 +74,7 @@ def _one_way_turnover(prev: pd.Series, new: pd.Series) -> float:
     return float(0.5 * (n - p).abs().sum())
 
 
-# ============================================================================
 # Walk-forward driver
-# ============================================================================
 def run_backtest(
     rebalance_dates: Sequence[pd.Timestamp],
     universe_at: Callable[[pd.Timestamp], list[str]],
@@ -102,42 +85,12 @@ def run_backtest(
     log_every: int = 12,
     on_rebalance_complete: Callable[["RebalanceRecord"], None] | None = None,
 ) -> BacktestResult:
-    """Walk-forward backtest.
+    """Walk-forward backtest; returns per-rebalance records plus gross/net NAV.
 
-    Parameters
-    ----------
-    rebalance_dates:
-        Sequence of timestamps at which a new portfolio is constructed.
-    universe_at:
-        Callable returning the asset list eligible at the given rebalance
-        date (e.g. top-100-by-mcap, intersected with available prices).
-    strategy:
-        Callable ``(t, asset_names) -> pd.Series`` of weights. Indexed by
-        asset_names, summing to 1.
-    prices:
-        Wide price panel, rows = trading days, columns = tickers.
-        Must cover from the first rebalance through ``last_rebalance +
-        holding_days``.
-    holding_days:
-        Trading-day holding period before the next rebalance. Default 21
-        (monthly).
-    transaction_cost_bps:
-        One-way turnover cost in basis points (5 bps = 0.05 %). Charged at
-        rebalance day on the *net* track only.
-    on_rebalance_complete:
-        Optional callback fired immediately after each rebalance's holding
-        period is simulated and the :class:`RebalanceRecord` is appended.
-        Receives that record. Used by
-        :func:`pipeline.closed_loop.run_closed_loop` to update the V2
-        ``UtilityStore`` *between* rebalances so the next iteration's
-        ``strategy(t+1, ...)`` call sees the freshly-keyed U row. Default
-        ``None`` = no callback, preserving the open-loop behaviour for
-        V0prime / V1 callers.
-
-    Returns
-    -------
-    :class:`BacktestResult` containing the per-rebalance records and the
-    NAV series (gross and net).
+    ``prices`` must cover through ``last_rebalance + holding_days``.
+    Transaction costs hit the net track only. ``on_rebalance_complete`` fires
+    after each holding period so a closed-loop driver can update state (e.g.
+    the V2 UtilityStore) before the next ``strategy`` call.
     """
     rebalances: list[RebalanceRecord] = []
     prev_weights = pd.Series(dtype=float)
@@ -151,7 +104,7 @@ def run_backtest(
     for i, t in enumerate(rebalance_dates):
         universe = universe_at(t)
         weights = strategy(t, universe)
-        # Defensive normalisation in case the strategy returned a slightly off-sum.
+        # Defensive normalisation.
         weights = weights.reindex(universe).fillna(0.0)
         total = weights.sum()
         if total < 1e-12:
@@ -168,16 +121,15 @@ def run_backtest(
         held_returns = daily_returns.loc[holding_idx, universe].fillna(0.0)
         portfolio_returns = held_returns @ weights
 
-        # One-way turnover & transaction cost.
         turnover = _one_way_turnover(prev_weights, weights) if not prev_weights.empty else weights.abs().sum() / 2.0
         tx_cost = turnover * (transaction_cost_bps / 10_000)
 
-        # Apply costs at the first day of the holding period.
+        # Costs hit the first day of the holding period.
         portfolio_returns_net = portfolio_returns.copy()
         if len(portfolio_returns_net) > 0:
             portfolio_returns_net.iloc[0] = portfolio_returns_net.iloc[0] - tx_cost
 
-        # Reward signal: excess annualised Sharpe vs 1/N over the holding period.
+        # Reward: excess annualised Sharpe vs 1/N.
         equal_returns = held_returns.mean(axis=1)
         reward = _annualised_sharpe(portfolio_returns) - _annualised_sharpe(equal_returns)
 
@@ -202,9 +154,8 @@ def run_backtest(
         rebalances.append(record)
         prev_weights = weights
 
-        # Fire the post-rebalance hook *before* advancing to the next
-        # rebalance, so a closed-loop driver can update state (e.g. the V2
-        # UtilityStore) that the next strategy() call will read.
+        # Fire before advancing so a closed-loop driver can update state
+        # that the next strategy() call reads.
         if on_rebalance_complete is not None:
             on_rebalance_complete(record)
 

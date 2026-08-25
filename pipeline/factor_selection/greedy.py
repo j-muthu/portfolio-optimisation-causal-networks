@@ -1,27 +1,10 @@
-"""Stage B — conditional greedy refinement on the Stage-A pool.
+"""Stage B: conditional greedy refinement on the Stage-A pool.
 
-Algorithm:
-
-1. Start with empty selected set ``S``.
-2. For each remaining candidate ``d`` in the pool, fit a small auxiliary
-   model: a regularised lagged regression of *each asset's* return on lagged
-   values of ``S ∪ {d}``. Score ``d`` by the aggregate held-out log-likelihood
-   gain vs the model that uses ``S`` only.
-3. Add the argmax candidate to ``S``.
-4. Repeat until ``|S| = K`` or the marginal gain falls below the
-   permutation-null threshold ``ε``.
-
-Implementation choices:
-
-* Regression: ``sklearn.linear_model.Ridge`` per asset, alpha calibrated
-  per call (default 1.0; downstream callers can override).
-* Validation: chronological 20 %-tail split of the window. Log-likelihood
-  under a Gaussian assumption — equivalent to scoring by negative half MSE
-  with a fixed variance, but the additive constants cancel in gain.
-* Stopping ``ε``: optional — when supplied, the loop terminates as soon as
-  the best marginal gain drops below ``ε`` even if ``|S| < K``. The plan's
-  default ``ε`` is the 95th percentile of marginal gains under a
-  permutation-null fit; computing that null is the caller's responsibility.
+Repeatedly add the candidate whose lagged ridge regression of asset returns
+on the selected set gives the largest held-out gain, until K is reached or
+the marginal gain falls below epsilon. Validation is a chronological 20%
+tail; the score is negative half MSE (equivalent to Gaussian log-likelihood
+up to constants that cancel in the gain).
 """
 
 from __future__ import annotations
@@ -36,26 +19,21 @@ import pandas as pd
 logger = logging.getLogger(__name__)
 
 
-# ============================================================================
 # Auxiliary regression
-# ============================================================================
 def _make_lagged_design(
     driver_window: pd.DataFrame,
     target_window: pd.DataFrame,
     selected: Sequence[str],
     lags: int,
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
-    """Build train/val (X, Y) matrices: lagged-driver predictors → asset returns.
+    """Build train/val (X, Y) matrices: lagged-driver predictors -> asset returns.
 
-    Drops the first ``lags`` rows (no lag history). Returns ``(X_tr, Y_tr,
-    X_va, Y_va)``; validation is the chronological 20 % tail of the post-lag
-    sample. ``X`` columns are the stacked lagged copies of the selected
-    drivers (shape ``len(selected) * lags``).
+    Validation is the chronological 20% tail of the post-lag sample; X stacks
+    the lagged copies of the selected drivers.
     """
     selected = list(selected)
     if not selected:
-        # Intercept-only baseline: X is a single column of ones; the regression
-        # will fit just the mean and held-out NLL gives the variance bound.
+        # Intercept-only baseline: a single column of ones fits just the mean.
         n = len(target_window) - lags
         X = np.ones((n, 1))
         Y = target_window.iloc[lags:].to_numpy(dtype=float)
@@ -80,10 +58,7 @@ def _ridge_val_score(
     alpha: float = 1.0,
 ) -> float:
     """Aggregate held-out negative-half MSE across all asset targets.
-
-    Larger is better (the conditional greedy step picks the candidate with
-    the largest *increase* in this score over the current ``S``).
-    """
+    Larger is better."""
     from sklearn.linear_model import Ridge
 
     model = Ridge(alpha=alpha, fit_intercept=True)
@@ -93,9 +68,7 @@ def _ridge_val_score(
     return -0.5 * float(mse)
 
 
-# ============================================================================
 # Stage B
-# ============================================================================
 @dataclass
 class StageBStep:
     """One iteration of the greedy expansion."""
@@ -134,30 +107,12 @@ def greedy_select(
     epsilon: float | None = None,
     alpha: float = 1.0,
 ) -> StageBResult:
-    """Stage B greedy expansion. See module docstring for full algorithm.
+    """Stage B greedy expansion; see the module docstring for the algorithm.
 
-    Parameters
-    ----------
-    driver_window, asset_window:
-        Per-window driver/asset frames, *already z-scored*. They must share
-        an index.
-    pool:
-        Stage A's pool of candidate driver names (typically top-2K).
-    K:
-        Target selected count.
-    lags:
-        Auxiliary-model lag horizon (e.g. ``1``).
-    epsilon:
-        Minimum marginal gain to accept a candidate. If a candidate's gain
-        falls below ``epsilon``, the loop stops even if ``|S| < K``. ``None``
-        disables the early-stop.
-    alpha:
-        Ridge regularisation for the per-asset auxiliary regression.
-
-    Returns
-    -------
-    :class:`StageBResult` with the selected drivers (in addition order),
-    a per-step gain log, and the termination reason.
+    ``driver_window`` / ``asset_window`` must already be z-scored and share
+    an index. ``epsilon`` is the minimum marginal gain to accept a candidate
+    (``None`` disables the early stop). Returns a :class:`StageBResult` with
+    the selection in addition order, a gain log, and the stop reason.
     """
     pool = [c for c in pool if c in driver_window.columns]
     selected: list[str] = []
@@ -201,8 +156,7 @@ def greedy_select(
                 selected=list(selected),
             )
         )
-        # Update the "current" score baseline with the actual fit incorporating
-        # the chosen candidate.
+        # Refresh the baseline score with the chosen candidate included.
         X_tr, Y_tr, X_va, Y_va = _make_lagged_design(driver_window, asset_window, selected, lags)
         current = _ridge_val_score(X_tr, Y_tr, X_va, Y_va, alpha=alpha)
 

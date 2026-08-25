@@ -1,22 +1,8 @@
-"""J6 — regime-conditional performance analysis (zero new compute).
+"""J6: regime-conditional performance analysis (no new compute).
 
-Reads the persisted Phase I backtest bundles and tabulates, per
-(variant × discovery-method × window × regime), the risk metrics that the
-interim report's §4.1 promises:
-
-* annualised Sharpe, max drawdown, annualised return / volatility — computed
-  on the daily net-return series restricted to each regime;
-* one-way annualised turnover within each regime — computed from the
-  per-rebalance weights whose rebalance date falls inside the regime.
-
-Regime definitions (per the report's methodology):
-  - NBER recession (FRED USREC), and its complement (expansion);
-  - VIX top-quintile (high vol) vs bottom-quintile (low vol).
-(Network-density regimes need per-window discovery W matrices, which were not
-persisted in the bundles — see the plan's J6 note; omitted here.)
-
-Self-check: the "all" row of each variant's table must reproduce that
-variant's full-sample Sharpe (already in the headline matrix) to <= 1e-9.
+Reads the persisted backtest bundles and tabulates risk metrics per
+(variant, method, window, regime). Regimes: NBER recession/expansion and
+VIX top/bottom quintile.
 
 Run:  python -m scripts.regime_analysis
 Outputs: results/regime_analysis/{daily_metrics,turnover,excess_sharpe_named}.csv
@@ -51,7 +37,7 @@ RESULTS = REPO / "results"
 OUT = RESULTS / "regime_analysis"
 
 # (variant label, discovery method, result-dir tag stem). V0 is the shared
-# cum-corr baseline (discovery-agnostic), so it appears once per window.
+# baseline, so it appears once per window.
 VARIANTS = [
     ("V0",          "—",        "phase_i_v0_w{w}"),
     ("V0prime",     "dynotears","phase_i_v0prime_w{w}"),
@@ -59,11 +45,10 @@ VARIANTS = [
     ("V2-DYNOTEARS","dynotears","phase_i_v2_w{w}"),
     ("V1-VARLiNGAM","varlingam","phase_i_v1_varlingam_w{w}"),
     ("V2-VARLiNGAM","varlingam","phase_i_v2_varlingam_w{w}"),
-    # The graph-blind correlation control for the skeleton-vs-orientation
-    # decomposition (plain correlation-distance HRP, method-independent).
+    # Graph-blind correlation control.
     ("CORR-HRP",    "—",        "phase_ii_corr_hrp_w{w}"),
-    # Phase-II direction-aware allocators (fixed-graph ablation). DYNO-D0 is
-    # byte-identical to V0prime, so only the VARLiNGAM D0 row is added.
+    # Phase-II allocators. DYNO-D0 is byte-identical to V0prime, so only the
+    # VARLiNGAM D0 row is added.
     ("VARL-D0",     "varlingam","phase_ii_varlingam_D0_w{w}"),
     ("DYNO-D0s",    "dynotears","phase_ii_dynotears_D0s_w{w}"),
     ("DYNO-D1",     "dynotears","phase_ii_dynotears_D1_w{w}"),
@@ -80,8 +65,8 @@ VARIANTS = [
 ]
 WINDOWS = [189, 252, 378, 504]
 
-# Named hand-picked stress windows (to de-hardcode plot_interim_results.py's
-# REGIME_EXCESS_SHARPE fixture with computed per-rebalance excess-Sharpe).
+# Hand-picked stress windows (replace the hard-coded fixture in
+# plot_interim_results.py with computed values).
 NAMED_WINDOWS = {
     "GFC 2007-09":   ("2007-07-01", "2009-06-30"),
     "2018Q4 selloff":("2018-10-01", "2018-12-31"),
@@ -119,7 +104,7 @@ def main() -> None:
             nav = bt.nav_net
             rets = nav.pct_change().dropna()
 
-            # --- regime masks aligned to the daily return index ---
+            # Regime masks aligned to the daily return index.
             nber = nber_recession_dates(rets.index)
             masks = {
                 "nber_recession": nber,
@@ -127,11 +112,11 @@ def main() -> None:
                 **vix_regime_masks(vix.reindex(rets.index, method="ffill")),
             }
 
-            # --- (a) daily return-based metrics per regime ---
+            # (a) daily return-based metrics per regime
             summ = regime_conditional_summary(
                 rets, masks, summary_fn=lambda r: performance_summary(r)
             )
-            # self-check: 'all' Sharpe must match a direct full-sample compute
+            # Self-check: 'all' Sharpe must match a direct full-sample compute.
             chk = annualised_sharpe(rets)
             assert abs(summ.loc["all", "annualised_sharpe"] - chk) < 1e-9, \
                 f"{tag}: regime 'all' Sharpe {summ.loc['all','annualised_sharpe']} != {chk}"
@@ -146,7 +131,7 @@ def main() -> None:
                               if regime != "all" else len(rets),
                 })
 
-            # --- (b) per-regime turnover from rebalances in-regime ---
+            # (b) per-regime turnover from rebalances in-regime
             recs = bt.rebalances
             rdates = pd.DatetimeIndex([r.rebalance_date for r in recs])
             for regime, mask in {"all": pd.Series(True, index=rets.index), **masks}.items():
@@ -160,8 +145,7 @@ def main() -> None:
                         "n_rebalances": len(w_hist),
                     })
 
-            # --- (c) named-window mean excess-Sharpe-vs-1/N (de-hardcode Fig b) ---
-            #     uses per-rebalance holding_reward (= excess Sharpe vs 1/N).
+            # (c) named-window mean excess-Sharpe vs 1/N, from holding_reward
             if w == 252:  # Fig bars(b) is the 252-window cut
                 hr = pd.Series([r.holding_reward for r in recs], index=rdates)
                 for name, (s, e) in NAMED_WINDOWS.items():
@@ -180,7 +164,7 @@ def main() -> None:
     turn_df.to_csv(OUT / "turnover.csv", index=False)
     named_df.to_csv(OUT / "excess_sharpe_named.csv", index=False)
 
-    # --- console summary: the headline regime view (Sharpe by variant × regime) ---
+    # Console summary: Sharpe by variant and regime.
     print("\n" + "=" * 88)
     print("J6 — regime-conditional annualised Sharpe (net), by variant × regime")
     print("=" * 88)
@@ -189,7 +173,6 @@ def main() -> None:
         if sub.empty:
             continue
         piv = sub.pivot_table(index="variant", columns="regime", values="sharpe")
-        # order columns sensibly
         cols = [c for c in ["all","nber_recession","nber_expansion","high_vol","low_vol"]
                 if c in piv.columns]
         print(f"\n--- window {w} ---")

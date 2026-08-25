@@ -1,19 +1,6 @@
 """Causal-HSP pipeline for the S&P 100 thesis.
 
-Top-level structure (see ``Causal Factor Discovery Pipeline.md`` and
-``Closed-Loop Causal-HSP Portfolio.md`` for the architectural plan):
-
-* :mod:`pipeline.data` -- universe, asset prices, driver pool, alignment
-* :mod:`pipeline.discovery` -- rolling DYNOTEARS / VARLiNGAM with prior-knowledge masks
-* :mod:`pipeline.factor_selection` -- greedy driver selection from causal output
-* :mod:`pipeline.sensitivities` -- per-asset FFNN + AAD sensitivity vectors
-* :mod:`pipeline.portfolio` -- HRP / HSP / Causal-HSP variants and benchmarks
-* :mod:`pipeline.feedback` -- utility EMA + lookahead-safe storage for V2
-* :mod:`pipeline.evaluation` -- metrics, regime breakdowns, bootstrap CIs
-
-The legacy asset-only DYNOTEARS/VARLiNGAM API (``Dataset``, ``build_dataset``,
-``run_rolling_dynotears``, ``run_rolling_varlingam``) is re-exported here for
-back-compat while the new Stage 1 / Stage 2 modules come online.
+Re-exports the legacy asset-only DYNOTEARS/VARLiNGAM API for back-compat.
 """
 
 from __future__ import annotations

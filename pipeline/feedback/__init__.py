@@ -1,14 +1,6 @@
-"""Closed-loop feedback.
-
-* :mod:`pipeline.feedback.utility` -- sensitivity-weighted credit attribution
-  and EMA driver-utility update.
-* :mod:`pipeline.feedback.storage` -- lookahead-safe persistence, keyed by
-  holding-period-end date; the ``lookup_utility`` API asserts the lookahead
-  gap to detect leakage.
-* :mod:`pipeline.feedback.leak_canary` -- deliberately-broken U lookup that
-  peeks one rebalance ahead; used as a periodic sanity check that the
-  feedback signal is strong enough to matter.
-"""
+"""Closed-loop feedback: credit attribution and EMA utility update (utility),
+lookahead-safe persistence (storage), and a deliberately leaky lookup used as
+a leak-detection canary (leak_canary)."""
 
 from __future__ import annotations
 

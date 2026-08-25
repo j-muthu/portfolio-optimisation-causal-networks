@@ -1,45 +1,9 @@
-"""Survivorship-bias-aware price fetcher for the S&P-100 backtest.
+"""Price fetcher with a WRDS/CRSP-first, yfinance-fallback cascade.
 
-The backtest spans 2007-2024, including the GFC, during which ~30-40 S&P 500
-constituents (mostly financials) were delisted. ``yfinance`` silently returns
-no data for many of these — if we relied on yfinance alone the resulting
-universe would be biased toward survivors. The intended primary source is
-CRSP via WRDS, which is survivorship-bias-free and also exposes
-*historical* shares-outstanding (so the S&P-100 market-cap approximation
-becomes point-in-time rather than today's shares × historical price).
-
-Strategy
---------
-Two-backend cascade per ticker, in priority order:
-
-1. **WRDS / CRSP** (primary) -- :mod:`pipeline.data.wrds_backend`. Requires
-   the ``wrds`` Python library + WRDS credentials configured in
-   ``~/.pgpass`` (the convention the ``wrds`` library expects). When
-   credentials are missing or the library is not installed the cascade
-   silently falls through to yfinance — so the pipeline still runs (with
-   the survivorship-bias caveat) before WRDS approval lands.
-2. **yfinance** -- live-data fallback for the most recent ~2 trading days
-   that CRSP typically hasn't yet ingested. Also the only backend before
-   WRDS approval.
-
-Every requested ticker is logged with its resolved source. At call sites
-that build a rebalance universe, an alarm fires if joint coverage falls
-below 95 %.
-
-Per-ticker caching to ``cache/prices/<ticker>.parquet`` makes the
-multi-hour download a one-time cost.
-
-Shares-outstanding for the market-cap-at-date selection comes from CRSP
-``shrout`` when WRDS is available (true point-in-time historical values),
-otherwise falls back to yfinance ``Ticker.fast_info.shares`` as a constant
-proxy. The fallback is a known approximation — flagged in the methodology
-chapter and removed automatically once WRDS is wired in.
-
-Entry points
-------------
-* :func:`fetch_prices` -- price panel for an explicit ticker list.
-* :func:`fetch_shares_outstanding` -- shares panel/snapshot for the same tickers.
-* :func:`coverage_report` -- joint backend coverage stats per rebalance date.
+CRSP is survivorship-bias-free and has historical shares outstanding;
+yfinance alone would bias the 2007-2024 universe toward survivors. Falls
+through silently to yfinance when WRDS is unavailable. Per-ticker parquet
+cache under cache/prices/.
 """
 
 from __future__ import annotations
@@ -57,11 +21,7 @@ from pipeline._vendored import THESIS_ROOT
 
 
 def _load_dotenv(path: Path) -> None:
-    """Minimal .env loader (no python-dotenv dependency).
-
-    Reads ``KEY=value`` lines, ignores comments and blanks, only sets env vars
-    that are not already defined (lets shell-level overrides win).
-    """
+    """Minimal .env loader; existing env vars win over file values."""
     if not path.exists():
         return
     for raw in path.read_text().splitlines():
@@ -90,25 +50,11 @@ _HTTP_HEADERS = {"User-Agent": "thesis-causal-hsp/1.0 (academic research)"}
 Source = Literal["wrds", "yfinance", "cache", "missing"]
 
 
-# ============================================================================
 # Result containers
-# ============================================================================
 @dataclass
 class PricePanel:
-    """Adjusted-close panel for a set of tickers over a date range.
-
-    Attributes
-    ----------
-    prices:
-        ``DataFrame`` indexed by date, columns = tickers actually resolved.
-    sources:
-        Mapping ``ticker -> source`` describing where each column came from
-        (``"wrds"``, ``"yfinance"``, ``"cache"``). Tickers that could not be
-        resolved at all are recorded as ``"missing"`` and omitted from
-        ``prices``.
-    coverage:
-        Per-ticker fraction of trading days with data in the requested range.
-    """
+    """Adjusted-close panel plus per-ticker source and coverage. Unresolved
+    tickers appear in sources as "missing" and are omitted from prices."""
 
     prices: pd.DataFrame
     sources: dict[str, Source] = field(default_factory=dict)
@@ -123,53 +69,39 @@ class PricePanel:
         return [t for t, s in self.sources.items() if s == "missing"]
 
 
-# ============================================================================
 # Ticker normalisation
-# ============================================================================
 def _normalise_ticker(symbol: str) -> str:
     """Yahoo's convention (``-`` for share-class)."""
     return symbol.strip().upper().replace(".", "-")
 
 
-# ============================================================================
 # WRDS / CRSP backend (primary)
-# ============================================================================
 def fetch_from_wrds(
     ticker: str, start: pd.Timestamp, end: pd.Timestamp
 ) -> pd.Series | None:
-    """Return CRSP's split-and-dividend-adjusted close as a ``Series``.
-
-    Thin shim over :mod:`pipeline.data.wrds_backend`. Returns ``None`` if the
-    ``wrds`` library isn't installed, credentials are missing, or the ticker
-    has no CRSP coverage in the date range — the cascade then falls through
-    to yfinance.
-    """
+    """CRSP adjusted close, or None (no wrds library, no credentials, or no
+    coverage) so the cascade falls through to yfinance."""
     try:
         from pipeline.data.wrds_backend import fetch_crsp_prices
     except ImportError:
-        # `wrds_backend` module unavailable — shouldn't happen since it ships
-        # with the package, but stay defensive.
         return None
     try:
         return fetch_crsp_prices(ticker, start, end)
     except (ImportError, ModuleNotFoundError):
-        # `wrds` library not installed — silent fall-through.
+        # wrds library not installed; fall through silently.
         return None
     except Exception as exc:
         logger.debug("WRDS fetch failed for %s: %s", ticker, exc)
         return None
 
 
-# ============================================================================
 # yfinance backend (fallback)
-# ============================================================================
 def fetch_from_yfinance(
     ticker: str, start: pd.Timestamp, end: pd.Timestamp
 ) -> pd.Series | None:
     """Return auto-adjusted close from yfinance or ``None`` on empty/missing."""
     import warnings
 
-    # source code available at: https://github.com/ranaroussi/yfinance
     import yfinance as yf
 
     try:
@@ -204,11 +136,8 @@ def fetch_from_yfinance(
     return series
 
 
-# ============================================================================
-# Per-ticker cached fetch (wrds → yfinance cascade)
-# ============================================================================
+# Per-ticker cached fetch (wrds -> yfinance cascade)
 def _cache_path(ticker: str) -> Path:
-    # Yahoo's ``BRK-B`` is fine for filenames; uppercase for consistency.
     return PRICES_DIR / f"{ticker.upper()}.parquet"
 
 
@@ -220,7 +149,6 @@ def _read_cache(ticker: str) -> tuple[pd.Series, Source] | None:
     if df.empty:
         return None
     src: Source = df.attrs.get("source", "cache") if hasattr(df, "attrs") else "cache"
-    # Parquet round-trips the column name; pull it out as a Series.
     series = df.iloc[:, 0]
     series.name = ticker
     return series, src
@@ -240,18 +168,14 @@ def fetch_one(
     use_cache: bool = True,
     prefer: tuple[str, ...] = ("wrds", "yfinance"),
 ) -> tuple[pd.Series | None, Source]:
-    """Fetch one ticker's close prices through the configured backend cascade.
-
-    Returns ``(series, source)``; ``series`` is ``None`` if every backend
-    failed (the ticker is recorded as ``"missing"``).
-    """
+    """Fetch one ticker through the backend cascade. Returns (series, source);
+    series is None if every backend failed."""
     ticker = _normalise_ticker(ticker)
     if use_cache:
         cached = _read_cache(ticker)
         if cached is not None:
             series, src = cached
             if series.index.min() <= start and series.index.max() >= end:
-                # Cached range fully covers the requested window.
                 return series.loc[start:end], src
 
     for backend in prefer:
@@ -267,9 +191,7 @@ def fetch_one(
     return None, "missing"
 
 
-# ============================================================================
-# Top-level: panel for a ticker list
-# ============================================================================
+# Panel for a ticker list
 def fetch_prices(
     tickers: Iterable[str],
     start: str | pd.Timestamp,
@@ -277,11 +199,8 @@ def fetch_prices(
     use_cache: bool = True,
     prefer: tuple[str, ...] = ("wrds", "yfinance"),
 ) -> PricePanel:
-    """Build a price panel for ``tickers`` over ``[start, end]``.
-
-    Per-ticker caching means re-running the same call is cheap. Tickers that
-    cannot be resolved by any backend are logged and omitted from the panel.
-    """
+    """Build a price panel for tickers over [start, end]. Unresolvable tickers
+    are logged and omitted."""
     start_ts = pd.Timestamp(start).normalize()
     end_ts = pd.Timestamp(end).normalize()
     tickers = sorted({_normalise_ticker(t) for t in tickers})
@@ -323,35 +242,20 @@ def fetch_prices(
     return PricePanel(prices=prices, sources=sources, coverage=coverage)
 
 
-# ============================================================================
 # Shares outstanding
-# ============================================================================
 def fetch_shares_outstanding(
     tickers: Iterable[str],
     as_of: pd.Timestamp | str | None = None,
     use_cache: bool = True,
 ) -> pd.Series:
-    """Shares-outstanding per ticker for the market-cap-at-date selection.
+    """Shares outstanding per ticker for market-cap-at-date selection.
 
-    Strategy:
-
-    1. Prefer CRSP via :func:`pipeline.data.wrds_backend.fetch_crsp_shares_outstanding`
-       when WRDS is available. CRSP exposes *historical* ``shrout`` so this
-       returns the value snapped to the most recent observation at or before
-       ``as_of``; the universe builder gets true point-in-time market cap.
-    2. Fall back to yfinance ``Ticker.fast_info.shares`` (current value as a
-       constant proxy) when WRDS isn't available. This is the standing
-       approximation flagged in the methodology chapter until WRDS lands.
-
-    ``as_of`` is ignored on the yfinance fallback path (no historical
-    coverage); on the CRSP path it determines which snapshot is returned.
-
-    Cached as ``cache/shares/shares_outstanding.parquet`` (yfinance path only;
-    the WRDS backend has its own per-query cache).
+    Prefers CRSP shrout (true point-in-time at as_of); falls back to current
+    yfinance shares as a constant proxy, which ignores as_of.
     """
     requested = sorted({_normalise_ticker(t) for t in tickers})
 
-    # --- WRDS path -----------------------------------------------------------
+    # WRDS path
     try:
         from pipeline.data.wrds_backend import fetch_crsp_shares_outstanding
     except ImportError:
@@ -363,7 +267,7 @@ def fetch_shares_outstanding(
         except Exception as exc:
             logger.debug("WRDS shrout lookup failed (%s); falling back to yfinance proxy", exc)
 
-    # --- yfinance fallback (current shares as proxy) ------------------------
+    # yfinance fallback (current shares as proxy)
     cache_path = SHARES_DIR / "shares_outstanding.parquet"
     cached: pd.Series
     if use_cache and cache_path.exists():
@@ -373,7 +277,6 @@ def fetch_shares_outstanding(
 
     missing = [t for t in requested if t not in cached.index]
     if missing:
-        # source code available at: https://github.com/ranaroussi/yfinance
         import yfinance as yf
 
         logger.info("Fetching shares-outstanding for %d new tickers", len(missing))
@@ -393,21 +296,14 @@ def fetch_shares_outstanding(
     return cached.loc[requested]
 
 
-# ============================================================================
 # Coverage check
-# ============================================================================
 def coverage_report(
     panel: PricePanel,
     rebalance_universes: dict[pd.Timestamp, Sequence[str]],
     min_coverage: float = 0.95,
 ) -> pd.DataFrame:
-    """Per-rebalance coverage: fraction of intended top-N actually resolved.
-
-    Returns a ``DataFrame`` (one row per rebalance) with columns
-    ``intended``, ``resolved``, ``coverage``, ``missing``. The Stage 2
-    backtest treats a row whose coverage falls below ``min_coverage`` as a
-    backtest-invalidating event (raise, do not silently down-sample).
-    """
+    """Per-rebalance coverage of the intended top-N. Coverage below
+    min_coverage invalidates the backtest (raise, don't down-sample)."""
     resolved = set(panel.resolved)
     rows = []
     for ts, universe in rebalance_universes.items():

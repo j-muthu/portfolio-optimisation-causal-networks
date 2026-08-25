@@ -1,8 +1,7 @@
 """Unit tests for causal-ordered bisection (topological.py).
 
-Property-tests the topological order on random DAGs, pins down the
-deterministic tie-break under relabelling, exercises the cycle branch
-(raise + feedback-arc fallback), and sanity-checks the DAG diagnostics.
+Property-tests the topological order, the deterministic tie-break, the
+cycle branch (raise + feedback-arc fallback), and the DAG diagnostics.
 """
 
 from __future__ import annotations
@@ -46,9 +45,7 @@ def _graph(M, names=None, is_dag=True):
     )
 
 
-# ============================================================================
 # topological_order
-# ============================================================================
 def test_order_respects_all_edges_on_random_dags():
     rng = np.random.default_rng(101)
     for _ in range(100):
@@ -81,9 +78,7 @@ def test_cycle_raises():
         topological_order(M)
 
 
-# ============================================================================
 # remove_feedback_arcs
-# ============================================================================
 def test_feedback_arc_removal_drops_minimum_edge_on_3cycle():
     M = np.zeros((3, 3))
     M[0, 1], M[1, 2], M[2, 0] = 0.9, 0.5, 0.1  # weakest closes the cycle
@@ -94,9 +89,7 @@ def test_feedback_arc_removal_drops_minimum_edge_on_3cycle():
     topological_order(cleaned)  # now sortable
 
 
-# ============================================================================
 # d2_weights
-# ============================================================================
 def test_d2_valid_weights_and_both_covariances():
     rng = np.random.default_rng(77)
     g = _graph(_random_dag(10, rng))
@@ -124,9 +117,7 @@ def test_d2_handles_non_dag_via_feedback_arc_fallback():
     assert w.sum() == pytest.approx(1.0, abs=1e-9)
 
 
-# ============================================================================
 # dag_diagnostics
-# ============================================================================
 def test_dag_depth_on_a_chain():
     N = 6
     M = np.zeros((N, N))

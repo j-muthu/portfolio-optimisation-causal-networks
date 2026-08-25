@@ -1,21 +1,8 @@
-"""Phase-II collation — headline matrix + the four pre-specified contrasts.
+"""Collate Phase II: headline matrix plus the pre-specified contrasts.
 
-Reads every ``results/phase_ii_*`` bundle plus the Phase-I comparators and
-emits:
-
-* ``results/phase_ii_matrix.csv`` — method × allocator × window: net Sharpe,
-  CAGR, max drawdown, mean one-way turnover, final NAV.
-* ``results/phase_ii_contrasts.csv`` — the §2-E1 contrasts with
-  Politis–Romano stationary-block-bootstrap ΔSharpe CIs and p-values
-  (10000 resamples, mean block 21):
-
-  1. ``D{X} − D0`` per (method, window) — the direction effect, fixed graph.
-  2. ``D0 − V0`` — replication of the Phase-I V0′-beats-correlation result
-     under the new harness (and its VARLiNGAM analogue).
-  3. ``best(D*) − V1-{method}`` — direction-aware route vs the full
-     HSP driver/FFNN machinery.
-  4. ``GRANGER − DYNO at the best allocator`` — does cheap directed
-     structure suffice? (Skipped gracefully until the E2 bundles exist.)
+Reads the results/phase_ii_* bundles and Phase-I comparators, emits
+results/phase_ii_matrix.csv and results/phase_ii_contrasts.csv
+(bootstrap ΔSharpe CIs, 10000 resamples).
 
 Usage:  python -m scripts.collate_phase_ii
 """
@@ -37,19 +24,15 @@ METHODS = ("dynotears", "varlingam", "granger")
 ALLOCS = ("D0", "D0s", "D1", "D2", "D2s", "D3", "D4")
 WINDOWS = (189, 252, 378, 504)
 DIRECTION_AWARE = ("D1", "D2", "D2s", "D3", "D4")
-# Mechanism controls (PREDICTIONS_COVARIANCE_CONTROLS.md and
-# PREDICTIONS_SKELETON_CONTROL.md): direction-free covariances on D0's
-# clustering plus the graph-free partial-correlation skeleton, DYNOTEARS
-# only. Deliberately NOT in ALLOCS — they must not enter the family
-# contrasts or the best(D*) selection.
+# Mechanism controls, DYNOTEARS only. Kept out of ALLOCS so they never
+# enter the family contrasts or the best(D*) selection.
 CONTROL_ALLOCS = ("D0lw", "D0df", "D0pc")
-# Naive anchors (graph-blind, method-independent): levels only, no family.
+# Graph-blind anchors: levels only, no family.
 ANCHORS = {
     "EW": "phase_ii_ew_w{w}",
     "IVP": "phase_ii_ivp_w{w}",
 }
-# HERC second family member (PREDICTIONS_HERC.md): its own control and two
-# graph cells, DYNOTEARS only; outside both SPA families by pre-commitment.
+# HERC cells (PREDICTIONS_HERC.md); outside both SPA families by pre-commitment.
 HERC = {
     "HERCC": "phase_ii_herc_corr_w{w}",
     "HERC0": "phase_ii_dynotears_HERC0_w{w}",
@@ -61,8 +44,7 @@ PHASE_I = {
     "V0prime": "phase_i_v0prime_w{w}",
     "V1-DYNOTEARS": "phase_i_v1_w{w}",
     "V1-VARLiNGAM": "phase_i_v1_varlingam_w{w}",
-    # The like-for-like correlation control for the skeleton-vs-orientation
-    # decomposition (graph-blind, method-independent, same allocator).
+    # Correlation control for the skeleton-vs-orientation decomposition.
     "CORR-HRP": "phase_ii_corr_hrp_w{w}",
 }
 
@@ -103,9 +85,7 @@ def _contrast(name: str, a: pd.Series, b: pd.Series, window: int, method: str) -
 
 
 def main() -> None:
-    # ------------------------------------------------------------------
     # Load everything
-    # ------------------------------------------------------------------
     rets: dict[tuple[str, str, int], pd.Series] = {}
     for m in METHODS:
         for a in ALLOCS:
@@ -137,9 +117,7 @@ def main() -> None:
             if r is not None:
                 herc[(name, w)] = r
 
-    # ------------------------------------------------------------------
     # Matrix
-    # ------------------------------------------------------------------
     rows = []
     for (m, a, w), r in sorted(rets.items()):
         rows.append({"method": m, "allocator": a, "window": w, **_metrics_row(r)})
@@ -161,9 +139,7 @@ def main() -> None:
           .pivot_table(index="allocator", columns="window", values="sharpe")
           .to_string(float_format=lambda x: f"{x:.3f}"))
 
-    # ------------------------------------------------------------------
     # Contrasts
-    # ------------------------------------------------------------------
     out = []
     for m in ("dynotears", "varlingam"):
         for w in WINDOWS:
@@ -175,12 +151,12 @@ def main() -> None:
                 r = rets.get((m, a, w))
                 if r is not None:
                     out.append(_contrast(f"{a}-D0", r, d0, w, m))
-            # 2. D0 − V0 (replication + its VAR analogue).
+            # 2. D0 - V0 (replication + its VAR analogue).
             v0 = comparators.get(("V0", w))
             if v0 is not None:
                 out.append(_contrast("D0-V0", d0, v0, w, m))
-            # 2b. The decomposition anchors vs the pure correlation matrix:
-            #     total(D*) − CORR = skeleton(D0 − CORR) + orientation(D* − D0).
+            # 2b. Decomposition anchors vs the correlation control:
+            #     total(D*) - CORR = skeleton(D0 - CORR) + orientation(D* - D0).
             corr = comparators.get(("CORR-HRP", w))
             if corr is not None:
                 out.append(_contrast("D0-CORR", d0, corr, w, m))
@@ -188,7 +164,7 @@ def main() -> None:
                     r = rets.get((m, a, w))
                     if r is not None:
                         out.append(_contrast(f"{a}-CORR", r, corr, w, m))
-            # 3. best(D*) − V1 under the same discovery method.
+            # 3. best(D*) - V1 under the same discovery method.
             v1_key = "V1-DYNOTEARS" if m == "dynotears" else "V1-VARLiNGAM"
             v1 = comparators.get((v1_key, w))
             cands = {a: rets[(m, a, w)] for a in ALLOCS if (m, a, w) in rets}
@@ -207,8 +183,8 @@ def main() -> None:
                 f"GRANGER-DYNO@{best_a}", g_cands[best_a], d_cands[best_a], w, "granger",
             ))
 
-    # 5. Mechanism controls: how much of the D1 − D0 gap does each
-    #    direction-free covariance reproduce, per window?
+    # 5. Mechanism controls: how much of the D1 - D0 gap does each
+    #    direction-free covariance reproduce?
     for w in WINDOWS:
         d0 = rets.get(("dynotears", "D0", w))
         d1 = rets.get(("dynotears", "D1", w))
@@ -221,16 +197,14 @@ def main() -> None:
             out.append(_contrast(f"{a}-D0", r, d0, w, "dynotears"))
             if d1 is not None:
                 out.append(_contrast(f"D1-{a}", d1, r, w, "dynotears"))
-        # Skeleton-channel control (PREDICTIONS_SKELETON_CONTROL.md): does
-        # the graph-free partial-correlation skeleton reproduce D0's gain
-        # over the correlation control?
+        # Skeleton-channel control: does the graph-free partial-correlation
+        # skeleton reproduce D0's gain over CORR?
         pc = rets.get(("dynotears", "D0pc", w))
         corr = comparators.get(("CORR-HRP", w))
         if pc is not None and corr is not None:
             out.append(_contrast("D0pc-CORR", pc, corr, w, "dynotears"))
 
-    # 6. HERC second family member (PREDICTIONS_HERC.md): the two channels
-    #    on the second tree-reading rule, mirroring D0-CORR and D1-D0.
+    # 6. HERC: the two channels on the second tree-reading rule.
     for w in WINDOWS:
         hc, h0, h1 = (herc.get(("HERCC", w)), herc.get(("HERC0", w)),
                       herc.get(("HERC1", w)))

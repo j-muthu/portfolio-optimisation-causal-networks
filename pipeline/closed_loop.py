@@ -1,26 +1,6 @@
-"""V2 closed-loop driver — interleaves Stage 1 + backtest + feedback per rebalance.
-
-This is the canonical entry point for the **V2 Causal-HSP closed-loop**
-variant from ``Closed-Loop Causal-HSP Portfolio.md``. The conventional
-``run_stage1 → run_stage2`` batch path is correct for V0prime / V1
-(open-loop) but produces a measurement artefact for V2: it pre-computes all
-of Stage 1's selections before the backtest loop, so the utility update at
-rebalance ``t`` never feeds back into the selector at ``t+1``.
-
-This module fixes that. At each rebalance:
-
-1. The strategy callable runs **one** rebalance's Stage 1 with the *live*
-   ``UtilityStore.as_lookup`` — so U[t-1] (keyed by holding-period-end
-   ≤ t - 21d, per the lookahead-safe schema) is actually read.
-2. ``run_backtest`` simulates the holding period and produces a
-   :class:`RebalanceRecord` with the realised reward.
-3. The post-rebalance hook (fired before the loop advances) computes the
-   sensitivity-weighted credit, EMA-updates U, and appends the row to the
-   store keyed by the holding-period-end.
-4. The next iteration's strategy callable sees the freshly-written row.
-
-The whole composition reuses existing building blocks — no algorithm logic
-lives here, only the orchestration.
+"""V2 closed-loop driver: interleaves Stage 1, backtest and feedback per
+rebalance, so the utility update at t actually feeds the selector at t+1
+(the batch stage1/stage2 path cannot do this).
 
 Entry point: :func:`run_closed_loop`.
 """
@@ -59,9 +39,7 @@ logger = logging.getLogger(__name__)
 RESULTS_ROOT = THESIS_ROOT / "results"
 
 
-# ============================================================================
 # Result container
-# ============================================================================
 @dataclass
 class ClosedLoopResult:
     """Output of :func:`run_closed_loop`."""
@@ -90,9 +68,7 @@ class ClosedLoopResult:
         return pd.DataFrame(rows)
 
 
-# ============================================================================
 # Closed-loop driver
-# ============================================================================
 def run_closed_loop(
     joint_frame: pd.DataFrame,
     asset_returns: pd.DataFrame,
@@ -127,53 +103,10 @@ def run_closed_loop(
 ) -> ClosedLoopResult:
     """Run V2 closed-loop end-to-end with genuine per-rebalance feedback.
 
-    Parameters
-    ----------
-    joint_frame:
-        Aligned trading-day panel (rows = trading days, columns = drivers +
-        assets) from :func:`pipeline.data.alignment.build_joint_matrix`.
-    asset_returns:
-        Wide daily-returns panel (index = trading days, columns = tickers)
-        consumed by the backtest engine to compute holding-period P&L.
-    rebalance_dates:
-        Sequence of trading-day timestamps at which Stage 1 is re-fit and
-        the portfolio is rebuilt.
-    universe_at:
-        Callable returning eligible assets at each rebalance date
-        (e.g. top-100-by-mcap intersected with available prices).
-    driver_columns, asset_columns:
-        Column subsets of ``joint_frame`` — full pool feeds discovery, then
-        the selector picks K of them.
-    K:
-        Selected-driver count target (Stage 1's ``select_drivers``).
-    window_size:
-        Stage 1 lookback in trading days (default 504 ≈ 2 years).
-    lookback_days:
-        Backtest sample-covariance lookback for the HSP allocation step.
-    holding_days:
-        Trading-day holding period before the next rebalance. Default 21
-        (monthly). Must match ``MIN_LOOKAHEAD_GAP_DAYS`` semantics in
-        ``UtilityStore.lookup_utility``.
-    gamma_ema:
-        EMA decay applied to the per-rebalance credit attribution.
-    discovery_kwargs, selector_kwargs, sensitivities_kwargs:
-        Forwarded to :func:`fit_stage1_rebalance`.
-    utility_store:
-        Pre-built or empty store. If ``None``, a new one is loaded from
-        ``output_dir / "utility.parquet"`` (typically empty on first run).
-    utility_lookup:
-        Optional override for the U-lookup callable. Default
-        ``utility_store.as_lookup()``. **Tests** can inject
-        ``pipeline.feedback.leak_canary.make_leaky_lookup(store)`` to verify
-        the lookahead guard makes a measurable difference.
-    tag, output_dir:
-        Provenance for persisted results.
-
-    Returns
-    -------
-    :class:`ClosedLoopResult` containing the backtest, the (now-populated)
-    utility store, every per-rebalance ``Stage1Rebalance``, and the
-    per-rebalance ``CreditAttribution`` history.
+    ``holding_days`` must match ``MIN_LOOKAHEAD_GAP_DAYS`` semantics in
+    ``UtilityStore.lookup_utility``. ``utility_lookup`` overrides the default
+    ``utility_store.as_lookup()``; tests can inject a leaky lookup to verify
+    the lookahead guard matters. Returns a :class:`ClosedLoopResult`.
     """
     discovery_kwargs = dict(discovery_kwargs or {})
     selector_kwargs = dict(selector_kwargs or {})
@@ -197,11 +130,9 @@ def run_closed_loop(
     stage1_cache: dict[pd.Timestamp, Stage1Rebalance] = {}
     credit_history: list[CreditAttribution] = []
 
-    # ------------------------------------------------------------------
     # Strategy: just-in-time Stage 1 at this t, then HSP allocation
-    # ------------------------------------------------------------------
     def strategy(t: pd.Timestamp, asset_names: list[str]) -> pd.Series:
-        # 1. Slice the Stage 1 lookback window ending at t (exclusive).
+        # Slice the Stage 1 lookback window ending at t (exclusive).
         end_pos = joint_frame.index.searchsorted(t, side="right")
         start_pos = max(0, end_pos - window_size)
         if end_pos - start_pos < window_size:
@@ -213,9 +144,8 @@ def run_closed_loop(
             return equal_weight(asset_names)
         joint_window = joint_frame.iloc[start_pos:end_pos]
 
-        # If an asset-eligibility mask was supplied (drivers_only mode), slice
-        # it to this window and inject into sensitivities_kwargs so the FFNN
-        # masks pre-inception zero-fills out of its per-asset loss.
+        # Slice any eligibility mask to this window so the FFNN keeps
+        # pre-inception zero-fills out of its per-asset loss.
         if asset_eligibility is not None:
             window_dates = joint_window.index
             eligibility_window = asset_eligibility.reindex(window_dates).reindex(
@@ -228,7 +158,7 @@ def run_closed_loop(
         else:
             sens_kwargs_this_call = sensitivities_kwargs
 
-        # 2. Fit Stage 1 for this single rebalance with the live U lookup.
+        # Fit Stage 1 for this single rebalance with the live U lookup.
         s1 = fit_stage1_rebalance(
             rebalance_idx=date_to_index[pd.Timestamp(t)],
             rebalance_date=pd.Timestamp(t),
@@ -247,9 +177,8 @@ def run_closed_loop(
         )
         stage1_cache[pd.Timestamp(t)] = s1
 
-        # 3a. V0′ asset-only Causal-HRP: cluster on the asset–asset causal
-        #     block (no drivers, no sensitivities). Tests whether exogenous
-        #     drivers add value over asset–asset causal structure alone.
+        # V0' asset-only Causal-HRP: cluster on the asset-asset causal block
+        # (no drivers, no sensitivities).
         if selection_method == "asset_only":
             disc_cols = list(s1.discovery.asset_columns)
             common = [a for a in asset_names if a in disc_cols]
@@ -259,7 +188,7 @@ def run_closed_loop(
             start_pos_ret = max(0, end_pos_ret - lookback_days)
             ret_window = asset_returns.iloc[start_pos_ret:end_pos_ret][common]
             if allocator is None:
-                # V0′ path, byte-identical to Phase I.
+                # V0' path, byte-identical to Phase I.
                 pos = [disc_cols.index(a) for a in common]
                 W_aa = s1.discovery.asset_to_asset_block(0)[np.ix_(pos, pos)]
                 w = v0prime_asset_only_causal_hrp(
@@ -267,8 +196,7 @@ def run_closed_loop(
                 )
             else:
                 # Phase-II D-variant path: same graph, direction-aware
-                # allocation. The chokepoint slices/thresholds M and computes
-                # the structural residual variances on the fit window.
+                # allocation.
                 graph = asset_graph_from_discovery(
                     s1.discovery, joint_window,
                     method=discovery_method or "dynotears",
@@ -281,8 +209,7 @@ def run_closed_loop(
             total = padded.sum()
             return padded / total if total > 1e-12 else equal_weight(asset_names)
 
-        # 3. Build the V2 portfolio. If selection or sensitivities are
-        #    empty (selector early-stop, etc.), fall back to equal-weight.
+        # Build the V2 portfolio; empty selection falls back to equal-weight.
         S = s1.sensitivities.S
         sens_assets = list(s1.sensitivities.asset_names)
         common = [a for a in asset_names if a in sens_assets]
@@ -306,9 +233,7 @@ def run_closed_loop(
             return equal_weight(asset_names)
         return padded / total
 
-    # ------------------------------------------------------------------
-    # Hook: credit attribution + EMA update + store.append (between rebalances)
-    # ------------------------------------------------------------------
+    # Hook: credit attribution + EMA update + store.append
     def on_rebalance_complete(rec) -> None:
         t = pd.Timestamp(rec.rebalance_date)
         s1 = stage1_cache.get(t)
@@ -324,9 +249,8 @@ def run_closed_loop(
             rec.weights, sens_df, rec.holding_reward,
             rec.rebalance_date, rec.holding_end,
         )
-        # Prior U: explicit ignore-strict on the read here; the strict guard
-        # is enforced where the *selector* reads U (inside fit_stage1_rebalance),
-        # not on the bookkeeping path.
+        # Non-strict read is fine here; the strict lookahead guard applies
+        # where the selector reads U, not on this bookkeeping path.
         if utility_store.frame.empty:
             prior = pd.Series(dtype=float, name="utility")
         else:
@@ -337,9 +261,7 @@ def run_closed_loop(
         utility_store.append(rec.rebalance_date, rec.holding_end, updated, rec.holding_reward)
         credit_history.append(attr)
 
-    # ------------------------------------------------------------------
     # Drive the backtest with the hook
-    # ------------------------------------------------------------------
     prices = (1.0 + asset_returns.fillna(0.0)).cumprod()
     bt = run_backtest(
         rebalance_dates=rebalance_dates,
@@ -351,7 +273,7 @@ def run_closed_loop(
         on_rebalance_complete=on_rebalance_complete,
     )
 
-    # Persist the store (idempotent — only writes if a parquet_path is set).
+    # Persist the store (only writes if a parquet_path is set).
     try:
         utility_store.save()
     except Exception as exc:  # pragma: no cover - best-effort persistence

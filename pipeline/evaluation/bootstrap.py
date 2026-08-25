@@ -1,14 +1,7 @@
-"""Politis-Romano stationary block bootstrap for Sharpe-difference CIs.
+"""Politis-Romano (1994) stationary block bootstrap for Sharpe-difference CIs.
 
-Standard bootstrap (iid resampling) destroys the temporal autocorrelation in
-return series and underestimates the variance of statistics like the Sharpe
-ratio. The stationary block bootstrap (Politis & Romano 1994) preserves the
-local time-series structure by resampling *blocks* of geometrically-distributed
-length, then computes the statistic on each resample.
-
-Used in ``Closed-Loop Causal-HSP Portfolio.md`` §Metrics to put a 95 % CI on
-``ΔSharpe`` (strategy vs V0 baseline) and test the null ``ΔSharpe = 0`` at the
-5 % level.
+iid resampling destroys the autocorrelation in returns and underestimates
+Sharpe variance; block resampling preserves the local time-series structure.
 """
 
 from __future__ import annotations
@@ -24,18 +17,12 @@ from pipeline.evaluation.metrics import annualised_sharpe
 logger = logging.getLogger(__name__)
 
 
-# ============================================================================
 # Block bootstrap
-# ============================================================================
 def stationary_block_indices(
     n: int, mean_block_length: float, rng: np.random.Generator,
 ) -> np.ndarray:
-    """Generate ``n`` indices via Politis-Romano stationary bootstrap.
-
-    Each block starts at a uniformly random index and has geometrically
-    distributed length with mean ``mean_block_length``. Blocks wrap around
-    the end of the series so the resample is exactly length ``n``.
-    """
+    """n resample indices: blocks start uniformly at random, have geometric
+    length with the given mean, and wrap around the series end."""
     if mean_block_length <= 1.0:
         return rng.integers(0, n, size=n)
     p = 1.0 / mean_block_length
@@ -58,12 +45,8 @@ def bootstrap_statistic(
     mean_block_length: float = 21.0,
     seed: int = 42,
 ) -> np.ndarray:
-    """Resample ``series`` via stationary block bootstrap; apply ``statistic``.
-
-    Returns the array of ``n_resamples`` bootstrap statistic values. Default
-    block length 21 ≈ one trading month, typical for monthly-cycle equity
-    return analyses.
-    """
+    """Bootstrap statistic values over n_resamples block resamples. Default
+    block length 21 is roughly one trading month."""
     rng = np.random.default_rng(seed)
     arr = series.dropna().to_numpy()
     n = len(arr)
@@ -74,12 +57,10 @@ def bootstrap_statistic(
     return out
 
 
-# ============================================================================
 # Sharpe-difference CI
-# ============================================================================
 @dataclass
 class SharpeDiffCI:
-    """Bootstrap-derived ``ΔSharpe = Sharpe(A) - Sharpe(B)`` and its 95 % CI."""
+    """Bootstrap Sharpe(A) - Sharpe(B) with its CI and two-sided p-value."""
 
     point_estimate: float
     ci_lower: float
@@ -97,12 +78,9 @@ def sharpe_difference_ci(
     seed: int = 42,
     periods_per_year: int = 252,
 ) -> SharpeDiffCI:
-    """95 % stationary-block-bootstrap CI on ``Sharpe(a) - Sharpe(b)``.
-
-    The two return series must share the same index; missing values are
-    dropped pairwise. The bootstrap resamples the *joint* (a, b) panel so
-    correlations between the strategies are preserved.
-    """
+    """Stationary-block-bootstrap CI on Sharpe(a) - Sharpe(b). Resamples the
+    joint (a, b) panel so cross-strategy correlation is preserved; missing
+    values are dropped pairwise."""
     df = pd.concat([returns_a.rename("a"), returns_b.rename("b")], axis=1).dropna()
     arr = df.to_numpy()
     n = len(arr)
@@ -119,8 +97,7 @@ def sharpe_difference_ci(
         diffs[b] = diff(arr[idx])
     alpha = (1 - confidence) / 2
     lo, hi = float(np.quantile(diffs, alpha)), float(np.quantile(diffs, 1 - alpha))
-    # Two-sided p-value: fraction of bootstrap diffs as extreme as 0 in the
-    # opposite direction of the point estimate.
+    # Two-sided p-value: bootstrap diffs crossing 0 against the point estimate.
     if point >= 0:
         p = float(np.mean(diffs <= 0)) * 2
     else:

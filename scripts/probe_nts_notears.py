@@ -1,15 +1,8 @@
-"""J5 — reduced-scope NTS-NOTEARS probe (non-linear discovery).
+"""J5: reduced-scope NTS-NOTEARS probe (non-linear discovery).
 
-A full NTS-NOTEARS backtest is compute-prohibitive (~10-25 min/window at d≈130 →
-~50-90 h per variant over 215 rebalances). This probe instead fits NTS-NOTEARS
-and DYNOTEARS on a *handful of regime windows* at a *reduced universe* and asks:
-does non-linear discovery agree with the linear (DYNOTEARS) driver->asset
-structure the thesis uses? Reports, per window:
-
-  * NTS asset->driver block max|.|  (prior sanity — should be ~0)
-  * top-K driver-set Jaccard (NTS vs DYNOTEARS Stage-A pools)
-  * Spearman rank-correlation of the two methods' Stage-A driver scores
-  * wall-clock per fit (substantiates the feasibility verdict)
+A full NTS-NOTEARS backtest is compute-prohibitive, so this fits NTS-NOTEARS
+and DYNOTEARS on a few regime windows at a reduced universe and reports
+agreement (Jaccard, Spearman) plus wall-clock per fit.
 
 Run:  python -m scripts.probe_nts_notears
 Output: results/j5_nts_probe.csv
@@ -34,7 +27,7 @@ from pipeline.factor_selection.prune import stage_a_score
 logging.basicConfig(level=logging.WARNING)
 REPO = pathlib.Path(__file__).resolve().parent.parent
 DROP = {"hyg_lqd_logret", "vvix"}
-N_ASSETS = 25          # reduced universe (probe, not full backtest)
+N_ASSETS = 25          # reduced universe
 WINDOW = 504
 TOPK = 10
 WINDOWS = {"2008-10 GFC": "2008-10-01", "2014-06 calm": "2014-06-02",

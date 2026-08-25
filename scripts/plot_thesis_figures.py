@@ -1,25 +1,8 @@
-"""Final-report figure set — the corrected (frozen-EEM) thesis story.
+"""Final-report figure set (frozen-EEM), regenerated from committed artefacts.
 
-Every figure is regenerated from the committed artefacts (frozen-EEM
-``closed_loop.pkl`` bundles + the J1/J4/J5/regime result CSVs), so the figures
-always match FINDINGS.md and are reproducible. Saved to ``results/figures/``
-(the submitted ``interim_report/figures/`` is left untouched — those reflect the
-pre-fix interim story).
-
-Figures
--------
-1. nav_curves.png        cumulative net NAV, V0/V0'/V1-DYNO/V1-VAR, w252 & w504
-2. sharpe_matrix.png     net Sharpe by variant x lookback window
-3. k_sensitivity.png     J4a: hsp-baseline vs causal-hsp across K (K-fragility)
-4. feedback_grid.png     J4b: causal-hsp-feedback across alpha/gamma grid (inert)
-5. regime_excess.png     regime-conditional Sharpe, excess over V0 (w252)
-6. directional_prior.png J1: how much the asset->driver prior does
-7. nts_probe.png         J5: NTS-NOTEARS vs DYNOTEARS agreement + cost
-8. returns_distribution.png  daily-return fat tails (motivates PSR/DSR)
-9. dsr_mcs.png           PSR/DSR + 90% Model Confidence Set membership (w252)
-
-Figures 8-9 read results/robust_stats.csv (and the bundles), produced by
-``python -m scripts.robust_stats`` — run that first.
+Saved to results/figures/; the submitted interim_report/figures/ are left
+untouched. Figures 8-9 need results/robust_stats.csv, so run
+scripts.robust_stats first.
 
 Run:  python -m scripts.plot_thesis_figures
 """
@@ -43,10 +26,10 @@ FIG = RESULTS / "figures"
 
 # Okabe-Ito colour-blind-safe palette (consistent with plot_interim_results.py).
 C = {
-    "V0": "#999999",            # grey baseline (cum-corr)
-    "V0prime": "#009E73",       # bluish-green — the standout
-    "V1-DYNOTEARS": "#0072B2",  # blue
-    "V1-VARLiNGAM": "#E69F00",  # orange
+    "V0": "#999999",
+    "V0prime": "#009E73",
+    "V1-DYNOTEARS": "#0072B2",
+    "V1-VARLiNGAM": "#E69F00",
     "DYNOTEARS": "#0072B2", "VARLiNGAM": "#E69F00", "NTS": "#CC79A7",
 }
 LABEL = {
@@ -77,7 +60,7 @@ def _csv(name: str) -> pd.DataFrame | None:
     return pd.read_csv(p) if p.exists() else None
 
 
-# --- 1. NAV curves --------------------------------------------------------
+# 1. NAV curves
 def fig_nav_curves():
     fig, axes = plt.subplots(1, 2, figsize=(12, 5.2), sharey=True)
     for ax, w in zip(axes, (252, 504)):
@@ -97,7 +80,7 @@ def fig_nav_curves():
     _save(fig, "nav_curves.png")
 
 
-# --- 2. Sharpe matrix -----------------------------------------------------
+# 2. Sharpe matrix
 def fig_sharpe_matrix():
     windows = [252, 504]
     sharpe = {v: {w: (annualised_sharpe(_nav(v, w).pct_change().dropna())
@@ -124,7 +107,7 @@ def fig_sharpe_matrix():
     _save(fig, "sharpe_matrix.png")
 
 
-# --- 3. K-sensitivity (J4a) ----------------------------------------------
+# 3. K-sensitivity (J4a)
 def fig_k_sensitivity():
     df = _csv("j4a_k_sensitivity.csv")
     if df is None:
@@ -149,7 +132,7 @@ def fig_k_sensitivity():
     _save(fig, "k_sensitivity.png")
 
 
-# --- 4. Feedback grid (J4b) ----------------------------------------------
+# 4. Feedback grid (J4b)
 def fig_feedback_grid():
     df = _csv("j4b_alpha_gamma.csv")
     if df is None:
@@ -172,7 +155,7 @@ def fig_feedback_grid():
     _save(fig, "feedback_grid.png")
 
 
-# --- 5. Regime-conditional excess over V0 (w252) -------------------------
+# 5. Regime-conditional excess over V0 (w252)
 def fig_regime_excess():
     df = _csv("regime_analysis/daily_metrics.csv")
     if df is None:
@@ -200,7 +183,7 @@ def fig_regime_excess():
     _save(fig, "regime_excess.png")
 
 
-# --- 6. Directional prior (J1) -------------------------------------------
+# 6. Directional prior (J1)
 def fig_directional_prior():
     df = _csv("directional_prior_verification.csv")
     if df is None:
@@ -225,7 +208,7 @@ def fig_directional_prior():
     _save(fig, "directional_prior.png")
 
 
-# --- 7. NTS-NOTEARS probe (J5) -------------------------------------------
+# 7. NTS-NOTEARS probe (J5)
 def fig_nts_probe():
     df = _csv("j5_nts_probe.csv")
     if df is None:
@@ -255,7 +238,7 @@ def fig_nts_probe():
     _save(fig, "nts_probe.png")
 
 
-# --- 8. Returns distribution (fat tails motivate PSR/DSR) ----------------
+# 8. Returns distribution (fat tails motivate PSR/DSR)
 def fig_returns_distribution():
     from scipy import stats
     pooled = []
@@ -272,12 +255,11 @@ def fig_returns_distribution():
     xs = np.linspace(r.min(), r.max(), 500)
     ax.plot(xs, stats.norm.pdf(xs, r.mean(), r.std(ddof=0)), color="#D55E00",
             lw=1.8, label="fitted normal")
-    ax.set_yscale("log")  # log-y exposes the tails the normal misses
+    ax.set_yscale("log")  # log-y exposes the tails
     ax.set_xlabel("daily net return")
     ax.set_ylabel("density (log)")
-    # No kurtosis figure in the title: the caption quotes \rsKurtosis (the
-    # mean per-config estimate from robust_stats.py), and quoting a second,
-    # differently-pooled estimate here put two conflicting numbers on one page.
+    # No kurtosis in the title: the caption quotes \rsKurtosis, and a second,
+    # differently-pooled estimate here would conflict with it.
     ax.set_title("Daily returns are heavy-tailed\n"
                  "— why the Sharpe is supplemented by PSR/DSR", fontsize=11)
     ax.legend(frameon=False, loc="upper right")
@@ -286,7 +268,7 @@ def fig_returns_distribution():
     _save(fig, "returns_distribution.png")
 
 
-# --- 9. DSR / MCS adjudication -------------------------------------------
+# 9. DSR / MCS adjudication
 def fig_dsr_mcs():
     df = _csv("robust_stats.csv")
     if df is None:

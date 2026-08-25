@@ -1,12 +1,5 @@
-"""Backtest evaluation.
-
-* :mod:`pipeline.evaluation.metrics` -- Sharpe / Sortino / Calmar / MDD /
-  CER / turnover / HHI.
-* :mod:`pipeline.evaluation.regime` -- NBER recessions, VIX-quintile vol
-  regimes, causal-network-density regimes.
-* :mod:`pipeline.evaluation.bootstrap` -- Politis-Romano stationary block
-  bootstrap on Sharpe-difference CIs.
-"""
+"""Backtest evaluation: performance metrics, regime classification, and
+stationary block bootstrap for Sharpe-difference CIs."""
 
 from __future__ import annotations
 

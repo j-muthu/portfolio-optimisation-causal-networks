@@ -1,21 +1,9 @@
-"""NTS-NOTEARS joint-window discovery wrapper (J5 — non-linear-discovery probe).
+"""NTS-NOTEARS joint-window wrapper (non-linear discovery probe).
 
-Wraps the vendored NTS-NOTEARS (per-variable 1D-CNN structure learning;
-`nts-notears/notears/nts_notears.py`) behind the same interface the pipeline
-already uses for DYNOTEARS, so Stage-A scoring and the block accessors work
-unchanged. The learned structure is non-linear, so we summarise each directed
-edge by the L2-norm of its CNN kernel (`model.fc1_to_adj()`), giving a
-``(W, A)`` pair of magnitude matrices that slot into ``JointDynotearsWindow``.
-
-The asset->driver directional prior is enforced via NTS-NOTEARS's native
-``prior_knowledge`` bound-dicts (lower=upper=0 on every asset->driver edge at
-every lag), the non-linear analogue of DYNOTEARS's ``tabu_edges``.
-
-Scope: this is a **reduced-scope probe**, not a full backtest path — a single
-NTS fit at d≈130 is ~10-25 min (vs ~4 min DYNOTEARS), so 215 rebalances ×
-variants is compute-prohibitive (see FINDINGS / plan J5). Used by
-``scripts/probe_nts_notears.py`` to compare discovered driver->asset structure
-against DYNOTEARS on a handful of windows.
+Wraps the vendored NTS-NOTEARS behind the DYNOTEARS interface; each edge is
+summarised by the L2-norm of its CNN kernel. The asset -> driver prior is
+enforced via NTS's native bound-dicts. A reduced-scope probe, not a full
+backtest path: fits are too slow to run at every rebalance.
 """
 
 from __future__ import annotations
@@ -36,9 +24,8 @@ _NTS_DIR = THESIS_ROOT / "nts-notears" / "notears"
 
 
 def _import_nts():
-    """Lazy import of the vendored NTS-NOTEARS (bare relative imports need the
-    notears/ dir on sys.path). Imported on first use to avoid the path mutation
-    and the torch import at module load."""
+    """Lazy import of the vendored NTS-NOTEARS; its bare relative imports need
+    the notears/ dir on sys.path, and this defers the torch import."""
     if str(_NTS_DIR) not in sys.path:
         sys.path.insert(0, str(_NTS_DIR))
     # source code available at: https://github.com/xiangyu-sun-789/NTS-NOTEARS
@@ -47,8 +34,7 @@ def _import_nts():
 
 
 def _asset_to_driver_prior(driver_columns, asset_columns, p):
-    """Bound-dicts forbidding every asset->driver edge at lags 0..p (the
-    directional prior; NTS-NOTEARS analogue of DYNOTEARS tabu_edges)."""
+    """Bound-dicts forbidding every asset->driver edge at lags 0..p."""
     rules = []
     for lag in range(p + 1):
         for a in asset_columns:
@@ -71,10 +57,8 @@ def run_nts_notears_joint_window(
     h_tol: float = 1e-6,
     enforce_prior: bool = True,
 ) -> JointDynotearsWindow:
-    """Fit NTS-NOTEARS on one joint ``[D | A]`` window; return a
-    ``JointDynotearsWindow`` (W = instantaneous kernel-norms, A[k] = lag-k
-    kernel-norms, ``W[i, j]`` = i->j) so downstream Stage-A / block accessors
-    are unchanged."""
+    """Fit NTS-NOTEARS on one joint ``[D | A]`` window; returns a
+    ``JointDynotearsWindow`` of kernel-norm magnitudes (``W[i, j]`` = i->j)."""
     nts = _import_nts()
     # source code available at: https://github.com/pytorch/pytorch
     import torch
@@ -86,7 +70,7 @@ def run_nts_notears_joint_window(
     driver_idx = np.array([columns.index(c) for c in driver_columns])
     asset_idx = np.array([columns.index(c) for c in asset_columns])
 
-    # Per-window z-score (NTS expects standardised input; mirrors DYNOTEARS).
+    # Per-window z-score (NTS expects standardised input).
     X = joint_window.to_numpy(dtype=np.float64)
     mean = X.mean(axis=0)
     std = X.std(axis=0)

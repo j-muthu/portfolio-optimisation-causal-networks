@@ -1,22 +1,9 @@
-"""Plot the Phase I interim results for the interim report.
+"""Plot the two Phase I figures for the interim report.
 
-Produces two figures from the persisted Phase I backtest bundles:
+Bar-chart numbers are hard-coded from Tables 3.1/3.2 so the figures match
+the text; recomputed Sharpes are printed as a cross-check.
 
-* ``interim_report/figures/nav_curve.png`` -- cumulative NAV (net of costs) for
-  V0 / V1 / V2 over 2007-2024 at the 252-day lookback window, read straight from
-  the real ``closed_loop.pkl`` ``backtest.nav_net`` series.
-* ``interim_report/figures/sharpe_and_regime.png`` -- a 1x2 panel: (left) Sharpe
-  by variant grouped by lookback window {252, 504}; (right) regime-conditional
-  mean monthly excess-Sharpe (window 252) by variant across five regimes.
-
-The bar-chart numbers are the authoritative Phase I summary values that already
-appear in the report's Tables 3.1 / 3.2 (hard-coded here as clearly-sourced
-constants so the figures match the text exactly). The script also prints the
-Sharpe recomputed from the pickled NAV series as a sanity cross-check.
-
-Run from the repo root with the project venv::
-
-    python -m scripts.plot_interim_results
+Run:  python -m scripts.plot_interim_results
 """
 
 from __future__ import annotations
@@ -31,15 +18,14 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 
-# Importing the pipeline package makes the pickled BacktestResult / RebalanceRecord
-# classes resolvable by pickle.load below.
+# Importing pipeline makes the pickled classes resolvable by pickle.load.
 from pipeline.evaluation.metrics import annualised_sharpe
 
 REPO_ROOT = pathlib.Path(__file__).resolve().parent.parent
 RESULTS_DIR = REPO_ROOT / "results"
 FIG_DIR = REPO_ROOT / "interim_report" / "figures"
 
-# Okabe-Ito colour-blind-safe palette: V0 grey baseline, V1 blue, V2 vermillion.
+# Okabe-Ito colour-blind-safe palette.
 COLOURS = {"V0": "#999999", "V1": "#0072B2", "V2": "#D55E00"}
 VARIANTS = ["V0", "V1", "V2"]
 LABELS = {
@@ -48,8 +34,7 @@ LABELS = {
     "V2": "V2  Causal-HSP (closed loop)",
 }
 
-# --- Authoritative Phase I summary numbers (net of 5 bps), from the full
-# --- 2007-2024 run; identical to Tables 3.1 / 3.2 in the report. ------------
+# Phase I summary numbers (net of 5 bps), identical to Tables 3.1/3.2.
 SHARPE = {  # net annualised Sharpe by window
     252: {"V0": 0.371, "V1": 0.382, "V2": 0.382},
     504: {"V0": 0.370, "V1": 0.382, "V2": 0.373},
@@ -77,7 +62,7 @@ def load_nav_net(variant: str, window: int) -> pd.Series:
 def plot_nav_curve(window: int = 252) -> None:
     """Figure 1: cumulative NAV (net) for V0/V1/V2 over the full sample."""
     fig, ax = plt.subplots(figsize=(7.2, 7.2))
-    ax.set_box_aspect(1)  # force a square plot box (axes form a square)
+    ax.set_box_aspect(1)  # square plot box
     for v in VARIANTS:
         nav = load_nav_net(v, window)
         ax.plot(nav.index, nav.values, color=COLOURS[v], lw=1.6, label=LABELS[v])
@@ -100,7 +85,7 @@ def plot_sharpe_and_regime() -> None:
     """Figure 2: Sharpe by variant x window, and regime-conditional excess-Sharpe."""
     fig, (axL, axR) = plt.subplots(1, 2, figsize=(11.0, 4.3))
 
-    # --- Left: Sharpe by variant, grouped by window. ---
+    # Left: Sharpe by variant, grouped by window.
     windows = [252, 504]
     x = np.arange(len(VARIANTS))
     bw = 0.38
@@ -119,7 +104,7 @@ def plot_sharpe_and_regime() -> None:
     axL.legend(frameon=False, fontsize=9, loc="upper right")
     axL.grid(True, axis="y", alpha=0.3)
 
-    # --- Right: regime-conditional excess-Sharpe (window 252). ---
+    # Right: regime-conditional excess-Sharpe (window 252).
     xr = np.arange(len(REGIMES))
     bw2 = 0.26
     for k, v in enumerate(VARIANTS):

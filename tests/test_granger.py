@@ -1,9 +1,7 @@
 """Unit tests for the ridge-VAR(1) GRANGER comparator (granger.py).
 
-Verifies support recovery on a simulated VAR(1) with known sparse
-coefficients, density matching, the zero driver blocks, and the interface
-parity with the joint discovery windows that the Phase-II chokepoint
-consumes.
+Checks support recovery on a simulated VAR(1), density matching, zero
+driver blocks, and interface parity with the joint discovery windows.
 """
 
 from __future__ import annotations
@@ -21,7 +19,7 @@ COLUMNS = DRIVERS + ASSETS
 
 
 def _simulated_var1(T=1500, seed=21):
-    """VAR(1) asset panel with a known sparse lag matrix (i → j)."""
+    """VAR(1) asset panel with a known sparse lag matrix (i -> j)."""
     rng = np.random.default_rng(seed)
     N = len(ASSETS)
     true = np.zeros((N, N))

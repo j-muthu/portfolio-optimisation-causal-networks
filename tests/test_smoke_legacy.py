@@ -1,14 +1,7 @@
 """End-to-end smoke test on a ~20-asset subset.
 
-Covers the verification plans from both Plan A and Plan B:
-
-* DYNOTEARS on a small subset -> output is a valid DAG with sensible weights.
-* VARLiNGAM on the same subset -> ``B0`` is triangular under the causal order;
-  the non-Gaussianity / error-independence assumption is checked.
-* Rolling windows for both methods -> graphs change but stay structurally close.
-* Graph analysis & regime detection on the rolling sequences.
-* Head-to-head comparison of DYNOTEARS ``W`` vs VARLiNGAM ``B0``.
-* HRP portfolio construction from a causal matrix.
+DYNOTEARS and VARLiNGAM single windows, rolling windows, graph analysis,
+head-to-head comparison, and HRP construction from a causal matrix.
 
 Run from the thesis root::
 
@@ -19,7 +12,6 @@ from __future__ import annotations
 
 import logging
 
-# source code available at: https://github.com/networkx/networkx
 import networkx as nx
 import numpy as np
 
@@ -56,9 +48,7 @@ def main() -> None:
         level=logging.INFO, format="%(levelname)s %(name)s: %(message)s"
     )
 
-    # ------------------------------------------------------------------
     # 1. Shared data pipeline
-    # ------------------------------------------------------------------
     _banner("1. DATA PIPELINE")
     ds = build_dataset(start=START, end=END, tickers=SMOKE_TICKERS)
     print(f"  dataset: {ds!r}")
@@ -69,9 +59,7 @@ def main() -> None:
     assert ds.n > WINDOW, f"need > {WINDOW} rows, got {ds.n}"
     assert ds.d >= 15, f"expected ~20 assets, got {ds.d}"
 
-    # ------------------------------------------------------------------
     # 2. DYNOTEARS single window -> valid DAG?
-    # ------------------------------------------------------------------
     _banner("2. DYNOTEARS SMOKE (single window)")
     window_df = ds.returns.iloc[:WINDOW]
     W, A, converged, removed = run_dynotears_window(
@@ -89,9 +77,7 @@ def main() -> None:
     print(f"  contemporaneous graph is a DAG: {is_dag}")
     assert is_dag, "DYNOTEARS contemporaneous graph must be acyclic"
 
-    # ------------------------------------------------------------------
     # 3. VARLiNGAM single window -> triangular B0 + assumption check
-    # ------------------------------------------------------------------
     _banner("3. VARLiNGAM SMOKE (single window)")
     vwin = run_varlingam_window(
         window_df, lags=1, criterion="bic", compute_error_independence=True
@@ -109,9 +95,7 @@ def main() -> None:
     print(f"  error-independence: {frac_ok:.0%} of pairs have p > 0.05")
     assert np.abs(lower).max() < 1e-6, "B0 not triangular under the causal order"
 
-    # ------------------------------------------------------------------
-    # 4. Rolling windows -- both methods
-    # ------------------------------------------------------------------
+    # 4. Rolling windows, both methods
     _banner("4. ROLLING WINDOWS")
     dyn = run_rolling_dynotears(ds, window=WINDOW, step=STEP, p=1,
                                 lambda_w=0.05, lambda_a=0.05)
@@ -122,9 +106,7 @@ def main() -> None:
     print(var.to_frame().to_string(index=False))
     assert len(dyn) == len(var) >= 3, "expected >= 3 comparable windows"
 
-    # ------------------------------------------------------------------
     # 5. Graph analysis & regime detection
-    # ------------------------------------------------------------------
     _banner("5. GRAPH ANALYSIS & REGIME DETECTION")
     dyn_metrics = analyse_rolling(dyn)
     print("  DYNOTEARS rolling metrics:")
@@ -136,17 +118,13 @@ def main() -> None:
     print("\n  VARLiNGAM causal-order drift:")
     print(drift.to_string())
 
-    # ------------------------------------------------------------------
     # 6. Head-to-head DYNOTEARS vs VARLiNGAM
-    # ------------------------------------------------------------------
     _banner("6. HEAD-TO-HEAD (W vs B0)")
     cmp = compare_rolling(dyn, var)
     print(cmp[["frobenius_distance", "edge_jaccard", "sign_agreement",
                "weight_correlation"]].to_string())
 
-    # ------------------------------------------------------------------
     # 7. Portfolio integration (HRP)
-    # ------------------------------------------------------------------
     _banner("7. PORTFOLIO INTEGRATION (HRP)")
     last_window_returns = ds.returns.iloc[dyn.windows[-1].start_row:
                                           dyn.windows[-1].end_row]

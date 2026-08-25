@@ -1,9 +1,7 @@
-"""Byte-exact verification of the discovery cache (J4 enabler).
+"""Byte-exact verification of the discovery cache.
 
-These tests gate the multi-day J4 sweeps: a cache that returned anything other
-than the exact graph a fresh fit produces would silently corrupt sweep results.
-We therefore assert hit==miss to the array level, that ``use_cache=False`` never
-touches disk, and that a changed hyper-parameter yields a different key.
+Hit must equal miss to the array level, ``use_cache=False`` must not touch
+disk, and any changed input must change the key.
 """
 
 from __future__ import annotations
@@ -51,13 +49,13 @@ def test_cache_hit_is_byte_exact(tmp_path, monkeypatch):
 
     fresh = _fit(frame, dcols, acols)  # ground truth, no cache
 
-    # First call: miss → computes + writes.
+    # Miss: computes and writes.
     miss = load_or_compute_discovery(
         lambda: _fit(frame, dcols, acols),
         joint_window=frame, driver_columns=dcols, asset_columns=acols,
         method="dynotears", discovery_kwargs=kwargs, use_cache=True,
     )
-    # Second call: hit → loads from disk. Thunk would raise if ever called.
+    # Hit: loads from disk; the thunk raises if ever called.
     hit = load_or_compute_discovery(
         lambda: (_ for _ in ()).throw(AssertionError("cache miss on warm key")),
         joint_window=frame, driver_columns=dcols, asset_columns=acols,
@@ -73,7 +71,6 @@ def test_cache_hit_is_byte_exact(tmp_path, monkeypatch):
         assert got.converged == fresh.converged
         assert list(got.columns) == list(fresh.columns)
 
-    # Exactly one cache file written.
     assert len(list(tmp_path.glob("*.pkl"))) == 1
 
 
@@ -90,7 +87,7 @@ def test_use_cache_false_touches_no_disk(tmp_path, monkeypatch):
 
 
 def test_key_isolation():
-    """Distinct inputs → distinct keys (no false hits)."""
+    """Distinct inputs give distinct keys; same inputs give the same key."""
     frame, dcols, acols = _small_joint()
     base = discovery_cache_key(frame, dcols, acols, "dynotears", {"lambda_w": 0.05})
 
@@ -106,17 +103,15 @@ def test_key_isolation():
     assert base != discovery_cache_key(
         perturbed, dcols, acols, "dynotears", {"lambda_w": 0.05}
     )
-    # Same inputs → identical key (deterministic).
+    # Deterministic.
     assert base == discovery_cache_key(
         frame, dcols, acols, "dynotears", {"lambda_w": 0.05}
     )
 
 
 def test_cache_key_invariant_to_datetime_index_unit():
-    """The key must not depend on the index's datetime64 resolution: the
-    joint index inherits its unit from whichever cache parquet was written
-    most finely, and an environment change once flipped it (us -> ns),
-    silently re-keying 1,684 byte-identical fits."""
+    """Key must not depend on the index's datetime64 unit: a us -> ns flip
+    once silently re-keyed 1,684 byte-identical fits."""
     import numpy as np
     import pandas as pd
 

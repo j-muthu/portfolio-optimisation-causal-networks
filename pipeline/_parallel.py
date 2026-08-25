@@ -1,17 +1,7 @@
 """Shared rolling-window execution: parallelism, progress logging, checkpointing.
 
-Both rolling drivers (:mod:`pipeline.rolling_dynotears` and
-:mod:`pipeline.rolling_varlingam`) fit one independent model per window. This
-module centralises *how* those per-window jobs are run:
-
-* **Parallelism** -- serial for ``n_jobs == 1``, otherwise a joblib generator so
-  results stream back as each window finishes.
-* **Progress logging** -- logged from the *parent* process. joblib worker
-  processes (loky / ``spawn``) do not inherit the parent's logging handlers, so
-  any logging inside a worker is invisible in the run's log file. Logging on the
-  parent side as each result arrives is the only way to get live progress.
-* **Checkpointing** -- each completed window is pickled immediately, so an
-  interrupted multi-hour run resumes instead of restarting from zero.
+Progress is logged from the parent process because joblib workers don't
+inherit logging handlers. Completed windows are pickled so runs can resume.
 """
 
 from __future__ import annotations
@@ -34,36 +24,11 @@ def execute_windows(
     checkpoint_dir: str | Path | None = None,
     log_every: int = 1,
 ) -> list:
-    """Run ``call_fn`` over every job, with live progress logging and checkpoints.
+    """Run ``call_fn`` over every job; returns results sorted by ``.index``.
 
-    Parameters
-    ----------
-    jobs:
-        Job tuples ``(index, start, end)``. ``index`` keys the checkpoint files
-        and the final ordering.
-    call_fn:
-        ``job -> result``. The result must carry an integer ``.index`` attribute
-        (the rolling drivers' ``DynotearsWindow`` / ``VarLingamWindow`` do). Local
-        closures are fine -- joblib pickles them via cloudpickle.
-    n_jobs:
-        ``1`` runs serially; anything else runs through
-        ``joblib.Parallel`` (``-1`` = all cores).
-    label:
-        Short method name (``"dynotears"`` / ``"varlingam"``) used in log lines
-        and checkpoint filenames.
-    checkpoint_dir:
-        If set, each completed window is pickled to
-        ``<checkpoint_dir>/<label>_window_<idx:04d>.pkl`` and windows already
-        present there are loaded instead of recomputed. Checkpoints are keyed
-        only by ``label`` + index -- the caller must use a fresh directory when
-        windowing/algorithm parameters change.
-    log_every:
-        Emit a progress line every ``log_every`` completed windows.
-
-    Returns
-    -------
-    list
-        All results, sorted by ``.index``.
+    Each result must carry an integer ``.index``. Checkpoints are keyed only
+    by ``label`` + index, so use a fresh ``checkpoint_dir`` when windowing or
+    algorithm parameters change.
     """
     log = logging.getLogger(f"pipeline.{label}")
     total = len(jobs)
@@ -74,7 +39,7 @@ def execute_windows(
     def _ckpt_path(index: int) -> Path:
         return ckpt / f"{label}_window_{index:04d}.pkl"  # type: ignore[union-attr]
 
-    # --- Partition into already-checkpointed and to-do --------------------
+    # Partition into already-checkpointed and to-do
     done: list = []
     todo: list[Job] = []
     for job in jobs:
@@ -93,7 +58,7 @@ def execute_windows(
     if not todo:
         return sorted(done, key=lambda r: r.index)
 
-    # --- Run the remaining jobs, recording each as it completes -----------
+    # Run the remaining jobs, recording each as it completes
     results: list = list(done)
     started = time.time()
     n_complete = len(done)

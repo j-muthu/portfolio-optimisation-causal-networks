@@ -1,18 +1,7 @@
-"""Hierarchical Sensitivity Parity (Rodriguez-Dominguez 2023) — HRP with the
-distance matrix replaced by the Euclidean distance in *sensitivity space*.
+"""Hierarchical Sensitivity Parity (Rodriguez-Dominguez 2023): HRP with the
+distance matrix replaced by Euclidean distance in sensitivity space.
 
-Two flavours are exposed:
-
-* :func:`hsp_weights_from_S` — directly takes the per-window sensitivity
-  matrix ``S`` from :func:`pipeline.sensitivities.fit_sensitivities_window`
-  and a return panel for the sample covariance.
-* :func:`hsp_weights_from_window` — convenience wrapper that takes a
-  ``SensitivityWindow`` and the corresponding asset-return frame.
-
-V0 (vanilla HSP) uses cumulative-correlation driver selection; the input
-``S`` here is correlation-derived. V1 / V2 (Causal-HSP) use causal-discovery-
-based driver selection but the *clustering math* is identical — only the
-upstream selection differs.
+V0 / V1 / V2 differ only in how the input ``S`` was selected upstream.
 """
 
 from __future__ import annotations
@@ -29,16 +18,14 @@ from pipeline.sensitivities.sensitivity_matrix import distance_from_S
 logger = logging.getLogger(__name__)
 
 
-# ============================================================================
-# Sample covariance helpers
-# ============================================================================
+# Covariance helpers
 def sample_covariance(returns: pd.DataFrame) -> pd.DataFrame:
     """Plain sample covariance of asset returns over the supplied window."""
     return returns.cov()
 
 
 def ledoit_wolf_covariance(returns: pd.DataFrame) -> pd.DataFrame:
-    """Ledoit-Wolf shrunk covariance — recommended at N ≈ T (S&P 100 + 504d)."""
+    """Ledoit-Wolf shrunk covariance (recommended at N ≈ T)."""
     from sklearn.covariance import LedoitWolf
 
     lw = LedoitWolf().fit(returns.dropna().to_numpy())
@@ -46,13 +33,9 @@ def ledoit_wolf_covariance(returns: pd.DataFrame) -> pd.DataFrame:
 
 
 def defactored_covariance(returns: pd.DataFrame) -> pd.DataFrame:
-    """Single-factor residual covariance: the market factor is the equal-weight
-    cross-sectional mean of the window, each asset is regressed on it, and the
-    covariance of the residuals is returned (same ddof as ``DataFrame.cov``).
-
-    This is the direction-free "de-factoring" control for the Σ_SEM mechanism
-    question (PREDICTIONS_COVARIANCE_CONTROLS.md): it removes the common
-    market component with no graph at all.
+    """Single-factor residual covariance: regress each asset on the equal-weight
+    cross-sectional mean and return the residual covariance (same ddof as
+    ``DataFrame.cov``). The direction-free de-factoring control.
     """
     rets = returns.dropna()
     X = rets.to_numpy(dtype=float)
@@ -64,9 +47,7 @@ def defactored_covariance(returns: pd.DataFrame) -> pd.DataFrame:
     return pd.DataFrame(cov, index=rets.columns, columns=rets.columns)
 
 
-# ============================================================================
 # HSP weights
-# ============================================================================
 def hsp_weights_from_S(
     S: np.ndarray,
     asset_names: list[str],
@@ -75,27 +56,11 @@ def hsp_weights_from_S(
     use_ledoit_wolf: bool = False,
     psd_project_distance: bool = False,
 ) -> pd.Series:
-    """Compute HSP weights from a sensitivity matrix + a return window.
+    """HSP weights from an ``(N, K)`` sensitivity matrix + a return window.
 
-    Parameters
-    ----------
-    S:
-        ``(N, K)`` per-asset sensitivity vectors. Rows must align with
-        ``asset_names``.
-    asset_names:
-        N asset names; also used to subset and order ``returns_window``.
-    returns_window:
-        Daily returns over the same window as the discovery / FFNN fit;
-        used to estimate the allocation covariance.
-    linkage_method:
-        SciPy linkage. Default ``"single"`` per López de Prado / HSP.
-    use_ledoit_wolf:
-        Shrink the covariance via Ledoit-Wolf — robust at N ≈ T.
-    psd_project_distance:
-        If ``True``, project the sensitivity-space distance matrix to its
-        nearest PSD before clustering. The Euclidean distance is symmetric
-        and non-negative by construction so PSD-projection is rarely needed,
-        but the plan calls for it as a safeguard.
+    Rows of ``S`` must align with ``asset_names``. ``psd_project_distance``
+    projects the distance to nearest-PSD before clustering (rarely needed;
+    kept as a safeguard).
     """
     if S.shape[0] != len(asset_names):
         raise ValueError(

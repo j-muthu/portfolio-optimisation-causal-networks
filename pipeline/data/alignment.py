@@ -1,23 +1,7 @@
-"""Joint matrix construction, NYSE calendar alignment, and per-window z-score.
+"""NYSE calendar alignment, joint [D | A] matrix construction, per-window
+z-scoring and stationarity flags.
 
-This module is the bridge between the data layer
-(:mod:`pipeline.data.{assets,drivers,universe}`) and the discovery layer. The
-contract it exposes:
-
-* :func:`trading_calendar` -- the NYSE trading days for a date range. Uses
-  ``pandas_market_calendars`` if installed; otherwise derives the calendar
-  from SPY's actual trading dates (an exact substitute for the U.S. equity
-  universe). The fallback exists because the new code shouldn't add a hard
-  dependency just for calendar arithmetic.
-* :func:`build_joint_matrix` -- given a driver frame and an asset frame,
-  produce ``X = [D | A]`` with the canonical column ordering used everywhere
-  downstream (``columns = drivers + assets``). Exposes ``driver_idx`` and
-  ``asset_idx`` for block-aware code.
-* :func:`zscore_window` -- per-window z-score normalisation. *Must* be called
-  inside the rolling loop, not on the full panel — the plan's
-  "Locked implementation choices" calls this out explicitly.
-* :func:`stationarity_flags` -- ADF + KPSS per column. Returns flags (does
-  not drop) so the discovery layer can log diagnostics with its output.
+zscore_window must be called inside the rolling loop, never on the full panel.
 """
 
 from __future__ import annotations
@@ -32,27 +16,21 @@ import pandas as pd
 logger = logging.getLogger(__name__)
 
 
-# ============================================================================
 # Trading calendar
-# ============================================================================
 def trading_calendar(
     start: str | pd.Timestamp,
     end: str | pd.Timestamp,
     use_market_calendars: bool = True,
 ) -> pd.DatetimeIndex:
-    """NYSE trading-day index for ``[start, end]`` inclusive.
+    """NYSE trading days for [start, end] inclusive.
 
-    Tries ``pandas_market_calendars`` first (preferred — handles every NYSE
-    holiday and half-day close historically). If unavailable, falls back to
-    the union of SPY's trading dates via yfinance (which by construction is
-    the NYSE calendar for the requested span, with the caveat that SPY's
-    history begins 1993).
+    Prefers pandas_market_calendars; falls back to SPY's trading dates via
+    yfinance (equivalent, but SPY history starts 1993).
     """
     start_ts = pd.Timestamp(start).normalize()
     end_ts = pd.Timestamp(end).normalize()
     if use_market_calendars:
         try:
-            # source code available at: https://github.com/rsheftel/pandas_market_calendars
             import pandas_market_calendars as mcal  # type: ignore
 
             nyse = mcal.get_calendar("NYSE")
@@ -68,7 +46,6 @@ def trading_calendar(
     # Fallback: derive from SPY.
     import warnings
 
-    # source code available at: https://github.com/ranaroussi/yfinance
     import yfinance as yf
 
     with warnings.catch_warnings():
@@ -89,29 +66,11 @@ def trading_calendar(
     return pd.DatetimeIndex(raw.index).normalize().unique().sort_values()
 
 
-# ============================================================================
 # Joint matrix
-# ============================================================================
 @dataclass
 class JointMatrix:
-    """The discovery-ready ``[D | A]`` panel plus column-role indices.
-
-    Attributes
-    ----------
-    frame:
-        DataFrame indexed by trading day. Columns are *driver names first,
-        then asset tickers* — the canonical ordering used everywhere.
-    driver_columns:
-        Driver column names, in their input order.
-    asset_columns:
-        Asset column names, in their input order.
-    driver_idx:
-        Integer positions of drivers in ``frame.columns``.
-    asset_idx:
-        Integer positions of assets in ``frame.columns``.
-    rows_dropped:
-        Number of rows dropped due to NaN (joint-availability requirement).
-    """
+    """Discovery-ready [D | A] panel; columns are always drivers first, then
+    assets."""
 
     frame: pd.DataFrame
     driver_columns: list[str]
@@ -120,11 +79,8 @@ class JointMatrix:
     asset_idx: np.ndarray
     rows_dropped: int = 0
     meta: dict = field(default_factory=dict)
-    # Per-(row, asset) boolean mask of "real data" — only meaningfully populated
-    # when ``build_joint_matrix(drop_na='drivers_only')`` is used. ``True`` =
-    # the asset had a non-NaN observation at this date; ``False`` = it was
-    # NaN-filled with 0 (e.g. pre-inception). Drivers are not represented here
-    # because rows where any driver is NaN are dropped regardless.
+    # Per-(row, asset) "real data" mask, populated only under
+    # drop_na='drivers_only'. False means the cell was NaN and zero-filled.
     asset_eligibility: pd.DataFrame | None = None
 
     @property
@@ -144,14 +100,8 @@ class JointMatrix:
     def assets_eligible_in_window(
         self, start: pd.Timestamp, end: pd.Timestamp,
     ) -> list[str]:
-        """Asset tickers with **fully** observed data over ``[start, end]``.
-
-        Returns every asset whose ``asset_eligibility`` is ``True`` on every
-        trading day in the window. Used by callers (e.g. closed-loop's
-        ``universe_at``) to enforce the strict full-observability rule:
-        an asset only enters that rebalance's portfolio if its entire
-        lookback window has real data.
-        """
+        """Assets with real (non-filled) data on every trading day in the
+        window."""
         if self.asset_eligibility is None:
             return list(self.asset_columns)
         mask = self.asset_eligibility.loc[start:end]
@@ -167,25 +117,12 @@ def build_joint_matrix(
     calendar: pd.DatetimeIndex | None = None,
     drop_na: bool | str = True,
 ) -> JointMatrix:
-    """Combine driver and asset frames into ``X = [D | A]``.
+    """Combine driver and asset frames into X = [D | A] on a shared calendar.
 
-    Both inputs must be indexed by date; the result is reindexed onto
-    ``calendar`` (or the intersection of the two indices if ``calendar`` is
-    ``None``). Columns are sorted as ``drivers + assets``.
-
-    ``drop_na`` modes:
-
-    * ``True`` (default) / ``"any"`` — drop any row with any NaN. Strictest;
-      one late-inception asset can lose years of data for every other column.
-    * ``"drivers_only"`` — drop rows where any *driver* has NaN; keep every
-      such row even if individual *assets* are NaN, fill those NaN cells with
-      0, and populate :attr:`JointMatrix.asset_eligibility` with a per-row
-      boolean indicating "real data" vs "filled-in zero" for each asset.
-      Lets us include late-inception names (e.g. LIN, FB→META) without
-      dropping rows for survivors. Downstream consumers must consult
-      ``asset_eligibility`` to avoid trusting the zero-fills.
-    * ``False`` — no NaN handling. The result may contain NaN; discovery
-      algorithms will likely fail.
+    drop_na: True/"any" drops any row with a NaN; "drivers_only" drops rows
+    with driver NaNs but keeps asset-NaN rows, zero-filling them and recording
+    the fills in asset_eligibility (consumers must not trust the zeros);
+    False leaves NaNs in place.
     """
     drivers = drivers.copy()
     assets = assets.copy()
@@ -199,8 +136,7 @@ def build_joint_matrix(
     aligned_d = drivers.reindex(calendar)
     aligned_a = assets.reindex(calendar)
 
-    # Asset columns sometimes overlap with driver names (defensive; should
-    # never happen in practice). Detect explicitly so we never silently shadow.
+    # Refuse to silently shadow a driver name with an asset name.
     overlap = set(aligned_d.columns) & set(aligned_a.columns)
     if overlap:
         raise ValueError(f"Driver/asset column overlap: {sorted(overlap)}")
@@ -221,10 +157,8 @@ def build_joint_matrix(
                 "build_joint_matrix: dropped %d/%d rows with NaN", rows_dropped, before
             )
     elif drop_na == "drivers_only":
-        # Drop rows where any DRIVER is NaN (discovery cannot tolerate that).
-        # Keep rows even when ASSETS are NaN, fill those with 0, and emit a
-        # per-(row, asset) eligibility mask so downstream code can refuse to
-        # trust the zero-fills.
+        # Drop driver-NaN rows; zero-fill asset NaNs and record them in the
+        # eligibility mask.
         before = len(joint)
         driver_nan_rows = joint[driver_columns].isna().any(axis=1)
         joint = joint.loc[~driver_nan_rows]
@@ -268,20 +202,16 @@ def build_joint_matrix(
     )
 
 
-# ============================================================================
-# Per-window z-score (the locked-in convention)
-# ============================================================================
+# Per-window z-score
 def zscore_window(
     frame: pd.DataFrame,
     ddof: int = 0,
     eps: float = 1e-12,
 ) -> tuple[pd.DataFrame, pd.Series, pd.Series]:
-    """Z-score every column using *this window's* mean and std.
+    """Z-score each column with this window's mean and std.
 
-    Returns ``(normalised, mean, std)`` so the inverse transform is available
-    for downstream visualisation. ``eps`` floors the std to avoid division by
-    zero on constant columns (which can happen for thinly-traded names early
-    in a window — they get logged as a discovery diagnostic, not raised).
+    Returns (normalised, mean, std). eps floors the std so constant columns
+    don't divide by zero.
     """
     mean = frame.mean(axis=0)
     std = frame.std(axis=0, ddof=ddof)
@@ -292,24 +222,12 @@ def zscore_window(
     return (frame - mean) / std_floored, mean, std_floored
 
 
-# ============================================================================
 # Stationarity flags
-# ============================================================================
 @dataclass
 class StationarityFlags:
-    """Per-column ADF and KPSS test outcomes.
-
-    Convention (each column gets two booleans):
-
-    * ``adf_stationary[col]`` -- True iff the ADF null (unit root) is rejected
-      at ``alpha`` (low p-value ⇒ stationary).
-    * ``kpss_stationary[col]`` -- True iff the KPSS null (stationarity) is
-      *not* rejected at ``alpha`` (high p-value ⇒ stationary).
-
-    Series that fail both (ADF says non-stationary, KPSS says non-stationary)
-    are recorded in ``both_fail``. Series flagged are not dropped — discovery
-    runs but the flags are persisted with the discovery output.
-    """
+    """Per-column ADF and KPSS outcomes. Note the nulls point opposite ways:
+    ADF stationary = low p, KPSS stationary = high p. Flagged series are kept,
+    not dropped."""
 
     adf_pvalues: pd.Series
     kpss_pvalues: pd.Series

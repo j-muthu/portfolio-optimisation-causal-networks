@@ -1,20 +1,8 @@
-"""Step 2 -- graph analysis & regime detection (shared by both methods).
+"""Graph analysis and regime detection, method-agnostic.
 
-This module is deliberately method-agnostic: it consumes the sequence of
-``d x d`` adjacency matrices produced by either :mod:`pipeline.rolling_dynotears`
-(the ``W`` matrices) or :mod:`pipeline.rolling_varlingam` (the ``B0`` matrices),
-both stored in the same ``i -> j`` convention.
-
-It computes the diagnostics the plan asks for:
-
-* graph **density** and **average edge weight** over time;
-* **graph distance** between consecutive windows (Frobenius norm of the
-  adjacency-matrix difference) -- large jumps flag **regime changes**;
-* **sector-level causal flow** (which GICS sectors drive which);
-* for VARLiNGAM only, drift in the discovered **causal order** across windows.
-
-It also offers head-to-head graph comparison (:func:`compare_graphs`) for the
-DYNOTEARS-vs-VARLiNGAM analysis, and plotting helpers.
+Consumes the per-window adjacency matrices from either rolling method (same
+``i -> j`` convention) and computes density, inter-window distance, sector
+flow, causal-order drift, and head-to-head comparisons.
 """
 
 from __future__ import annotations
@@ -28,9 +16,7 @@ import pandas as pd
 logger = logging.getLogger(__name__)
 
 
-# ============================================================================
 # Single-matrix metrics
-# ============================================================================
 def graph_density(matrix: np.ndarray, threshold: float = 0.0) -> float:
     """Fraction of possible directed edges that are present.
 
@@ -63,9 +49,7 @@ def edge_jaccard(a: np.ndarray, b: np.ndarray, threshold: float = 0.0) -> float:
     return float(np.count_nonzero(ea & eb) / union) if union else 1.0
 
 
-# ============================================================================
 # Result adapters
-# ============================================================================
 def _extract_sequence(result) -> tuple[np.ndarray, pd.DatetimeIndex, list[str]]:
     """Pull ``(matrices, dates, columns)`` from either rolling result type."""
     if hasattr(result, "w_stack"):
@@ -75,9 +59,7 @@ def _extract_sequence(result) -> tuple[np.ndarray, pd.DatetimeIndex, list[str]]:
     raise TypeError(f"unrecognised rolling result: {type(result)!r}")
 
 
-# ============================================================================
 # Time-series of metrics + regime detection
-# ============================================================================
 def analyse_rolling(result, threshold: float = 0.0) -> pd.DataFrame:
     """Per-window graph metrics for a rolling result.
 
@@ -107,11 +89,9 @@ def detect_regime_changes(
 ) -> pd.DataFrame:
     """Flag windows whose graph jumped abnormally far from the previous one.
 
-    A window is a candidate **regime change** when its ``distance_prev`` exceeds
-    ``mean + n_sigma * std`` of all consecutive distances.  This operationalises
-    the plan's "large jumps = regime changes" -- the supervisor's priority.
-
-    Returns the subset of ``metrics`` flagged, with an added ``z_score`` column.
+    A window is a candidate regime change when ``distance_prev`` exceeds
+    ``mean + n_sigma * std`` of all consecutive distances. Returns the
+    flagged subset of ``metrics`` with an added ``z_score`` column.
     """
     dist = metrics["distance_prev"].dropna()
     if dist.empty:
@@ -127,9 +107,7 @@ def detect_regime_changes(
     return flagged
 
 
-# ============================================================================
 # Sector-level causal flow
-# ============================================================================
 def sector_flow(
     matrix: np.ndarray,
     columns: list[str],
@@ -138,10 +116,8 @@ def sector_flow(
 ) -> pd.DataFrame:
     """Aggregate edge weights into a sector-by-sector causal-flow matrix.
 
-    Entry ``[s_from, s_to]`` is the total absolute edge weight flowing from
-    assets in sector ``s_from`` to assets in sector ``s_to``.  With
-    ``normalise=True`` each entry is divided by the number of ordered asset
-    pairs between the two sectors, giving a comparable per-pair intensity.
+    Entry ``[s_from, s_to]`` is the total absolute weight from one sector to
+    another; ``normalise=True`` divides by the number of ordered asset pairs.
     """
     labels = [sectors.get(c, "Unknown") for c in columns]
     unique = sorted(set(labels))
@@ -163,19 +139,13 @@ def sector_flow(
     return pd.DataFrame(flow, index=unique, columns=unique)
 
 
-# ============================================================================
 # VARLiNGAM-specific: causal-order drift
-# ============================================================================
 def causal_order_drift(result) -> pd.DataFrame:
     """Track how VARLiNGAM's discovered causal order shifts across windows.
 
-    For each consecutive pair of windows we compute Kendall's tau between the
-    asset *rank vectors*.  tau near 1 means a stable ordering; a sharp drop
-    signals a re-shuffling of which assets are causally upstream -- a
-    regime-change indicator unique to VARLiNGAM.
-
-    Returns a DataFrame indexed by window end-date with ``kendall_tau`` and
-    ``n_position_changes`` (assets whose rank moved between windows).
+    Kendall's tau between consecutive rank vectors; a sharp drop signals a
+    re-shuffling of which assets are causally upstream. Returns a DataFrame
+    with ``kendall_tau`` and ``n_position_changes`` per window.
     """
     from scipy.stats import kendalltau
 
@@ -208,19 +178,14 @@ def causal_order_drift(result) -> pd.DataFrame:
     return pd.DataFrame(rows).set_index("end_date")
 
 
-# ============================================================================
 # Head-to-head graph comparison
-# ============================================================================
 def compare_graphs(
     a: np.ndarray, b: np.ndarray, threshold: float = 0.0
 ) -> dict[str, float]:
-    """Compare two adjacency matrices (e.g. DYNOTEARS ``W`` vs VARLiNGAM ``B0``).
+    """Compare two adjacency matrices (same convention, same asset ordering).
 
-    Both must be in the same ``i -> j`` convention and share an asset ordering.
-
-    Returns a dict with the Frobenius distance, edge-set Jaccard overlap, the
-    fraction of common edges whose sign agrees, and the Pearson correlation of
-    the weights over edges present in *either* graph.
+    Returns Frobenius distance, edge-set Jaccard, sign agreement on common
+    edges, and weight correlation over edges present in either graph.
     """
     ea = np.abs(a) > threshold
     eb = np.abs(b) > threshold
@@ -248,8 +213,7 @@ def compare_graphs(
 def compare_rolling(dyn_result, var_result, threshold: float = 0.0) -> pd.DataFrame:
     """Window-by-window comparison of a DYNOTEARS run against a VARLiNGAM run.
 
-    The two runs must come from the same dataset (identical windows and asset
-    ordering).  Returns one row per window of :func:`compare_graphs` metrics.
+    Both runs must share windows and asset ordering. One row per window.
     """
     w_stack, dates, _ = _extract_sequence(dyn_result)
     b_stack, _, _ = _extract_sequence(var_result)
@@ -265,9 +229,7 @@ def compare_rolling(dyn_result, var_result, threshold: float = 0.0) -> pd.DataFr
     return pd.DataFrame(rows).set_index("end_date")
 
 
-# ============================================================================
 # Plotting
-# ============================================================================
 def plot_metrics(
     metrics: pd.DataFrame,
     output_path: str | Path,
@@ -276,8 +238,7 @@ def plot_metrics(
 ) -> Path:
     """Plot density, average weight and inter-window distance over time.
 
-    If ``regime_changes`` is supplied (from :func:`detect_regime_changes`), the
-    flagged windows are marked with vertical lines.  Returns the saved path.
+    Flagged ``regime_changes`` windows get vertical lines. Returns the path.
     """
     import matplotlib
 
@@ -307,24 +268,13 @@ def plot_metrics(
     return output_path
 
 
-# ============================================================================
 # VARLiNGAM HSIC residual-independence diagnostics
-# ============================================================================
 def summarise_error_independence(window) -> dict:
-    """Boil a ``JointVarLingamWindow``'s HSIC p-value matrix down to scalars.
+    """Summarise a window's HSIC p-value matrix as scalars.
 
-    Returns ``{"rejection_rate", "min_pvalue", "median_pvalue", "n_pairs"}``
-    where ``rejection_rate`` is the fraction of off-diagonal p-values < 0.05
-    (LiNGAM null hypothesis = "residuals are pairwise independent").
-
-    Interpretation:
-    * ``rejection_rate ≈ 0.05`` (the false-positive level) ⇒ LiNGAM
-      assumption holds for this window.
-    * ``rejection_rate ≫ 0.05`` ⇒ LiNGAM is misspecified; the recovered
-      causal order should not be trusted for downstream interpretation.
-
-    Returns an empty dict if the window has no ``error_indep_pvalues``
-    (e.g. spot-check skipped this rebalance).
+    ``rejection_rate`` is the fraction of off-diagonal p-values < 0.05;
+    much above 0.05 means LiNGAM is misspecified for this window. Empty dict
+    if the window has no ``error_indep_pvalues``.
     """
     pvalues = getattr(window, "error_indep_pvalues", None)
     if pvalues is None:
@@ -343,8 +293,7 @@ def summarise_error_independence(window) -> dict:
 def summarise_error_independence_panel(result) -> pd.DataFrame:
     """Aggregate :func:`summarise_error_independence` across a rolling result.
 
-    Returns one row per window that has HSIC p-values populated (skipped
-    windows are omitted). Useful for plotting the misspecification time-series.
+    One row per window with HSIC p-values populated; skipped windows omitted.
     """
     rows = []
     for w in result.windows:

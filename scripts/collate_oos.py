@@ -1,15 +1,8 @@
 """Collate the 2025-26 out-of-sample slice (PREDICTIONS_OOS.md).
 
-Reads the ``results/oos_*`` bundles and emits ``results/oos_slice.csv``:
-net annualised Sharpe per cell plus the pre-committed contrasts per
-window (skeleton = D0 - CORR, orientation = D1 - D0, total = D1 - CORR,
-D2s - D0, and the D1 - D0df residual). POINT ESTIMATES ONLY by
-pre-commitment: at ~19 months no bootstrap p-value on this slice is
-evidence in either direction, so none is computed here.
-
-Also emits ``_generated/oos_stats.tex`` into both report directories:
-one ``\\newcommand`` per contrast cell of the report's ``tab:oos``, so
-no out-of-sample number is transcribed by hand.
+Emits results/oos_slice.csv (Sharpe per cell, pre-committed contrasts;
+point estimates only, no bootstrap by pre-commitment) and the
+_generated/oos_stats.tex macros for the report's tab:oos.
 
 Usage:  python -m scripts.collate_oos
 """

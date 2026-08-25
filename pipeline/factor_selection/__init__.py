@@ -1,14 +1,5 @@
-"""Stage 1 driver-selection.
-
-* :mod:`pipeline.factor_selection.prune` -- Stage A: pool-down by outgoing
-  causal-edge score.
-* :mod:`pipeline.factor_selection.k_calibration` -- one-off Kneedle +
-  permutation-null K selection on the burn-in window.
-* :mod:`pipeline.factor_selection.greedy` -- Stage B: conditional greedy
-  refinement on the pool.
-* :mod:`pipeline.factor_selection.selector` -- top-level α-blend of causal
-  evidence and lagged driver utility, then Stage A + Stage B.
-"""
+"""Stage 1 driver selection: Stage A pruning, K calibration, Stage B greedy
+refinement, and the top-level alpha-blended selector."""
 
 from __future__ import annotations
 

@@ -1,14 +1,7 @@
-"""J4 collation — K-sensitivity (J4a) + alpha/gamma sweep (J4b) tables.
+"""Collate the J4 tables: K-sensitivity (J4a) and alpha/gamma sweep (J4b).
 
-Reads the persisted sweep bundles (results/phase_i_*/closed_loop.pkl), computes
-net annualised Sharpe per config, and the Politis-Romano stationary-block
-bootstrap ΔSharpe (2000 resamples) vs the matched baseline — same methodology
-as the committed J2/J3 results.
-
-J4a: V1 vs V0 at matched K ∈ {10,14,17,20,25} × {w252,w504}. K=17 reuses the
-     committed phase_i_v{0,1}_w{w} bundles.
-J4b: V2(alpha,gamma) vs V1(open-loop) at w252. (0.6,0.3) reuses phase_i_v2_w252;
-     the V1 baseline is phase_i_v1_w252.
+Computes net Sharpe per config and bootstrap ΔSharpe vs the matched baseline,
+same methodology as J2/J3.
 
 Run:  python -m scripts.collate_j4
 Outputs: results/j4a_k_sensitivity.csv, results/j4b_alpha_gamma.csv
@@ -42,9 +35,8 @@ def _rets(tag: str) -> pd.Series | None:
     return bt.nav_net.pct_change().dropna()
 
 
-# All J4 configs are run fresh under deterministic-EEM with a _k/_a_g suffix
-# (self-consistent tables); committed phase_i_v{0,1,2}_w{w} stay the untouched
-# headline. main() separately checks fresh-K17 reproduces the committed numbers.
+# J4 configs run fresh with a suffix; committed phase_i_* bundles stay the
+# headline. main() checks fresh K=17 reproduces the committed numbers.
 def _v0_tag(w, k):  return f"phase_i_v0_w{w}_k{k}"
 def _v1_tag(w, k):  return f"phase_i_v1_w{w}_k{k}"
 def _v2_tag(a, g):  return f"phase_i_v2_w252_a{a}_g{g}"
@@ -72,8 +64,7 @@ def collate_j4a() -> pd.DataFrame:
 
 
 def collate_j4b() -> pd.DataFrame:
-    # Open-loop (alpha=1) baseline = fresh V1 w252 K=17 under the same frozen-EEM
-    # conditions as the V2 grid (falls back to committed if the fresh run absent).
+    # Baseline is fresh V1 w252 K=17; fall back to committed if absent.
     r_v1 = _rets("phase_i_v1_w252_k17")
     if r_v1 is None:
         r_v1 = _rets("phase_i_v1_w252")

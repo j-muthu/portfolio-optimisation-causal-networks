@@ -1,15 +1,8 @@
-"""Corrected versions of the two interim-report figures (frozen-EEM).
+"""Corrected (frozen-EEM) versions of the two interim-report figures.
 
-Same format/style as ``plot_interim_results.py`` (which reproduces the *submitted*
-interim figures with the original jittery-EEM numbers), but driven entirely by
-the frozen-EEM bundles + ``results/regime_analysis/excess_sharpe_named.csv`` —
-so the numbers match the corrected FINDINGS. Written to a SEPARATE directory,
-``interim_report/figures_corrected/``; the submitted ``interim_report/figures/``
-are deliberately left untouched.
-
-What changed vs the submitted figures: V1 w504 Sharpe 0.382→0.372 (EEM artefact),
-and V2 ≡ V1 everywhere (the closed loop is inert — the old 2018Q4 "V2 edge" was
-a jittery-EEM artefact and is gone, so the V2 bars now overlap V1).
+Same style as plot_interim_results.py but driven by the frozen-EEM bundles,
+written to interim_report/figures_corrected/ so the submitted figures stay
+untouched.
 
 Run:  python -m scripts.plot_interim_corrected
 """
@@ -35,7 +28,7 @@ COLOURS = {"V0": "#999999", "V1": "#0072B2", "V2": "#D55E00"}
 VARIANTS = ["V0", "V1", "V2"]
 LABELS = {"V0": "V0  vanilla HSP (cum-corr)", "V1": "V1  Causal-HSP (open loop)",
           "V2": "V2  Causal-HSP (closed loop)"}
-# named-regime → CSV variant row (DYNOTEARS scope, matching the interim report)
+# CSV variant rows (DYNOTEARS scope, matching the interim report)
 CSV_VAR = {"V0": "V0", "V1": "V1-DYNOTEARS", "V2": "V2-DYNOTEARS"}
 REGIME_ORDER = ["GFC 2007-09", "2018Q4 selloff", "COVID 2020", "2022 rate-hike", "Bull 2013-18"]
 REGIME_LBL = ["GFC\n2007-09", "2018Q4\nselloff", "COVID\n2020", "2022\nrate-hike", "Bull\n2013-18"]

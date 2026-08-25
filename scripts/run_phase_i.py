@@ -1,27 +1,16 @@
-"""Phase I — full 2007-2024 thesis backtest launcher.
+"""Phase I full 2007-2024 backtest launcher (V0/V1/V2).
 
-The headline run: V0 / V1 / V2 over the full sample, fixed 99-ticker universe
-(the G.7 universe, for direct G.7↔Phase-I comparability), 33-driver pool
-(HYG/LQD + VVIX dropped — they don't exist before 2007-04 and baa10y_diff
-already covers the credit-spread role, so dropping them recovers full GFC
-capture; joint matrix then starts 2006-01).
-
-All data is pre-cached (cache/prices/ + cache/drivers/), so this makes ZERO
-WRDS calls — no Duo prompt. Verified by the offline-build guard in pre-flight.
-
-K calibration is run ONCE (by the V1 launch) and the resulting K is reused by
-V0 and V2 via ``--k`` so the 3h calibration isn't paid three times.
+All data is pre-cached, so this makes no WRDS calls. K calibration runs once
+(on the V1 launch); V0 and V2 reuse the result via --k.
 
 Usage
 -----
-    # 1. V1 first — calibrates K, prints "chosen K=N", then backtests.
+    # 1. V1 first: calibrates K, prints "chosen K=N", then backtests.
     python -m scripts.run_phase_i --variant V1 --window 252
 
-    # 2. Once V1's K-cal lands (~3h in), launch V0 + V2 reusing that K:
+    # 2. Once K is known, launch V0 + V2 reusing it:
     python -m scripts.run_phase_i --variant V0 --window 252 --k N
     python -m scripts.run_phase_i --variant V2 --window 252 --k N
-
-    # 3. Window-504 robustness appendix (same pattern, --window 504).
 """
 
 from __future__ import annotations
@@ -33,18 +22,19 @@ import pathlib
 from pipeline.data.drivers import DRIVER_CATALOGUE
 from pipeline.shakedown import run_shakedown
 
-# Drivers excluded for the full-sample run (see module docstring).
+# Excluded for the full-sample run: they don't exist before 2007-04, and
+# baa10y_diff already covers the credit-spread role.
 DROP_DRIVERS = {"hyg_lqd_logret", "vvix"}
 
-# 99-ticker universe (the G.7 universe, for G.7↔Phase-I comparability). Tracked
-# copy lives next to this script; falls back to the cache/ copy if absent.
+# 99-ticker G.7 universe. Tracked copy lives next to this script; falls back
+# to the cache/ copy if absent.
 _TRACKED_UNIVERSE = pathlib.Path(__file__).resolve().parent / "phase_i_universe.txt"
 _CACHE_UNIVERSE = pathlib.Path(__file__).resolve().parent.parent / "cache" / "phase_i_universe.txt"
 UNIVERSE_FILE = _TRACKED_UNIVERSE if _TRACKED_UNIVERSE.exists() else _CACHE_UNIVERSE
 
 # Fixed sample boundaries.
-DATA_START = "2005-01-03"      # cache coverage; joint naturally starts 2006-01
-BACKTEST_START = "2007-01-03"  # first rebalance; full GFC captured at window 252
+DATA_START = "2005-01-03"      # joint matrix naturally starts 2006-01
+BACKTEST_START = "2007-01-03"  # full GFC captured at window 252
 DATA_END = "2024-12-31"
 
 
@@ -94,41 +84,34 @@ def main(argv: list[str] | None = None) -> None:
         sorted(DROP_DRIVERS), BACKTEST_START, DATA_END,
     )
 
-    # Variant → (selection_method, discovery_method, K-calibration on?)
+    # Variant -> (selection_method, discovery_method, K-calibration on?)
     if args.variant == "V0":
         # V0 (cum-corr) never uses discovery or K calibration.
         selection_method, discovery_method = "correlation", "dynotears"
         use_kcal = False
     elif args.variant == "V0prime":
-        # V0′ asset-only Causal-HRP: DYNOTEARS discovery, asset–asset block →
-        # HRP. No drivers selected, no FFNN, no K calibration.
+        # V0' asset-only Causal-HRP: no drivers, no FFNN, no K calibration.
         selection_method, discovery_method = "asset_only", "dynotears"
         use_kcal = False
-    else:  # V1 / V2 — causal greedy on the chosen discovery backend
+    else:  # V1 / V2: causal greedy on the chosen discovery backend
         selection_method, discovery_method = "causal_greedy", args.discovery_method
-        use_kcal = args.k is None  # calibrate unless a K was supplied
+        use_kcal = args.k is None
 
     if args.k is not None:
         log.info("Reusing pre-calibrated K=%d (skipping K calibration)", args.k)
 
-    # VARLiNGAM at d=132 must disable lingam's adaptive-lasso pruning: its
-    # _pruning step regresses each variable on its causal-order predecessors
-    # via LassoLarsIC, which fails when a late-order variable has more
-    # predecessors than the ~251 window samples (n_samples < n_features). We
-    # don't need lingam's pruning anyway — the asset→driver mask is enforced
-    # by post-fit projection and Stage A thresholds edges itself.
+    # VARLiNGAM at d=132 must disable lingam's adaptive-lasso pruning: it
+    # fails when a late-order variable has more predecessors than window
+    # samples. Not needed anyway; the mask is enforced by post-fit projection.
     discovery_kwargs = {"prune": False} if discovery_method == "varlingam" else None
 
-    # Method-aware tag: suffix non-default discovery so VARLiNGAM runs don't
-    # clobber the committed DYNOTEARS Phase I bundles. DYNOTEARS keeps the
-    # original unsuffixed tag for back-compat.
+    # Suffix non-default discovery so VARLiNGAM runs don't clobber the
+    # committed DYNOTEARS bundles; DYNOTEARS keeps the unsuffixed tag.
     if args.variant != "V0" and discovery_method != "dynotears":
         tag = f"phase_i_{args.variant.lower()}_{discovery_method}_w{args.window}"
     else:
         tag = f"phase_i_{args.variant.lower()}_w{args.window}"
-    # Optional suffix so hyperparameter-sweep runs (J4: varying K / alpha /
-    # gamma) write to distinct result dirs instead of clobbering the committed
-    # K=17 / alpha=0.6 Phase I bundles.
+    # J4 sweep runs write to distinct result dirs via the suffix.
     if args.tag_suffix:
         tag = f"{tag}{args.tag_suffix}"
 
@@ -163,7 +146,7 @@ def main(argv: list[str] | None = None) -> None:
     try:
         bt = res.closed_loop.backtest
         print(f"final NAV (gross/net): {bt.nav_gross.iloc[-1]:.4f} / {bt.nav_net.iloc[-1]:.4f}")
-    except Exception as exc:  # never let a cosmetic print abort a multi-hour run
+    except Exception as exc:  # cosmetic print must not abort a multi-hour run
         log.warning("Could not print final NAV (%s); results are persisted regardless.", exc)
     print("=" * 70)
 

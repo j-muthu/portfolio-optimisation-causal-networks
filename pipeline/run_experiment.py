@@ -1,43 +1,13 @@
-"""Full rolling-window causal-discovery experiment driver.
+"""Rolling-window causal-discovery experiment driver.
 
-Runs DYNOTEARS and/or VARLiNGAM across the configured universe and date range,
-then persists everything needed for downstream analysis so a multi-hour run is
-never lost:
+Runs DYNOTEARS and/or VARLiNGAM over the configured universe and date range,
+persisting results, metrics and per-window checkpoints to
+``results/<tag>/``. Re-running the same ``--tag`` resumes from checkpoints;
+use a new tag when windowing or algorithm parameters change.
 
-* ``<method>.pkl``           -- the full rolling result object (pickled).
-* ``<method>_windows.csv``   -- per-window edge counts / parameters.
-* ``<method>_metrics.csv``   -- density, avg weight, inter-window distance.
-* ``<method>_regimes.csv``   -- windows flagged as regime changes.
-* ``<method>_metrics.png``   -- the metrics plotted over time.
-* ``head_to_head.csv``       -- DYNOTEARS-vs-VARLiNGAM comparison (if both run).
-* ``causal_order_drift.csv`` -- VARLiNGAM causal-order stability (if VARLiNGAM).
-* ``run.log``                -- full log of the run.
-* ``dataset.pkl``            -- the exact returns matrix used (for reproducibility).
-* ``checkpoints/``           -- per-window pickles written as each window finishes.
-
-Results land in ``thesis/results/<tag>/``.
-
-Checkpoint/resume: every completed window is pickled under ``checkpoints/`` as it
-finishes, so an interrupted run can be resumed simply by re-running the same
-command -- already-computed windows are loaded instead of recomputed. Checkpoints
-are keyed by ``--tag`` and window index only: when changing windowing or
-algorithm parameters, use a new ``--tag`` (or delete ``checkpoints/``) so stale
-windows are not reused.
-
-Examples
---------
-Scaling test on ~100 assets (the plan's "find where the VAR step breaks")::
+Example::
 
     .venv/bin/python -m pipeline.run_experiment --max-assets 100 --tag sp100
-
-Full fixed-universe run (Approach 1, ~500 assets, 10 years -- a long job)::
-
-    .venv/bin/python -m pipeline.run_experiment --approach fixed --tag full \\
-        --n-jobs -1 --var-method ridge
-
-Survivorship-bias robustness check (Approach 3)::
-
-    .venv/bin/python -m pipeline.run_experiment --approach intersection --tag robust
 """
 
 from __future__ import annotations
@@ -165,7 +135,7 @@ def main(argv: list[str] | None = None) -> None:
     logger.info("Experiment '%s' -> %s", args.tag, output_dir)
     logger.info("Config: %s", vars(args))
 
-    # --- Data ---------------------------------------------------------------
+    # Data
     dataset = build_dataset(
         start=args.start,
         end=args.end,
@@ -180,8 +150,7 @@ def main(argv: list[str] | None = None) -> None:
         f"meta={dataset.meta}\n"
         f"dropped={dataset.dropped}\n"
     )
-    # Snapshot the exact dataset so results stay reproducible even if yfinance
-    # later revises historical prices.
+    # Snapshot the dataset in case yfinance later revises history.
     with open(output_dir / "dataset.pkl", "wb") as fh:
         pickle.dump(dataset, fh)
 
@@ -190,7 +159,7 @@ def main(argv: list[str] | None = None) -> None:
     run_var = args.methods in ("varlingam", "both")
     dyn = var = None
 
-    # --- DYNOTEARS ----------------------------------------------------------
+    # DYNOTEARS
     if run_dyn:
         logger.info("=== Running rolling DYNOTEARS ===")
         t0 = time.time()
@@ -208,7 +177,7 @@ def main(argv: list[str] | None = None) -> None:
         _save_rolling(dyn, "dynotears", output_dir)
         logger.info("DYNOTEARS done in %.1f min", (time.time() - t0) / 60)
 
-    # --- VARLiNGAM ----------------------------------------------------------
+    # VARLiNGAM
     if run_var:
         logger.info("=== Running rolling VARLiNGAM ===")
         t0 = time.time()
@@ -228,7 +197,7 @@ def main(argv: list[str] | None = None) -> None:
         drift.to_csv(output_dir / "causal_order_drift.csv")
         logger.info("VARLiNGAM done in %.1f min", (time.time() - t0) / 60)
 
-    # --- Head-to-head -------------------------------------------------------
+    # Head-to-head
     if dyn is not None and var is not None:
         logger.info("=== Head-to-head comparison ===")
         comparison = compare_rolling(dyn, var)

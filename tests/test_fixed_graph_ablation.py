@@ -1,15 +1,8 @@
-"""Integration test: the Phase-II ablation isolates edge direction.
+"""Integration test: the ablation isolates edge direction.
 
-The design claim is that direction is the *sole* treatment variable: the
-control allocators (D0, D0s, and the mechanism controls D0lw/D0df) must be
-blind to edge direction, while the
-direction-aware allocators (D1, D2, D2s, D3, D4) must respond to it. The
-sharpest formulation is transpose (in)variance — reversing every edge
-(``M → Mᵀ``) changes nothing the controls can see (the embedding halves
-swap per asset; ``(|M|+|Mᵀ|)/2`` is literally invariant) but reverses the
-causal flow the treatments allocate on. A graph-sensitivity check (the
-leak-canary pattern) guards against any allocator silently ignoring the
-graph altogether.
+Controls (D0, D0s, D0lw, D0df) must be transpose-invariant; the
+direction-aware allocators must respond to edge reversal. A
+graph-sensitivity check guards against allocators ignoring the graph.
 """
 
 from __future__ import annotations
@@ -26,17 +19,13 @@ NAMES = [f"A{i}" for i in range(N)]
 
 
 def _chainlike_dag(seed=13):
-    """An asymmetric DAG with real depth, so direction genuinely matters.
-
-    The backbone node *sequence* is seed-permuted (not just the magnitudes),
-    so different seeds give structurally different graphs — different
-    topological orders, not merely different edge weights.
-    """
+    """Asymmetric DAG with real depth; the node sequence is seed-permuted,
+    so different seeds give structurally different graphs."""
     rng = np.random.default_rng(seed)
     seq = rng.permutation(N)
     M = np.zeros((N, N))
     for a in range(N - 1):
-        M[seq[a], seq[a + 1]] = rng.uniform(0.4, 0.9)          # backbone chain
+        M[seq[a], seq[a + 1]] = rng.uniform(0.4, 0.9)  # backbone chain
     M[seq[0], seq[3]], M[seq[1], seq[5]], M[seq[2], seq[7]] = 0.5, 0.35, 0.45
     return M
 
@@ -91,11 +80,8 @@ def test_treatments_respond_to_edge_reversal(name):
 
 
 def test_d2_responds_to_topological_structure():
-    """D2 is deliberately excluded from the full-reversal test: recursive
-    bisection is *mirror-invariant* (reversing the leaf order reproduces the
-    identical partition tree), so D2's direction signal enters through the
-    partition structure, not the mirror. A structurally different DAG — a
-    star rooted mid-sequence vs a chain — must move the weights."""
+    """D2 skips the reversal test (recursive bisection is mirror-invariant),
+    but a star vs a chain must move its weights."""
     rets = _returns()
     chain = _chainlike_dag(seed=13)
     star = np.zeros((N, N))
@@ -109,9 +95,7 @@ def test_d2_responds_to_topological_structure():
 
 @pytest.mark.parametrize("name", ["D0", "D1", "D2", "D3", "D4"])
 def test_graph_sensitivity_leak_canary(name):
-    """Different graphs must yield different weights (guards against an
-    allocator that silently ignores its graph — the off-by-one join bug
-    class the Phase-I leak canary exists for)."""
+    """Different graphs must yield different weights."""
     rets = _returns()
     w_a = dispatch_allocator(name, _graph(_chainlike_dag(seed=13)), rets)
     w_b = dispatch_allocator(name, _graph(_chainlike_dag(seed=99)), rets)

@@ -1,26 +1,13 @@
-"""Phase-II E7 — seed audit of the Phase-I FFNN path.
+"""E7: seed audit of the Phase-I FFNN path.
 
-Ce Guo's critique, quantified: the HSP-style pipeline routes allocation
-through a per-window FFNN whose Jacobian is the sensitivity matrix, and the
-FFNN fit depends on the torch seed. This script re-runs the committed
-V1-DYNOTEARS w252 K=17 configuration (byte-identical everywhere else —
-discovery graphs come from the content-keyed cache) across FFNN seeds with
-the FFNN cache disabled, so the *only* varying ingredient is the network
-initialisation. The output table reports the Sharpe distribution across
-seeds and where the committed number sits inside it. Every Phase-II
-D-variant is deterministic by construction (no NN anywhere), which is the
-contrast the report draws.
-
-Honesty note: on Apple-silicon MPS, torch does not guarantee bit-wise
-reproducibility even at a fixed seed; any seed-0 divergence from the
-committed bundle is itself framework nondeterminism and is reported as such.
-
-Resumable: a seed whose bundle already exists is skipped, so the multi-hour
-run can be interrupted and relaunched freely.
+Re-runs the committed V1-DYNOTEARS w252 K=17 config across FFNN seeds with
+the FFNN cache off, so only the network initialisation varies. Resumable:
+seeds with an existing bundle are skipped. Note torch on Apple-silicon MPS
+is not bit-reproducible even at a fixed seed.
 
 Usage
 -----
-    python -m scripts.run_seed_audit --n-seeds 10          # the minimum version
+    python -m scripts.run_seed_audit --n-seeds 10
 """
 
 from __future__ import annotations
@@ -47,7 +34,7 @@ from scripts.run_phase_ii import (
 RESULTS = THESIS_ROOT / "results"
 OUT_CSV = RESULTS / "seed_audit.csv"
 
-# The committed Phase-I V1 w252 configuration (results/phase_i_v1_w252 config).
+# The committed Phase-I V1 w252 configuration.
 K = 17
 WINDOW = 252
 ALPHA, GAMMA, BURN_IN = 0.6, 0.3, 3
