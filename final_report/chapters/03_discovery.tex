@@ -1,12 +1,19 @@
 % ============================================================
-\chapter{A1: Discovering the Graph}
+\chapter{Discovering the Graph}
 \label{chap:discovery}
 % ============================================================
 
-This chapter presents the discovery pipeline (A1, addressing C1) that produces
-the object at the centre of the research question: a credible, reproducible
-asset--asset causal
-graph at every monthly rebalance of the 2007--2024 backtest.
+This chapter addresses the attribution challenge. The graph enters allocation
+through several channels (skeleton, orientation and implied covariance), and
+isolating them requires a credible graph that is held fixed and
+bit-reproducible across every allocator, and cheap enough to refit 215 times
+per configuration; an earlier driver-selection route built on neural-network
+sensitivities was seed-dependent and could not meet that standard. The
+deliverable is a reproducible rolling discovery pipeline with a directional
+prior, a content-keyed cache, a determinism fix and a single extraction
+chokepoint, which together produce the object at the centre of the research
+question: a credible, reproducible asset--asset causal graph at every monthly
+rebalance of the 2007--2024 backtest.
 Section~\ref{sec:data} describes the data; Section~\ref{sec:discovery-run} the
 rolling discovery, the directional prior, and its empirical verification;
 Section~\ref{sec:asset-graph} the extraction chokepoint through which every
@@ -74,7 +81,7 @@ series.
 
 The primary discovery method is chosen against three requirements, not by
 default: it must scale to the ${\sim}132$-variable joint panel at every
-rebalance of a sweepable grid; it must accept the directional prior of C1
+rebalance of a sweepable grid; it must accept the directional prior
 natively, rather than by post-hoc edge deletion; and it must return
 a DAG, because the allocators of Chapter~\ref{chap:sensitivity} rely
 on exact nilpotent total-effect algebra. DYNOTEARS meets all three; the
@@ -92,7 +99,7 @@ The convention throughout is $M[i,j]$ = effect of variable $i$ on variable
 $j$; the operative hyperparameters are tabulated in
 Appendix~\ref{app:tables}.
 
-\paragraph{Enforcing the prior.} The directional prior of C1 (drivers may
+\paragraph{Enforcing the prior.} The directional prior (drivers may
 cause assets; individual large-cap stocks do not move the 10-year Treasury
 yield at these scales) is enforced natively: DYNOTEARS accepts a
 forbidden-edge list (\texttt{tabu\_edges}), populated with every asset$\to$driver pair

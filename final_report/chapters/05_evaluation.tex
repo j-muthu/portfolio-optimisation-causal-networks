@@ -1,9 +1,17 @@
 % ============================================================
-\chapter{A3: Decomposing the Gain}
+\chapter{Decomposing the Gain}
 \label{chap:evaluation}
 % ============================================================
 
-This chapter evaluates (A3, addressing C3). Its structure follows the
+This chapter addresses the challenge of inference at realistic effect sizes.
+The effects at stake are of the order of 0.01 to 0.03 Sharpe on about
+18 years of data, spread across many evaluated configurations, and a
+pairwise $p$-value means nothing there without pricing the multiplicity,
+quantifying the power and controlling for non-causal mechanisms such as
+shrinkage and market-factor removal. The deliverable is a pre-registered,
+controlled, multiplicity-aware evaluation: block bootstrap, deflated Sharpe,
+SPA and MCS including a pooled SPA, a minimum detectable effect,
+pre-committed controls and an out-of-sample slice. Its structure follows the
 logical order in which the research question must be answered. Section~\ref{sec:method} fixes
 how the gain is measured. Section~\ref{sec:r1} tests Requirement 1,
 whether the causal graph improves on the correlation matrix at all.

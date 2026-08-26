@@ -46,41 +46,11 @@ provided as an input to hierarchical allocators by symmetrising
 the adjacency matrix representation of the graph. The edge
 orientations cannot, as symmetrisation discards directionality,
 so incorporating their information requires novel allocators.
-In this thesis, I create these novel allocators (the
-``orientation-aware'' allocator family) and create an experimental
-design where each allocator receives the same DAG, 
-so any performance difference is attributable to the information
-(i.e. skeleton or skeleton + edge orientations) the allocator 
-extracts from the DAG.
-
-This research is informative for a variety of reasons.
-First, running a causal discovery algorithm is computationally 
-intensive, but once the DAG has been produced, 
-using a skeleton in an existing hierarchical allocator is
-trivial. Using the edge orientations' information, however,
-requires the novel allocators developed in this research.
-By decomposing a DAG into the two components,
-and examining the marginal performance contributions of both, 
-it informs practitioners as to whether the benefits of their
-chosen portfolio optimisation approach are worth the costs.
-Second, where previous research just constructed causal
-graphs of assets \cite{howard2025causal}, this research
-contributes to the causal finance literature by actually
-setting portfolio weights based on the asset graphs,
-and reporting the decomposed contribution of both aspects of
-the graphs.
-Third, the project demonstrates how small effects can be
-presented comprehensively and honestly. Much
-of the quantitative finance literature has a notable
-problem with overfitting to backtests
-\cite{bailey2014deflated,lopezdeprado2023causal}: when testing
-a multitude of strategies, some will perform well by statistical
-chance alone, though these chance outperformances are generally
-very small in settings with long samples and highly correlated
-strategies. I therefore distinguish between chance and real 
-effects by reporting a variety of statistics, and 
-accounting for the number of strategies searched over when 
-reporting statistics.
+In this thesis, every allocator receives the same DAG, so any
+performance difference is attributable to the information (skeleton
+alone, or skeleton and edge orientations) the allocator extracts from
+it. Whether the orientations are worth their cost is the practical
+question the decomposition answers.
 
 \section{The research question}
 \label{sec:question}
@@ -162,78 +132,109 @@ between assets, holding the graph fixed. The two marginal
 contributions sum to the total performance gain of the causal
 graph over the correlation-based allocator. 
 
-A subsidiary question follows once the decomposition is measured: through
-what channel does orientation pay, directional content read from the
-arrows, or properties of the implied covariance that a graph-free
-construction can reproduce? The distinction matters, because only the
-first would vindicate a causal reading of the graph.
-Chapter~\ref{chap:evaluation} answers it with two covariance controls,
-Ledoit--Wolf
-shrinkage and a de-factored covariance, and completes the symmetry with a
-graph-free skeleton control that asks the same question of the skeleton
-channel.
+In addition, after isolating the contributions of the two 
+aspects of the graph, further questions arise regarding what drives the
+performance gain within those two aspects. Specifically:
+\begin{itemize}
+    \item Does the skeleton's performance gain arise purely from the 
+    actual discovered causal graph structure, or can the performance gain
+    be reproduced by any sparse dependence structure of a similar density,
+    regardless of whether it has been created by causal discovery?
+    \item Does the performance gain from edge orientations
+    arise specifically from the directional content of the causal DAG's
+    edges, or does it arise from another aspect of the DAG, such as the
+    implied covariance, which can be reproduced without the need for
+    a causal graph?
+\end{itemize}
+\noindent I answer these questions in Chapter~\ref{chap:evaluation}.
 
 \section{Challenges and contributions}
 \label{sec:challenges}
 
-The work is organised as three technical challenges (C1--C3) and the
-deliverables addressing them (A1--A3), one chapter each. The mapping onto the
-research question
-is direct: C1 supplies the graph, C2 supplies the allocators that decompose
-its value, and C3 supplies the inference that adjudicates the decomposition.
-Together they integrate three literatures that have not previously met at
-the allocation step (causal structure learning, hierarchical portfolio
-construction, and the backtest-rigour programme), and A1--A3 are the
-project's objectives: Chapters~\ref{chap:discovery}--\ref{chap:evaluation}
-deliver them, and Chapter~\ref{chap:evaluation} assesses them jointly
-against the research question.
+Answering the research question raises three technical challenges, one per
+chapter: Chapter~\ref{chap:discovery} supplies the graph,
+Chapter~\ref{chap:sensitivity} supplies the allocators that decompose its
+value, and Chapter~\ref{chap:evaluation} supplies the inference that
+adjudicates the decomposition. Together they integrate three literatures
+that have not previously met at the allocation step (causal structure
+learning, hierarchical portfolio construction, and the backtest-rigour
+programme). I state each challenge and then the novel aspect of the work
+that addresses it.
 
-\begin{enumerate}[label=C\arabic*, itemsep=2pt, topsep=3pt]
-  \item Discovering a credible asset--asset causal graph at every
-    rebalance. The graph must be estimated over a ${\sim}130$-variable joint
-    panel of assets and macro drivers, under an economically-motivated
-    directional prior (drivers may cause assets; single stocks do not cause
-    the 10-year Treasury yield), 215 times per configuration, cheaply enough
-    to sweep, and reproducibly: a graph that changes between runs
-    invalidates every downstream comparison.
-  \item Feeding a directed graph to an allocator that fundamentally
-    consumes symmetric matrices. Hierarchical clustering requires a
-    symmetric distance; naive symmetrisation discards exactly the
-    orientations in question. Exploiting them requires allocation machinery
-    with no analogue in the hierarchical-allocation literature, and an
-    experimental design
-    in which orientation is the only treatment variable.
-  \item Attributing small performance differences credibly. The
-    candidate effects are $0.01$--$0.03$ Sharpe on heavy-tailed returns,
-    produced by a study that evaluated \rsNtrials\ configurations, so
-    the search itself, if unpriced, could manufacture the whole effect.
-\end{enumerate}
+\begin{itemize}[itemsep=2pt, topsep=3pt]
+  \item Attribution. Causal-discovery portfolios report Sharpe
+    gains over correlation-based HRP, but the graph enters allocation
+    through several channels at once (its skeleton, its edge orientations,
+    and the covariance it implies), so nothing in the published designs
+    isolates which channel pays. Isolating them needs a graph that is
+    credible (estimated over a ${\sim}130$-variable joint panel of assets
+    and macro drivers, under an economically motivated directional prior,
+    215 times per configuration, cheaply enough to sweep) and, above all,
+    held fixed and bit-reproducible across every allocator: a graph that
+    changes between runs invalidates every downstream contrast. An earlier
+    route through driver selection with neural-network sensitivities
+    proved seed-dependent, its edge lying inside its own seed noise
+    (Appendix~\ref{app:hsp}).
+  \item Using direction at all. Hierarchical allocators consume a
+    symmetric distance, and naive symmetrisation discards exactly the
+    orientations in question. There is no established way to feed an
+    asymmetric DAG adjacency into clustering or risk allocation, and the
+    experiment needs a design in which orientation is the only treatment
+    variable.
+  \item Inference at realistic effect sizes. The candidate
+    effects are $0.01$--$0.03$ Sharpe on about 18 years of monthly
+    rebalances and heavy-tailed returns, produced by a study that
+    evaluated \rsNtrials\ configurations (methods, allocators and
+    windows). Pairwise bootstrap $p$-values mean nothing without pricing
+    that multiplicity, quantifying power (the minimum detectable effect),
+    and controlling for non-causal mechanisms, such as generic shrinkage
+    or market-factor removal, that could mimic an orientation effect.
+\end{itemize}
 
-\begin{enumerate}[label=A\arabic*, itemsep=2pt, topsep=3pt]
-  \item A reproducible rolling pipeline for causal discovery
-    (addresses C1; Chapter~\ref{chap:discovery}): DYNOTEARS with the directional prior
-    enforced natively and empirically verified to matter; a content-keyed
-    discovery cache that makes the full ablation grid tractable
-    (a backtest re-runs in ${\approx}40$ seconds against cached fits
-    instead of ${\approx}15$ hours); a data-determinism defect found
-    and fixed; and a single extraction chokepoint guaranteeing that every
-    allocator receives the identical graph.
-  \item The orientation-aware allocator family and the fixed-graph
-    ablation (addresses C2; Chapter~\ref{chap:sensitivity}), the core
-    methodological novelty: a covariance implied by a structural equation
-    model (SEM), which propagates shocks through all directed paths of the
-    DAG, and
-    causal-ordered bisection, which replaces the clustering
-    dendrogram with the DAG's topological order. Each is deterministic and
-    seed-free, and each is evaluated against matched skeleton-only and
-    correlation controls on the identical graphs.
-  \item A multiplicity-, distribution- and stability-aware evaluation
-    (addresses C3; Chapter~\ref{chap:evaluation}): stationary-block-bootstrap
-    contrasts for every pairwise step of the decomposition; and the
-    PSR/DSR/Reality-Check/SPA/MCS battery (the DSR deflating against all
-    \rsNtrials\ trials, the family-wise tests over their stated
-    per-question families).
-\end{enumerate}
+\noindent The novel aspects of the work, each addressing one challenge:
+
+\begin{itemize}[itemsep=2pt, topsep=3pt]
+  \item A fixed-graph decomposition design and reproducible
+    discovery pipeline (attribution; Chapter~\ref{chap:discovery}). The
+    same per-window DYNOTEARS or VARLiNGAM graph feeds a ladder of
+    allocators, correlation \HRP{} to skeleton-only to orientation-aware,
+    so that each rung of the ladder isolates one channel: the skeleton
+    contribution is the skeleton-only allocator minus \HRP{}, and the
+    orientation contribution is the orientation-aware allocator minus the
+    skeleton-only one. DYNOTEARS runs with the directional prior enforced
+    natively and empirically verified to matter; a content-keyed discovery
+    cache makes the full grid tractable (a backtest re-runs in
+    ${\approx}40$ seconds against cached fits instead of ${\approx}15$
+    hours); a data-determinism defect was found and fixed; a single
+    extraction chokepoint guarantees that every allocator receives the
+    identical graph; and a replication gate reproduces the first phase's skeleton-only
+    allocator through the new harness byte-for-byte ($\Delta$Sharpe $=0$,
+    maximum weight difference $=0.0$).
+  \item The orientation-aware allocator family (direction;
+    Chapter~\ref{chap:sensitivity}), the core methodological novelty. A
+    structural covariance implied by the DAG's structural equation model,
+    $\Sigma = D_\sigma B \Sigma_\varepsilon B^{\top} D_\sigma$ with
+    $B=(I-M^{\top})^{-1}$, which is exact for a DAG by nilpotency (no
+    spectral-radius assumption); and causal-ordered bisection, which
+    replaces the clustering dendrogram with the DAG's topological order.
+    Both are deterministic and seed-free, and both are evaluated against
+    matched skeleton-only and correlation controls verified to be
+    orientation-blind. A ridge-Granger comparator shows that cheap
+    directed structure suffices for the ordering but not for the
+    structural covariance.
+  \item A pre-registered, controlled evaluation (inference;
+    Chapter~\ref{chap:evaluation}). Politis--Romano stationary block
+    bootstrap contrasts for every rung of the ladder; the
+    PSR/DSR/Reality-Check/SPA/MCS battery over all \rsNtrials\ trials,
+    including a pooled strategies-times-windows SPA; the minimum
+    detectable effect at $80\%$ power quantified
+    (${\approx}\,\rsContrastMDEOrient$ for orientation,
+    ${\approx}\,\rsContrastMDETotal$ for the total); three controls with
+    interpretations committed before they were run (Ledoit--Wolf
+    shrinkage, a de-factored covariance, and a graph-free
+    partial-correlation skeleton); a pre-committed 2025--26 out-of-sample
+    slice; and HERC as a second allocator family.
+\end{itemize}
 
 \section{Quantified benefits}
 \label{sec:benefits}
@@ -242,54 +243,53 @@ All benefits below are measured on the protocol of
 Section~\ref{sec:question} (net of 5\,bps, monthly rebalances, 2007--2024)
 with significance from the Politis--Romano stationary block bootstrap
 \cite{politis1994stationary}, and are reported as measured, including
-where the answer is small or null. Full detail is in
-Chapter~\ref{chap:evaluation}.
+where the answer is small or null. Because no published configuration sets
+hierarchical weights from a discovered graph (Howard et al.\
+\cite{howard2025causal} build causal graphs on the S\&P~500 but never set
+weights from them), no external number exists for a direct comparison;
+the external benchmark is therefore the \HRP{} control itself, L\'opez de
+Prado's published textbook construction, evaluated on the identical
+protocol. Full detail is in Chapter~\ref{chap:evaluation}.
 
 \begin{itemize}[itemsep=2pt, topsep=3pt]
-  \item The decomposition (the answer to the research question).
-    The graph's total gain over the correlation control is stable across
-    estimation windows ($+0.018$ to $+0.032$ net Sharpe for \skelsem{}), worth
-    $+0.4$ to $+0.7$ percentage points of net compound annual growth rate
-    (CAGR) per year, but its composition shifts with the window: the
-    skeleton's contribution is hump-shaped and peaks near the conventional
-    one-year window, while orientation's is positive at every window and
-    largest at the extremes, though the between-window differences are
-    about one standard error and the window grid was widened partway
-    through. Statistical support is modest: one pairwise contrast in
-    twelve is individually significant, and family-wise support exists
-    only under a narrowed family fixed after the results were seen
-    (Chapter~\ref{chap:evaluation} gives the full estimates, the
-    anchor-robustness caveats and the multiplicity treatment).
-  \item What orientation buys is robustness, not level. The
-    orientation-aware allocators are strong at every window (\skelsem{}
-    spans $0.395$--$0.415$ and \orientsem{} $0.399$--$0.419$ across the
-    four estimation windows, against the skeleton-only allocator's
-    $0.372$--$0.403$), and their edge over the skeleton is largest where
-    the sample moments feeding the control are weakest (the nine-month and
-    two-year windows), consistent with structure substituting for
-    sample-moment quality. A direct control identifies the mechanism: the
-    SEM covariance's removal of the common market factor, which a
-    graph-free de-factored covariance reproduces at every window
-    (Chapter~\ref{chap:evaluation}), so the robustness is real but is not
-    evidence of directional content. A matching graph-free skeleton
-    control shows the converse for the skeleton channel: its one-year
-    gain does require the discovered graph. At the 18-month window
-    \orientsem{} attains the highest Deflated
-    Sharpe ratio of all \rsNtrials\ configurations
-    ($\rsDtwosDSRWthree$). The effect is, however,
-    method-dependent (absent under VARLiNGAM graphs at all four windows)
-    and, descriptively, concentrates in calm regimes (the bottom quintile
-    of the Cboe Volatility Index, VIX) rather than stress.
-  \item Novelty relative to the closest published work. Howard et
-    al.\ \cite{howard2025causal} build causal graphs on the S\&P~500 but
-    never set weights from them. Setting hierarchical weights
-    directly from a causal graph, decomposing skeleton from orientation on
-    fixed graphs, and the orientation-aware allocator family itself are, to
-    my knowledge, new. Because no published configuration sets hierarchical
-    weights from a discovered graph, no external number exists for a direct
-    comparison; the external benchmark is therefore the \HRP{} control
-    itself, L\'opez de Prado's published textbook construction, evaluated
-    on the identical protocol.
+  \item Total causal gain over correlation \HRP{}. $+0.018$ to
+    $+0.032$ net Sharpe for \skelsem{} at every estimation window, worth
+    $+0.4$ to $+0.7$ percentage points of net CAGR per year; 19 of the 20
+    DYNOTEARS graph-versus-\HRP{} cells (and 36 of 40 across both
+    discovery methods) sit above the control. At the 18-month window
+    \orientsem{} attains the highest Deflated Sharpe ratio of all
+    \rsNtrials\ configurations ($\rsDtwosDSRWthree$). On the 2025--26
+    out-of-sample slice every sign specified in advance came back
+    consistent with the in-sample decomposition.
+  \item Orientation. Positive at all four windows ($+0.009$ to
+    $+0.023$), largest at the extremes, and it repairs the skeleton-only
+    allocator's two-year collapse (\rsDoneSharpeWfive{} against
+    \rsDzeroSharpeWfive{}). The increment is cost-invariant from 0 to
+    20\,bps, with lower turnover than the skeleton control. Family-wise,
+    the narrowed-family SPA gives $p=\rsSpaDirWfive$ at two years, and
+    nothing rejects once the window axis is pooled.
+  \item Skeleton. $+0.022$ at the one-year window, where it beats
+    a graph-free partial-correlation skeleton of matched density by
+    $+0.025$ ($p=0.008$), so the discovered structure, not sparsity
+    alone, does the work there. This answers the first sub-question of
+    Section~\ref{sec:question}.
+  \item Mechanism. A graph-free de-factored covariance reproduces
+    the orientation gain at every window (residual within $-0.011$ to
+    $+0.004$), whereas Ledoit--Wolf shrinkage does not (\skelsem{} beats
+    it by $+0.018$ to $+0.042$). The covariance-channel gain is therefore
+    attributable to the SEM's independent-shock structure removing the
+    market factor, not to directional content, which answers the second
+    sub-question of Section~\ref{sec:question}. The observed effects are
+    about half the minimum detectable effect, so the honest result is a
+    bounded null: orientation is worth roughly $0$ to $0.04$ Sharpe. The
+    effect is also method-dependent (absent under VARLiNGAM graphs at all
+    four windows).
+  \item Against the driver-and-sensitivity route it replaces.
+    Plain \HRP{} (\rsCorrSharpe) already beats that route's baseline
+    ($0.371$) at one year on the identical protocol, and every graph-route
+    allocator, seed-free and at about 40 seconds per backtest, sits above
+    the maximum of that route's \rsSeedN-seed cloud
+    (Appendix~\ref{app:hsp}).
 \end{itemize}
 
 In summary: the causal graph's value to hierarchical allocation
@@ -304,11 +304,11 @@ Chapter~\ref{chap:conclusion} restates the full answer with its caveats.
 
 Chapter~\ref{chap:background} analyses the two works this study builds
 on (HRP and the backtest-rigour agenda, and causal graphs in equity
-markets) and locates the gap. Chapter~\ref{chap:discovery} (A1) presents the
+markets) and locates the gap. Chapter~\ref{chap:discovery} presents the
 discovery pipeline that produces the graphs. Chapter~\ref{chap:sensitivity}
-(A2) develops the allocator family and the fixed-graph ablation that make the
+develops the allocator family and the fixed-graph ablation that make the
 research question
-answerable. Chapter~\ref{chap:evaluation} (A3) evaluates: the two
+answerable. Chapter~\ref{chap:evaluation} evaluates: the two
 requirements, the decomposition itself, and how much of it survives rigorous
 inference. Chapter~\ref{chap:conclusion} concludes with limitations,
 broader impact, and future work. Appendix~\ref{app:tables} collects the full

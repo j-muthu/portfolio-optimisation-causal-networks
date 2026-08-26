@@ -7,8 +7,9 @@ Rather than survey the two literatures this project sits between (portfolio
 construction and causal discovery), this chapter analyses in depth the two
 works it directly builds on, one per theme. L\'opez de Prado's Hierarchical
 Risk Parity and backtest-rigour agenda (Section~\ref{sec:hrp-theme}) supplies
-both the allocator whose symmetric clustering step C2 targets and the
-inferential standard C3 adopts. Howard, Lohre and Mudde's causal networks on
+both the allocator whose symmetric clustering step
+Chapter~\ref{chap:sensitivity} targets and the inferential standard
+Chapter~\ref{chap:evaluation} adopts. Howard, Lohre and Mudde's causal networks on
 the S\&P~500 (Section~\ref{sec:howard-theme}) are the closest causal-finance
 work, and stop exactly one step short of the question this thesis asks.
 Section~\ref{sec:cd-tools}
@@ -48,7 +49,8 @@ a sign and magnitude that $B$ does not reciprocate), no correlation-fed
 hierarchical allocator can represent that fact. This is the interface deficit of
 Section~\ref{sec:motivation}: not a flaw of correlation estimation but of
 what the clustering step can accept. Making that interface accept directional
-information, without breaking what makes HRP work, is challenge C2.
+information, without breaking what makes HRP work, is the challenge
+Chapter~\ref{chap:sensitivity} addresses.
 
 The limitation is family-wide, not HRP-specific. HRP seeded a family of
 hierarchical allocators (hierarchical clustering-based asset allocation
@@ -180,7 +182,8 @@ $h(W)=\operatorname{tr}(e^{W\circ W})-d=0$, making DAG learning a continuous
 optimisation; DYNOTEARS \cite{pamfil2020dynotears} extends it to the
 structural VAR $X = XW + \sum_p Y_p A_p + Z$ with acyclicity on the
 contemporaneous $W$ only, and natively supports forbidden-edge lists, which
-is how the directional prior of C1 is enforced. It is the primary method
+is how the directional prior described in Chapter~\ref{chap:discovery} is
+enforced. It is the primary method
 here.
 (ii) Non-Gaussianity identifies direction. The LiNGAM family
 \cite{shimizu2006lingam} exploits non-Gaussian residuals to identify a unique

@@ -1,13 +1,17 @@
 % ============================================================
-\chapter{A2: From Graph to Weights}
+\chapter{From Graph to Weights}
 \label{chap:sensitivity}
 % ============================================================
 
-This chapter presents the allocation machinery (A2, addressing C2) that makes
-the research question answerable: a family of allocators fed the identical
-per-window graph, split
-into controls that can see only the skeleton and treatments
-that can see the orientations. The family is the construction that
+This chapter addresses the challenge of using direction at all. Hierarchical
+allocators consume a symmetric distance, symmetrisation discards the
+orientations, and there is no established way to feed an asymmetric DAG
+adjacency into clustering or risk allocation. The deliverable is the
+allocation machinery that makes the research question answerable: an
+orientation-aware allocator family fed the identical per-window graph, split
+into orientation-blind controls that can see only the skeleton and treatments
+that can see the orientations, assembled into a fixed-graph ablation in which
+orientation is the only treatment variable. The family is the construction that
 discharges
 Requirement 2: without it, the value of orientation cannot be measured at
 all. Section~\ref{sec:symm} states the problem;
