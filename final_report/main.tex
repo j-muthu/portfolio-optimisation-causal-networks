@@ -8,22 +8,7 @@
 \usepackage{array}
 \usepackage{enumitem}
 
-% ------------------------------------------------------------------
-% Allocator names. The stem is what the clustering/ordering step reads
-% (correlation matrix, graph skeleton, or the DAG's topological order),
-% "sem" marks the SEM-implied covariance in the bisection step (sample
-% covariance where absent), so each name names a cell of the crossing
-% in Table~\ref{tab:crossing}. These are display names only: the code,
-% caches and CSVs keep their own tags, and the mapping is mirrored in
-% scripts/plot_phase_ii_figures.py (DISPLAY) -- keep the two in step.
-%   \HRP        <- CORR-HRP   textbook correlation HRP (graph-blind anchor)
-%   \skelsamp   <- D0         skeleton clustering, sample covariance
-%   \skelalt    <- D0s        second symmetrisation of the skeleton
-%   \skelsem    <- D1         skeleton clustering, Sigma_SEM
-%   \orientsamp <- D2         topological ordering, sample covariance
-%   \orientsem  <- D2s        topological ordering, Sigma_SEM
-% NB \HRP is the *allocator*; plain "HRP" in prose is the algorithm.
-% ------------------------------------------------------------------
+% Allocator names
 \newcommand{\HRP}{\textsc{correlation-hrp}}
 \newcommand{\skelsamp}{\textsc{skeleton-hrp}}
 \newcommand{\skelalt}{\textsc{alt-skeleton-hrp}}
@@ -32,71 +17,13 @@
 \newcommand{\orientsem}{\textsc{ordered-sem-hrp}}
 \newcommand{\orientany}{\textsc{direction-aware}}
 
-% ------------------------------------------------------------------
-% Driver-route (HSP) arm. These allocate from neural driver
-% sensitivities, not from the causal graph, so they are a separate
-% family from the allocators above. Display names only; the code,
-% caches and CSVs keep the V* tags, and the mapping is mirrored in
-% scripts/plot_phase_ii_figures.py -- keep the two in step.
-%   \hspbase    <- V0   HSP as published: correlation-selected drivers
-%   \hspcausal  <- V1   the same, with causally-selected drivers
-%   \hsploop    <- V2   \hspcausal plus the closed feedback loop
-% ------------------------------------------------------------------
-\newcommand{\hspbase}{\textsc{hsp-baseline}}
-\newcommand{\hspcausal}{\textsc{causal-hsp}}
-\newcommand{\hsploop}{\textsc{causal-hsp-feedback}}
-
-% Referencing (Vancouver style, mandated)
+% Referencing (Vancouver)
 \addbibresource{references.bib}
 
-% Robust-stats macros (PSR/DSR/SPA/MCS, seed audit, measurement problem),
-% generated over the unified trial universe by
-%   python -m scripts.robust_stats --phase-ii
-% The committed file carries the authoritative values.
+% Robust-stats macros (PSR/DSR/SPA/MCS)
 \input{_generated/robust_stats}
-
-% ------------------------------------------------------------------
-% MARKING GATES (check before every submission build):
-%  1. Main content (Ch1 to end of Ch6) must be <= 60 pages: the page
-%     limit is an absolute cap on the Communication criterion, which in
-%     turn caps the overall mark.
-%  2. Abstract must fit on one page at these margins.
-%  3. Declarations (originality / ethics / GenAI) must be present and
-%     in the front matter.
-%  4. If _generated/robust_stats.tex is regenerated, re-read the
-%     sentences coupled to specific values. Narrowed family: "rejecting
-%     marginally at the two longest windows" / "only at two years"
-%     assume exactly {(i), SkelWthree, SkelWfive, DirWfive} < 0.05 and
-%     every other narrowed p >= 0.05; the marginal-range macro pair
-%     \rsSpaSkelWthree--\rsSpaDirWfive (Ch5 x2, Ch6) assumes SkelWthree
-%     <= DirWfive. Full grid: "rejects nowhere/nothing
-%     rejects" (abstract, Ch1, Ch5 x2, Ch6) assumes every *Pre window
-%     macro >= 0.05; "p >= \rsSpaSkelWfivePre" (abstract) assumes
-%     SkelWfivePre is the minimum of the eight *Pre window p's.
-%     Pooled SPA: "nothing rejects once the window search is priced"
-%     (abstract, Ch5 x2, Ch6 x2) assumes all four \rsSpa*Pooled* macros
-%     >= 0.05. Mechanism controls: the literals "+0.018 to +0.042
-%     (p=0.05 at two years, p >= 0.08 elsewhere)" and "-0.011 to +0.004
-%     (p >= 0.5)" (Ch5 5.3, Ch6 finding list) come
-%     from results/phase_ii_contrasts.csv (D1-D0lw and D1-D0df rows).
-%     Skeleton control: the literals "+0.025 (p=0.008)" / "-0.003
-%     (p=0.86)" / "within +/-0.004, p >= 0.70" (Ch5 5.3, Ch6 x2, Ch1,
-%     abstract) come from the D0pc-D0 and D0pc-CORR rows.
-%     Precision macros: "roughly twice the observed increments" (Ch5
-%     threats, Ch6 limitations) assumes \rsContrastMDETotal ~ 2x the
-%     +0.031 total and \rsContrastMDEOrient ~ 1.5-2x the +0.023
-%     orientation increment.
-%     OOS slice: Table tab:oos literals and "every sign consistent"
-%     (Ch5 sec:oos, Ch6 limitation vi) come from results/oos_contrasts
-%     .csv; "399 trading days"/"19 rebalances" from oos_slice.csv.
-%     HERC: the channel literals (+0.119/+0.131/+0.018/+0.092,
-%     -0.203/-0.193/+0.011/-0.040, p's) in Ch5 and the appendix cells
-%     come from the HERC0-HERCC / HERC1-HERC0 contrast rows and
-%     phase_ii_matrix.csv (method "herc"). DSR macros deflate against
-%     all \rsNtrials trials INCLUDING the 12 HERC cells, so DSR values
-%     dropped when the HERC arm joined; "highest DSR" ordering (D2s@378
-%     > D0df@378 > D1@378) re-verified after the widening.
-% ------------------------------------------------------------------
+% Out-of-sample slice macros (tab:oos)
+\input{_generated/oos_stats}
 
 % Document metadata
 \title{Portfolio Optimisation with Causal Networks}
@@ -108,71 +35,46 @@
 
 \begin{document}
 
-% --- Front matter (does not count towards the 60-page limit) ---
+% Front matter
 \pagenumbering{roman}
 
 \maketitle
 
 \begin{abstract}
-\noindent Hierarchical portfolio allocators cluster assets on a symmetric
-matrix, usually the return correlation matrix. Correlation records
-which assets move together, but not which asset's movement comes first.
-Causal discovery algorithms, by producing a directed graph,
-recover both: a skeleton denoting which pairs are linked, 
-and edge orientations indicating which way influence flows. 
-A small literature discovers such graphs in equity markets, but
-no published work sets hierarchical portfolio weights from a discovered
-graph, so what either aspect of  the graph contributes to a portfolio is
-unknown. This thesis asks: when the correlation matrix in hierarchical
-portfolio allocation is replaced by a causal graph, is there a
-performance improvement, and how much of any improvement is attributable
+\noindent Hierarchical portfolio allocators typically use 
+the return correlation matrix as an input to their allocation. 
+However, this matrix lacks any notion of directionality or causality.
+Causal discovery algorithms ameliorate this, producing
+a directed graph (DAG) which can be decomposed into a skeleton
+(which assets are linked) and edge orientations
+(which assets causally affect others).
+This thesis addresses the following question: when the
+correlation matrix in hierarchical portfolio allocation is
+replaced by a causal graph, is there a performance
+improvement, and how much of any improvement is attributable
 to the graph's skeleton versus its edge orientations?
 
-I answer this by providing an identical graph to allocators 
-that differ only in the amount of information they extract from the graph.
-This isolates the performance gain attributable 
-to the differing information extracted.
-I compare an HRP baseline to two groups of graph-based allocators: 
-skeleton-only and orientation-aware. 
-The two successive differences sum to the total gain over the control. I
-estimate this decomposition over 2007--2024, using four estimation horizons 
-(nine months to two years), on a 99-asset subset of the S\&P~500. 
-DYNOTEARS is the primary causal discovery algorithm used, 
-with VARLiNGAM and ridge-Granger as comparators.
-I measure performance with out-of-sample, net-of-cost annualised Sharpe.
+I answer this question by providing an identical DAG to
+two classes of allocators: one that only takes in the graph's
+skeleton, and one that takes in the whole graph, including its
+edge orientations. This decomposes the performance gain into
+the two aspects of the DAG. I then compare these allocators
+to HRP as a baseline. I estimate this decomposition over 
+2007--2024, using 4 estimation windows 
+(9 months to 2 years), on a 99-asset subset of the S\&P~500. 
+I use DYNOTEARS and VARLiNGAM as causal discovery algorithms,
+with ridge-Granger as a robustness check.
 
-The gain is small and stable in sign: the 40 graph-versus-control cells
-span $-0.025$ to $+0.036$ net Sharpe (median $+0.017$; 36 positive).
-Sign-stability is not significance: Hansen's SPA test rejects nowhere
-over the full allocator grid ($p \geq \rsSpaSkelWfivePre$), only
-marginally at the two longest horizons over a narrower family fixed
-after the results were seen ($p=\rsSpaSkelWthree$, $\rsSpaSkelWfive$),
-and nowhere once a pooled test prices the search across strategies and
-estimation windows jointly. The composition shifts with horizon: the
-skeleton carries most of the gain near the one-year convention, while
-orientation's increment is positive from one year out and largest at the
-longer horizons. Direct controls identify
-the mechanism: a de-factored covariance with no graph reproduces the
-orientation allocators' covariance-channel gain at every window, their
-Deflated Sharpe ratios near-tied at the top of the study, so that gain
-works through market-factor removal, not directional content; a
-graph-free skeleton of matched density fails the same test, so the
-skeleton's one-year gain does need the discovered graph. An
-out-of-sample slice on 2025--26 data, which post-dates
-every design choice, returns the same sign on every
-contrast its protocol specified in advance; at 19 months, signs are
-all it can certify.
-
-The answer is therefore conditional and modest: replacing correlation
-with a DYNOTEARS graph pays, and most of what it pays is available from
-the skeleton alone near the one-year convention. Orientation buys
-robustness to the estimation horizon, but what it adds is reproducible
-by de-factoring alone, and its statistical support is marginal,
-family-dependent, and absent under joint multiplicity pricing. The
-neural driver route this project began from is dominated on every axis,
-its monthly reward being ${\sim}95\%$ noise and its Sharpe moving with
-the network seed, which is why the graph rather than the network is the
-object of study.
+I find that replacing the correlation matrix with a causal DAG
+yields a positive but statistically insignificant increase 
+in the Sharpe ratio. Around the 1-year estimation window,
+the graph's skeleton accounts for most of the performance gain,
+while the edge orientations contribute most at the extremes
+(9 month and 2 year windows). However, the edge orientations'
+contribution is due to the DAG's removal of the common
+market factor, as providing a de-factored covariance matrix
+as an allocator input reproduces the performance gain from the
+edge orientations.
 \end{abstract}
 
 \begin{acknowledgements}
@@ -186,13 +88,13 @@ marker.
 \listoftables
 \clearpage
 
-% --- Main content (60-page limit applies from here) ---
+% Main content
 \pagenumbering{arabic}
 
 % The spine: Ch1 states Q + R1/R2 and operationalises every term; Ch2 positions
-% the three core papers against Q; Ch3 = A1 (discover the graph, C1);
+% HRP, HSP and Howard et al. against Q; Ch3 = A1 (discover the graph, C1);
 % Ch4 = A2 (graph -> weights: CORR control, \skelsamp{} skeleton, \skelsem{}/\orientsamp{}/\orientsem{} orientation
-% family, fixed-graph ablation design, compact HSP driver arm, C2);
+% family, fixed-graph ablation design, C2);
 % Ch5 = A3 (protocol + battery, R1, the decomposition, what survives rigour,
 % threats, C3); Ch6 answers Q in two lines and lists contributions.
 \input{chapters/01_introduction}
@@ -202,7 +104,7 @@ marker.
 \input{chapters/05_evaluation}
 \input{chapters/06_conclusion}
 
-% --- Back matter (does not count towards the 60-page limit) ---
+% End matter
 \clearpage
 \printbibliography[heading=bibintoc, title={References}]
 

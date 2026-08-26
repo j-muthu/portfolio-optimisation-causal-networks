@@ -6,8 +6,7 @@
 This chapter evaluates (A3, addressing C3). Its structure follows the
 logical order in which the research question must be answered. Section~\ref{sec:method} fixes
 how the gain is measured. Section~\ref{sec:r1} tests Requirement 1,
-whether the causal graph improves on the correlation matrix at all, and
-disposes of the driver route the project began from.
+whether the causal graph improves on the correlation matrix at all.
 Section~\ref{sec:decomposition} presents the decomposition of the gain
 into
 skeleton and orientation (the answer to the research question), together with its
@@ -24,8 +23,8 @@ backtest: the fixed 99-name universe, monthly rebalancing over 2007--2024
 windows' longer burn-ins leave 209 and 203), estimation windows of 189, 252,
 378 and 504 trading days for both the graph fit and the sample covariance,
 weights held for 21 trading days, transaction costs of 5\,bps per unit of
-one-way turnover (swept over $\{0,5,10,20\}$\,bps). ``Performance'' always means the \emph{out-of-sample,
-net-of-cost, annualised Sharpe ratio of daily portfolio returns}, reported
+one-way turnover (swept over $\{0,5,10,20\}$\,bps). ``Performance'' always means the out-of-sample,
+net-of-cost, annualised Sharpe ratio of daily portfolio returns, reported
 alongside CAGR, maximum drawdown and mean turnover
 (Table~\ref{tab:return-terms} in Appendix~\ref{app:tables} tabulates them
 for the headline
@@ -37,39 +36,26 @@ block bootstrap \cite{politis1994stationary} (10{,}000 resamples, mean
 block 21
 days), which resamples the joint return panel so cross-strategy correlation
 is preserved. Because daily returns here are heavily non-normal (excess
-kurtosis ${\approx}\,\rsKurtosis$; Figure~\ref{fig:retdist}) and because this
+kurtosis ${\approx}\,\rsKurtosis$; Figure~\ref{fig:retdist},
+Appendix~\ref{app:tables}) and because this
 project evaluated \rsNtrials\ configurations in total (the deflation
 universe deliberately keeps byte-identical duplicates, a conservative
 choice), pairwise
 $p$-values are never taken at face value: every claim is re-adjudicated by
 the battery of Section~\ref{sec:believe-rigour}: Probabilistic and
 Deflated Sharpe ratios \cite{bailey2012psr,bailey2014deflated} (the DSR
-deflating against all \rsNtrials\ trials), White's Reality Check
-\cite{white2000reality}, Hansen's SPA \cite{hansen2005spa} for each
+deflating against all \rsNtrials\ trials), Hansen's SPA
+\cite{hansen2005spa}, the studentised successor of White's Reality
+Check \cite{white2000reality}, for each
 family-wise comparison, and the $90\%$ Model Confidence Set
 \cite{hansen2011mcs}. Regimes are defined by NBER recession dates and
 top/bottom VIX quintiles.
 
-\paragraph{Stability.} Two further checks target the failure modes of the
-incumbent framework specifically. The \emph{seed audit} re-runs the complete
-driver-route pipeline under \rsSeedN\ different neural-network seeds with
-everything else frozen, measuring how much of its performance is
-initialisation noise (Section~\ref{sec:seed-audit}); the graph-based
-allocators need no
-such audit, being deterministic, a
-property verified by the replication gate
+\paragraph{Stability.} Every allocator in the study is deterministic and
+seed-free: two independent end-to-end runs produce identical graphs,
+weights and NAVs, a property verified by the replication gate
 (Section~\ref{sec:ablation-design}). Every number in this chapter comes
 from the pipeline of Section~\ref{sec:cache}.
-
-\begin{figure}[tbp]
-  \centering
-  \includegraphics[width=0.7\textwidth]{figures/returns_distribution.png}
-  \caption{Distribution of daily net returns (pooled across variants) against
-    a fitted normal, log-density axis. The heavy tails (excess kurtosis
-    ${\approx}\,\rsKurtosis$) are why the plain Sharpe ratio is supplemented
-    by the Probabilistic and Deflated Sharpe ratios throughout.}
-  \label{fig:retdist}
-\end{figure}
 
 \section{Requirement 1: the causal graph against the correlation matrix}
 \label{sec:r1}
@@ -94,20 +80,14 @@ common machinery, so they are far from independent draws and no sign-count
 converts into a valid $p$-value. What it establishes is that the gain's
 direction does not depend on the choice of allocator, discovery method or
 window; no cell is individually significant, and inference under the
-panel's dependence structure is delegated to the family-wise test.
-Hansen's SPA over the full allocator grid gives
-$p=\rsSpaSkelWonePre$, $\rsSpaSkelWtwoPre$, $\rsSpaSkelWthreePre$ and
-$\rsSpaSkelWfivePre$ across the four windows: no rejection anywhere.
-Over the narrowed family the report defines, a restriction fixed only
-after these results were seen (Section~\ref{sec:believe-rigour}), the
-same test gives $p=\rsSpaSkelWone$, $\rsSpaSkelWtwo$,
-$\rsSpaSkelWthree$ and $\rsSpaSkelWfive$, crossing the $5\%$ bar at the
-two longest windows. Requirement 1 therefore rests on the sign
+panel's dependence structure is delegated to the family-wise tests of
+Section~\ref{sec:believe-rigour}. In brief: Hansen's SPA rejects
+nowhere over the full allocator grid, and crosses the $5\%$ bar only at
+the two longest windows under a narrowed family fixed after these
+results were seen. Requirement 1 therefore rests on the sign
 consistency and the stable total, not on family-wise significance: the
 causal graph out-performs the correlation matrix by a modest margin at
-every window. The narrowed-family rejections at 18 months and two
-years add suggestive, not confirmatory, support, at a size
-Section~\ref{sec:believe-rigour} weighs. The decomposition that follows
+every window. The decomposition that follows
 does not stand or fall with Requirement 1 in any case: it compares the
 graph-fed allocators against each other on identical inputs, so it
 remains informative about where any gain, whatever its size, comes
@@ -123,94 +103,21 @@ four windows. The
 thesis's claims are contrasts within the family; the anchors size the
 family's absolute edge on this universe as modest.
 
-Two contextual facts inform this reading. First, an earlier phase of this
-project reported the same comparison against \hspbase{}
-(correlation-selected drivers plus neural sensitivities) and found it
-strongly significant ($+0.032$, $p<0.001$; family-wise
-$p=\rsSpaConsistent$). The \HRP{} control explains the discrepancy:
-plain correlation-distance HRP itself beats \hspbase{} ($\rsCorrSharpe$ vs $0.371$
-at
-one year), so the HSP driver-and-network machinery subtracts value
-relative to textbook HRP, and much of the earlier significance was a
-statement about \hspbase{}'s machinery rather than about the correlation matrix.
-Stating the question
-against the stronger control is the more conservative choice, and it
-costs the headline its stars.
-
-\paragraph{The driver route is a documented dead end.} The rest of this
-section disposes of the arm the project began from, because its failure
-motivates allocating from the graph directly. Causal driver selection
-(\hspcausal{})
-beats \hspbase{} at the data-chosen $K{=}17$ ($+0.010$, $p=0.27$) and
-marginally at $K{=}14$ ($+0.003$, $p=0.77$), but trails it at $K=10$, $20$
-and $25$ ($-0.015$, $-0.016$, $-0.010$), so the sign of the difference
-depends on a parameter the data chose (Figure~\ref{fig:ksens}). No
-difference at any $K$ is significant ($p=0.10$--$0.77$). The edge is
-therefore
-$K$-fragile, consistent with the calibration finding that zero drivers
-clear
-FDR-controlled significance (Section~\ref{sec:selection}). The closed loop
-(\hsploop{}) is exactly inert: across the full
-$\alpha\in\{0.4,0.6,0.8\}\times\gamma\in\{0.1,0.3,0.5\}$ grid its weights
-equal open-loop \hspcausal{}'s at every rebalance (Figure~\ref{fig:grid}),
-because the
-utility blend can only re-rank drivers within the causally-selected
-set. Even where it could act, it could not learn: the monthly reward
-$R[t]$ is a Sharpe ratio estimated from 21 daily observations, and across
-215
-rebalances it has mean $\rsRewardMean$ and standard deviation
-$\rsRewardStd$, a per-update signal-to-noise ratio of
-${\approx}\,\rsRewardSNR$. The update frequency is itself the measurement
-problem: a monthly loop receives one number a month that is ${\sim}95\%$
-noise, so no feedback rule at this frequency could extract the signal, and
-a
-redesign would have to raise the update frequency (or lengthen the reward
-window) before touching the learning rule. Together with the seed
-instability quantified in Section~\ref{sec:seed-audit}, the driver route
-is
-dominated on every axis by the graph route, which is
-why the research question is about the graph.
-
-\begin{figure}[tbp]
-  \centering
-  \includegraphics[width=0.97\textwidth]{figures/k_sensitivity.png}
-  \caption{The driver route's $K$-fragility: net Sharpe of \hspbase{} and
-    \hspcausal{}
-    (DYNOTEARS) across the number of selected drivers $K$. The correlation
-    selector's Sharpe varies erratically with $K$ while \hspcausal{} is
-    stable, so the
-    sign of their difference depends on $K$: \hspcausal{} leads at $K=14$
-    and $K=17$ and trails at $K=10$, $20$ and $25$. No
-    difference is significant.}
-  \label{fig:ksens}
-\end{figure}
-
-\begin{figure}[tbp]
-  \centering
-  \includegraphics[width=0.7\textwidth]{figures/feedback_grid.png}
-  \caption{The closed loop is inert: \hsploop{} net Sharpe across the
-    $\alpha\times\gamma$ feedback grid (one-year window) is $0.381$
-    everywhere, identical to open-loop \hspcausal{} to four decimals. The
-    feedback
-    can only re-rank within the causally-selected set, and its monthly reward
-    has signal-to-noise ${\approx}\,\rsRewardSNR$.}
-  \label{fig:grid}
-\end{figure}
-
 \section{The decomposition: skeleton versus orientation}
 \label{sec:decomposition}
 
-\subsection{The decomposition across estimation horizons}
+\subsection{The decomposition across estimation windows}
 
 Figure~\ref{fig:gradient} is the thesis's central result:
 the two components of the decomposition traced across the four estimation
-windows. Figure~\ref{fig:decomp} shows the per-window levels,
-Table~\ref{tab:decomp} the numbers, and Figure~\ref{fig:heatmap} the full
-allocator--method matrix. Three features carry the answer to the research
+windows. Table~\ref{tab:decomp} gives the numbers,
+Figure~\ref{fig:heatmap} the full
+allocator--method matrix, and Figure~\ref{fig:decomp}
+(Appendix~\ref{app:tables}) the per-window levels. Three features carry the answer to the research
 question. First, the
 total causal-graph gain is stable: $+0.018$ to $+0.032$ (\skelsem{}) at
 every
-horizon, rising to $+0.036$ for \orientsem{} at two years. Second, the
+estimation window, rising to $+0.036$ for \orientsem{} at two years. Second, the
 skeleton contribution is hump-shaped ($-0.003$ at nine months, peaking at
 $+0.022$ at the one-year convention, decaying to $+0.009$ at two years) and
 never individually significant ($p \geq 0.14$). Third, the
@@ -220,14 +127,10 @@ $p=0.048$): largest at the two extremes, smallest where the skeleton peaks,
 with 11 of the 12 DYNOTEARS orientation contrasts positive across the grid
 (Figure~\ref{fig:forest}). The two components are roughly complementary,
 which is why the total is flat while its composition shifts. Family-wise,
-Hansen's SPA over the direction-aware variants of both methods against
-the shared skeleton control (\skelsamp{} on DYNOTEARS graphs, the V0$'$
-replication; VARLiNGAM's variants are held to the same benchmark rather
-than their own skeleton)
-gives $p=\rsSpaDirWone$, $\rsSpaDirWtwo$, $\rsSpaDirWthree$ and
-$\rsSpaDirWfive$ across the four windows, rejecting at the $5\%$ level
-only at two years, where the pairwise effect also peaks;
-Section~\ref{sec:believe-rigour} sizes that rejection.
+the direction-aware variants against the shared skeleton control reject
+only at two years, where the pairwise effect also peaks, and only under
+the narrowed family; Section~\ref{sec:believe-rigour} reports both
+families and sizes that rejection.
 
 \paragraph{Anchor-dependence of the shapes.} The contributions above are
 anchored
@@ -240,14 +143,14 @@ becomes $-0.003$/$+0.013$/$+0.006$/$+0.012$ for \skelsem{}
 ($-0.003$/$+0.008$/$+0.010$/$+0.016$ for \orientsem{}; point estimates,
 not formally tested). The two anchors agree that orientation's increment
 is positive at every window from one year out and largest at the longer
-horizons; they disagree at nine months, where the symmetrisation choice
-itself moves the controls by as much as the contributions do (the $+0.025$,
-$p=0.013$ control-versus-control divergence reported under robustness
-below). The hump and the U are therefore \skelsamp{}-anchored
+estimation windows; they disagree at nine months, where \skelalt{}
+beats \skelsamp{} by $+0.025$ ($p=0.013$), the strongest
+control-versus-control divergence in the study. At the shortest window
+the choice of symmetrisation therefore matters as much as orientation
+itself, and the nine-month column is read with that caveat throughout.
+The hump and the U are \skelsamp{}-anchored
 descriptions; the anchor-robust findings are the flat-to-positive
-skeleton gain, the long-horizon orientation increment, and the
-narrowed-family rejections (Section~\ref{sec:believe-rigour}), which
-land on the anchor-robust region.
+skeleton gain and the orientation increment at long estimation windows.
 
 \begin{figure}[tbp]
   \centering
@@ -290,17 +193,6 @@ land on the anchor-robust region.
 
 \begin{figure}[tbp]
   \centering
-  \includegraphics[width=0.99\textwidth]{figures/phase_ii_decomposition.png}
-  \caption{The per-window levels behind Figure~\ref{fig:gradient}
-    (DYNOTEARS graphs, net annualised Sharpe): \HRP{} $\to$ \skelsamp{}
-    ($+$skeleton) $\to$ \skelsem{}/\orientsem{} ($+$orientation) at each estimation window,
-    steps annotated with the pairwise bootstrap $\Delta$ and $p$-value.
-    Section~\ref{sec:believe-rigour} adjudicates these steps family-wise.}
-  \label{fig:decomp}
-\end{figure}
-
-\begin{figure}[tbp]
-  \centering
   \includegraphics[width=0.99\textwidth]{figures/phase_ii_heatmap.png}
   \caption{Net Sharpe by discovery method $\times$ allocator at the four
     windows (boxed column: the symmetrised control \skelsamp{}; panel titles carry
@@ -328,7 +220,7 @@ land on the anchor-robust region.
 \subsection{What orientation contributes}
 \label{sec:orientation-role}
 
-Orientation contributes robustness to the estimation horizon rather than
+Orientation contributes robustness to the estimation window rather than
 level. The skeleton
 allocator's performance is window-fragile ($0.372$--$0.403$ across the four
 windows, and below the control at nine months); \skelsem{}
@@ -353,11 +245,10 @@ the window moves the graph and the sample moments together (both are
 estimated on the same lookback), so the gradient cannot by itself
 separate moment degradation from graph degradation; the stability of the
 discovered graphs across windows (density $6.3$--$6.9\%$ at every
-horizon; Section~\ref{sec:asset-graph}) supports, but does not prove, the
+estimation window; Section~\ref{sec:asset-graph}) supports the
 reading that the moments degrade faster. Second, the nine-month arm of
 the U is anchor-dependent (Section~\ref{sec:decomposition}), so the
-regulariser mechanism is asserted with confidence only on its
-long-horizon arm, where both anchors agree.
+regulariser mechanism is claimed only for the long-window arm.
 
 \paragraph{An alternative explanation, tested directly.} The
 contrast $\skelsem{}-\skelsamp{}$ compares the SEM-implied covariance
@@ -376,7 +267,7 @@ regressed on the window's equal-weight market return, allocation on the
 residual covariance), neither of which sees an edge direction. The
 shrinkage account fails: the Ledoit--Wolf control sits below the plain
 skeleton at every window ($\rsDlwSharpeWone$, $\rsDlwSharpe$,
-$\rsDlwSharpeWthree$, $\rsDlwSharpeWfive$ across the four horizons), and
+$\rsDlwSharpeWthree$, $\rsDlwSharpeWfive$ across the four estimation windows), and
 \skelsem{} beats it by $+0.018$ to $+0.042$ ($p=0.05$ at two years, its
 strongest window; $p \geq 0.08$ elsewhere).
 The de-factoring account succeeds: the de-factored control
@@ -429,10 +320,9 @@ one-year gain does.
 \begin{figure}[tbp]
   \centering
   \includegraphics[width=0.99\textwidth]{figures/phase_ii_nav.png}
-  \caption{Cumulative net NAV, one-year window: the correlation control, the
-    \hspbase{}, the skeleton \skelsamp{}, the orientation-aware \skelsem{}
-    and \orientsem{}, and
-    the driver route \hspcausal{}. All variants absorb the full ${\approx}50\%$ GFC
+  \caption{Cumulative net NAV, one-year window: the correlation control
+    \HRP{}, the skeleton \skelsamp{}, and the orientation-aware \skelsem{}
+    and \orientsem{}. All variants absorb the full ${\approx}50\%$ GFC
     drawdown; the study concerns relative allocation quality, not
     drawdown avoidance.}
   \label{fig:nav}
@@ -467,7 +357,7 @@ one year is.
 is absent at all four windows (4 of 12 contrasts positive, mean $-0.005$;
 Figure~\ref{fig:forest}, right, and the grey series of
 Figure~\ref{fig:gradient}). The decomposition is therefore
-\emph{method-dependent}: DYNOTEARS' jointly-optimised, acyclicity-constrained
+method-dependent: DYNOTEARS' jointly-optimised, acyclicity-constrained
 $W$ supports orientation-aware allocation where VARLiNGAM's ICA-ordered
 $B_0$ does not. This is consistent with VARLiNGAM's identification
 weakening as
@@ -495,91 +385,48 @@ ingredient only the jointly-optimised DYNOTEARS fit supplies. This is a
 refinement of the answer to the research question, not a separate benchmark: ``orientation''
 pays through its weighted, propagatable form.
 
-\paragraph{The controls disagree at the shortest window.} At 189 days the
-two orientation-blind symmetrisations diverge: \skelalt{} beats
-\skelsamp{} by $+0.025$
-($p=0.013$), the strongest control-versus-control divergence in the
-study. The implication is that at the shortest
-window
-the choice of symmetrisation matters as much as orientation itself,
-so the nine-month skeleton and orientation contributions carry an extra layer of
-estimator uncertainty that the anchored decomposition cannot remove; the
-nine-month column is read with that caveat throughout.
-
 \paragraph{A second family member (HERC).} Chapter~\ref{chap:background}'s
 family-wide framing is an interface claim: any hierarchical allocator
 clustering on a symmetric matrix discards orientation, whatever its
-tree-reading rule. Whether the \emph{measured} decomposition generalises
-across tree-reading rules is a separate, empirical question, and I test
-it on a second member with interpretations committed before any cell
-was run (\texttt{PREDICTIONS\_HERC.md}): a full-recursion Hierarchical
-Equal Risk Contribution allocator \cite{raffinot2018herc}, identical to
-the HRP family in clustering stage and cluster-risk measure, but
-descending the dendrogram's actual topology instead of bisecting the
-leaf ordering. Three cells mirror the decomposition (correlation
-control, skeleton member on \skelsamp{}'s distance, orientation member
-on $\Sigma_{\mathrm{SEM}}$; Appendix~\ref{app:tables}). The outcome is
-the mixed reading, and it bounds the generalisation
-informatively. The orientation channel's sign carries: $+0.119$,
-$+0.131$, $+0.018$ and $+0.092$ across the four windows (unadjusted
-bootstrap $p = 0.03$, $0.03$, $0.81$, $0.21$), positive everywhere, as
-under HRP. The skeleton channel's does not ($-0.203$, $-0.193$,
-$+0.011$, $-0.040$; $p \geq 0.16$), and the whole HERC family sits well
-below its HRP counterparts (control $0.245$--$0.325$). The mechanical
-reading is an interface interaction: under the house single-linkage
-pattern the dendrogram is deeply chained, and walking its topology
-compounds roughly a hundred sequential budget splits, which HRP's
-balanced bisection of the ordering never does; the embedding-distance
-tree is evidently more chained still at the shorter windows. The
-decomposition's magnitudes are therefore allocator-specific: what
-generalises to this second member is orientation's sign, not the
-skeleton's contribution, and the family-wide claim is retained only in
+tree-reading rule. Whether the measured decomposition
+generalises across tree-reading rules is a separate, empirical
+question, tested on a second member with interpretations committed
+before any cell was run (\texttt{PREDICTIONS\_HERC.md}): a
+full-recursion Hierarchical Equal Risk Contribution allocator
+\cite{raffinot2018herc}, identical to the HRP family in clustering
+stage and cluster-risk measure but descending the dendrogram's actual
+topology instead of bisecting the leaf ordering. The outcome is mixed
+and bounds the generalisation: the orientation channel's sign carries
+at every window, the skeleton channel's does not, and the whole HERC
+family sits well below its HRP counterparts (cells and contrasts in
+Appendix~\ref{app:tables}). The decomposition's magnitudes are
+therefore allocator-specific: what generalises to this second member
+is orientation's sign, and the family-wide claim is retained only in
 its interface form. All twelve HERC cells join the deflation universe
-and neither SPA family; Raffinot's cluster-cut variant, which prunes
-the walk, is the natural next member to test.
+and neither SPA family.
 
 \subsection{Regime dependence}
 \label{sec:regimes}
 
 The prior-verification result (Section~\ref{sec:discovery-run}) showed
-edge
-assignment matters most in stress windows, motivating the hypothesis
-that orientation-aware allocation would add most value in crises. The
-regime-conditional analysis contradicts this (Figure~\ref{fig:regime};
-Table~\ref{tab:regime-full} gives every variant, including the graph-blind
-controls, so within-regime treatment-versus-control differences can be
-read directly): at
-the
-one-year window the orientation-aware allocators' edge over \hspbase{}
-(the shared weakest baseline, chosen so every variant is visible on one
-scale)
-concentrates
-in the bottom VIX quintile ($+0.22$/$+0.25$ Sharpe for
-\skelsem{}/\orientsem{}) and is
-approximately zero (\skelsem{}) to negative (\orientsem{}) in the top
-quintile, while in NBER
-recessions the skeleton allocator is the strongest and \skelsem{} adds
-nothing. These regime-conditional figures are descriptive; no formal
-regime-level test was run, and conditional Sharpe levels are mechanically
-inflated in the calm regime (the volatility denominator conditions on
-low-VIX days), so only cross-strategy differences within a regime are
-read. A
-plausible reading is that in stress, correlations rise toward one and any
-structure, causal or correlational, is swamped by the common factor,
-while in calm markets cross-sectional causal heterogeneity is the signal.
-Whatever the mechanism, the hypothesis as stated was wrong and is
-reported as such, an outcome that Howard et al.'s stable-regime centrality
-alpha (Section~\ref{sec:howard-theme}) had anticipated.
-
-\begin{figure}[tbp]
-  \centering
-  \includegraphics[width=0.9\textwidth]{figures/phase_ii_regime.png}
-  \caption{Regime-conditional Sharpe excess over \hspbase{} (one-year window).
-    The
-    orientation-aware edge concentrates in the VIX bottom quintile (calm
-    markets), not in stress: the stress hypothesis is rejected.}
-  \label{fig:regime}
-\end{figure}
+edge assignment matters most in stress windows, motivating the
+hypothesis that orientation-aware allocation would add most value in
+crises. The regime-conditional analysis contradicts this: at the
+one-year window the orientation-aware allocators' edge over the \HRP{}
+control concentrates in the bottom VIX quintile ($+0.29$/$+0.31$
+Sharpe for \skelsem{}/\orientsem{}) and is slightly negative in the
+top quintile, while in NBER recessions the skeleton allocator is the
+strongest (Figure~\ref{fig:regime} and Table~\ref{tab:regime-full},
+Appendix~\ref{app:tables}). These figures are descriptive: no formal
+regime-level test was run, and conditional Sharpe levels are
+mechanically inflated in the calm regime, so only within-regime
+differences are read. A plausible reading is that in stress,
+correlations rise toward one and any structure is swamped by the
+common factor, while in calm markets cross-sectional causal
+heterogeneity is the signal. Whatever the mechanism, the hypothesis as
+stated was wrong and is reported as such, an outcome that Howard et
+al.'s stable-regime centrality alpha (Section~\ref{sec:howard-theme})
+had anticipated.
 
 \section{Multiplicity-aware adjudication}
 \label{sec:believe-rigour}
@@ -605,7 +452,7 @@ Section~\ref{sec:orientation-role}. The ordering of the decomposition survives d
 how much of its statistical separation survives is what the family-wise
 tests size next.
 
-\paragraph{Family-wise comparisons (RC/SPA).} Four SPA families
+\paragraph{Family-wise comparisons (SPA).} Two SPA families
 adjudicate the claims with the search priced in, and every window-level
 test is run twice: first over the full allocator grid (all
 seven graph-consuming allocators of the experiment plan, both discovery
@@ -614,19 +461,12 @@ narrower family the report's taxonomy defines (the $2\times2$ crossing
 plus the second symmetrisation control). The narrowing was fixed only
 after the four-window results had been seen, so the full grid's
 numbers are the primary ones and the narrowed family's are reported
-second and labelled as such. Two of the families are single tests:
-\textbf{(i)} causal-structure strategies vs \hspbase{} at one
-year gives $p=\rsSpaConsistent$, significant, but as Section~\ref{sec:r1}
-showed, substantially a verdict on \hspbase{}'s machinery; and
-\textbf{(iv)} the Chapter-\ref{chap:sensitivity} allocator family
-against \hspbase{} gives
-$p=\rsSpaDvarPre$ over the full grid and $\rsSpaDvar$ narrowed,
-significant under neither. The two window-level families, \textbf{(ii)}
-the causal family vs the \HRP{} control and \textbf{(iii)} the
+second and labelled as such. The two families, (i)
+the causal family vs the \HRP{} control and (ii) the
 orientation-aware variants vs the shared skeleton control (\skelsamp{}
 on DYNOTEARS graphs; Section~\ref{sec:decomposition}), are tabulated in
 Table~\ref{tab:spa}, whose final column prices the search across
-strategies \emph{and} the four estimation windows in a single pooled
+strategies and the four estimation windows in a single pooled
 family against the one-year control.
 
 \begin{table}[t]
@@ -642,19 +482,18 @@ family against the one-year control.
     \toprule
     Family & Grid & 189 & 252 & 378 & 504 & Pooled \\
     \midrule
-    (ii) vs \HRP{}      & full     & $\rsSpaSkelWonePre$ & $\rsSpaSkelWtwoPre$ & $\rsSpaSkelWthreePre$ & $\rsSpaSkelWfivePre$ & $\rsSpaSkelPooledPre$ \\
-    (ii) vs \HRP{}      & narrowed & $\rsSpaSkelWone$ & $\rsSpaSkelWtwo$ & $\mathbf{\rsSpaSkelWthree}$ & $\mathbf{\rsSpaSkelWfive}$ & $\rsSpaSkelPooled$ \\
-    (iii) vs \skelsamp{} & full     & $\rsSpaDirWonePre$ & $\rsSpaDirWtwoPre$ & $\rsSpaDirWthreePre$ & $\rsSpaDirWfivePre$ & $\rsSpaDirPooledPre$ \\
-    (iii) vs \skelsamp{} & narrowed & $\rsSpaDirWone$ & $\rsSpaDirWtwo$ & $\rsSpaDirWthree$ & $\mathbf{\rsSpaDirWfive}$ & $\rsSpaDirPooled$ \\
+    (i) vs \HRP{}      & full     & $\rsSpaSkelWonePre$ & $\rsSpaSkelWtwoPre$ & $\rsSpaSkelWthreePre$ & $\rsSpaSkelWfivePre$ & $\rsSpaSkelPooledPre$ \\
+    (i) vs \HRP{}      & narrowed & $\rsSpaSkelWone$ & $\rsSpaSkelWtwo$ & $\mathbf{\rsSpaSkelWthree}$ & $\mathbf{\rsSpaSkelWfive}$ & $\rsSpaSkelPooled$ \\
+    (ii) vs \skelsamp{} & full     & $\rsSpaDirWonePre$ & $\rsSpaDirWtwoPre$ & $\rsSpaDirWthreePre$ & $\rsSpaDirWfivePre$ & $\rsSpaDirPooledPre$ \\
+    (ii) vs \skelsamp{} & narrowed & $\rsSpaDirWone$ & $\rsSpaDirWtwo$ & $\rsSpaDirWthree$ & $\mathbf{\rsSpaDirWfive}$ & $\rsSpaDirPooled$ \\
     \bottomrule
   \end{tabular}
 \end{table}
 
-In sum: under the full grid the
-only rejection is family (i), against the weak incumbent anchor. Every
+In sum: under the full grid nothing rejects. Every
 window-level rejection quoted in this report
-($p=\rsSpaSkelWthree$--$\rsSpaDirWfive$, the longest horizons of
-families (ii) and (iii)) exists only under the post-hoc narrowing.
+($p=\rsSpaSkelWthree$--$\rsSpaDirWfive$, the longest estimation windows of
+families (i) and (ii)) exists only under the post-hoc narrowing.
 The pooled column completes the multiplicity accounting on the axis the
 per-window tests leave unpriced, and it is decisive in the deflationary
 direction: once the window search is priced alongside the strategy
@@ -662,87 +501,52 @@ search, nothing rejects for either family, under either grid
 ($p=\rsSpaSkelPooled$ for the narrowed causal family,
 $\rsSpaDirPooled$ for the narrowed orientation family). The
 window-level rejections are therefore read as
-suggestive rather than established: they coincide with, and add
-modestly to, the sign-consistent point estimates, but the
-full grid's family-wise evidence does not reject anywhere on the
-window grid, and the jointly-priced test does not reject at all.
+suggestive rather than established: they coincide with the peaks of
+the point estimates, but survive neither the full grid nor the joint
+pricing of the window search.
 
 \paragraph{The Model Confidence Set.} The $90\%$ MCS over the
-\rsMcsUniverse\ distinct one-year strategies retains \rsMcsSize\ of them,
-eliminating only \rsMcsExcluded. This is best read as a statement about
-power, not a vindication of everything retained: with seventeen highly
+distinct one-year strategies retains every member of the reported
+family and both graph-blind controls. This is best read as a statement
+about
+power, not a vindication of everything retained: with this many highly
 correlated long-only variants whose Sharpes span $0.35$--$0.41$, the
-equivalence test can only discriminate against the strategy that loses
-consistently, \hspbase{}. The MCS confirms its
-inferiority and otherwise declines to rank the causal family, including
-declining to separate treatments from controls.
-
-\paragraph{The seed audit.}
-\label{sec:seed-audit}
-Re-running the committed driver-route configuration (\hspcausal{}, one-year
-window,
-$K{=}17$) under \rsSeedN\ neural-network seeds (discovery cached, so the
-initialisation is the only varying ingredient) moves its net
-Sharpe across $[\rsSeedMin, \rsSeedMax]$ (median $\rsSeedMedian$;
-Figure~\ref{fig:seed}). The range ($\rsSeedRange$) is more than twice the
-$+0.010$ edge the arm claims over its own baseline, and the committed value
-sits at the $\rsSeedPct$th percentile of its own seed distribution: at
-the unluckiest seed the edge all but vanishes. This quantifies, on this
-pipeline, the concern that neural sensitivity-based results are fragile to
-undisclosed seed choices, and it is the strongest argument for the
-deterministic graph-based family: at the one-year window the audit ran
-at, every DYNOTEARS-graph member of the
-reported family sits above the seed
-cloud's maximum (the headline allocators \skelsamp{}, \skelsem{} and
-\orientsem{} comfortably so)
-and produces identical results on every run
-(Table~\ref{tab:seed-full} gives the full audit).
-
-\begin{figure}[tbp]
-  \centering
-  \includegraphics[width=0.85\textwidth]{figures/phase_ii_seed.png}
-  \caption{The seed audit: net Sharpe of the driver route \hspcausal{} across
-    \rsSeedN\ network seeds (one-year window), against the deterministic
-    graph-based allocators. The seed range exceeds \hspcausal{}'s claimed edge over
-    its baseline; the graph-based allocators shown sit above the seed-cloud
-    maximum.}
-  \label{fig:seed}
-\end{figure}
+equivalence test lacks the power to rank the causal family, including
+separating treatments from controls.
 
 \paragraph{Verdict on the research question, with uncertainty stated.} The decomposition's
 point estimates are clear and internally consistent: a stable total
-gain whose composition shifts with the horizon (skeleton hump-shaped and
+gain whose composition shifts with the estimation window (skeleton hump-shaped and
 peaking at the one-year convention, orientation positive at every window
 and largest at the extremes), with the orientation-aware allocators
 topping the study-wide DSR table. Its statistical support is
 modest and reported at its estimated size: 36 of 40
 graph-versus-correlation cells
 positive; one pairwise-significant orientation cell among twelve
-($p=0.048$) and one suggestive one ($p=0.08$); no family-wise rejection
-anywhere under the full grid; under the post-hoc narrowed
-family only, marginal rejections confined to the longest horizons
-(Requirement 1 at 18 months and two years,
-$p=\rsSpaSkelWthree$ and $\rsSpaSkelWfive$; orientation at two years,
-$p=\rsSpaDirWfive$), coinciding with the peaks of the point
-estimates; and no rejection for either family once the pooled test
+($p=0.048$); no family-wise rejection
+anywhere under the full grid; marginal rejections at the longest
+estimation windows under the post-hoc narrowed family only, coinciding
+with the peaks of the point estimates; and no rejection for either
+family once the pooled test
 prices the window search alongside the strategy search
-(Table~\ref{tab:spa}). The mechanism controls of Section~\ref{sec:orientation-role}
-bound what the orientation edge means: its covariance channel is
-reproduced by a graph-free de-factored covariance, so the defensible
-gain is one of robustness, not of directional information as such. The
-skeleton control sharpens this into an asymmetric verdict: the skeleton
+(Table~\ref{tab:spa}). The mechanism controls of
+Section~\ref{sec:orientation-role} land asymmetrically. The
+orientation channel's covariance gain is
+reproduced by a graph-free de-factored covariance, so it is
+robustness, not directional information as such; the skeleton
 channel's one-year gain is not reproduced by a graph-free skeleton of
-matched density, so what the discovery machinery itself earns is
-concentrated in the skeleton at the conventional window. The
-largest defensible claim is therefore conditional and modest: if one
-replaces the correlation matrix with a DYNOTEARS graph, the skeleton pays
-only near the conventional one-year window; keeping the orientations
-costs nothing and improves robustness to the estimation-horizon choice,
-though the same improvement is available from de-factoring the
-covariance with no graph at all; and the long-horizon edge is suggestive
-under the narrowed family, unsupported under the full grid, and
-dissolves when the window search is priced jointly with the strategy
-search.
+matched density, so the paying region at the conventional window does
+need the discovered graph. The
+largest defensible claim is modest: replacing the correlation
+matrix with a DYNOTEARS graph pays through the skeleton near the
+one-year convention, and keeping the orientations costs nothing while
+improving robustness to the estimation-window choice. The evidence
+does not support attributing the covariance-channel gain to edge
+direction, any orientation effect under VARLiNGAM graphs, or the
+stress hypothesis. That profile, precise sign-consistent point
+estimates whose family-wise support appears only under the post-hoc
+narrowing, and whose leading mechanism a direction-free control
+reproduces, is the finding.
 
 \section{An out-of-sample slice}
 \label{sec:oos}
@@ -758,9 +562,9 @@ were committed before any out-of-sample price was fetched
 (\texttt{PREDICTIONS\_OOS.md}), including this constraint, stated in
 advance: 19 monthly rebalances (399 trading days) put the standard
 error of an annualised Sharpe near $0.8$ and of the pairwise contrasts
-near $0.08$, so \emph{the slice is a sign and magnitude check on the
+near $0.08$, so the slice is a sign and magnitude check on the
 point estimates, and no $p$-value computed on it counts as evidence in
-either direction}. Two protocol notes: CRSP daily data ends 2024-12-31,
+either direction. Two protocol notes: CRSP daily data ends 2024-12-31,
 so the slice's prices come from Yahoo Finance (the source switch is
 confined to the slice and disclosed here), and all 99 names remained
 listed throughout it.
@@ -781,11 +585,11 @@ listed throughout it.
     \cmidrule(lr){2-5}
     Contrast & 189 & 252 & 378 & 504 \\
     \midrule
-    skeleton: \skelsamp{} $-$ \HRP{}          & $+0.057$ & $+0.096$ & $+0.102$ & $+0.144$ \\
-    orientation: \skelsem{} $-$ \skelsamp{}   & $+0.035$ & $+0.076$ & $+0.121$ & $+0.073$ \\
-    orientation: \orientsem{} $-$ \skelsamp{} & $-0.042$ & $+0.009$ & $+0.088$ & $+0.095$ \\
-    total: \skelsem{} $-$ \HRP{}              & $+0.091$ & $+0.172$ & $+0.223$ & $+0.217$ \\
-    residual: \skelsem{} $-$ de-factored      & $-0.011$ & $-0.009$ & $-0.004$ & $+0.020$ \\
+    skeleton: \skelsamp{} $-$ \HRP{}          & $\rsOosSkelWone$ & $\rsOosSkelWtwo$ & $\rsOosSkelWthree$ & $\rsOosSkelWfive$ \\
+    orientation: \skelsem{} $-$ \skelsamp{}   & $\rsOosOrientWone$ & $\rsOosOrientWtwo$ & $\rsOosOrientWthree$ & $\rsOosOrientWfive$ \\
+    orientation: \orientsem{} $-$ \skelsamp{} & $\rsOosOrientBothWone$ & $\rsOosOrientBothWtwo$ & $\rsOosOrientBothWthree$ & $\rsOosOrientBothWfive$ \\
+    total: \skelsem{} $-$ \HRP{}              & $\rsOosTotalWone$ & $\rsOosTotalWtwo$ & $\rsOosTotalWthree$ & $\rsOosTotalWfive$ \\
+    residual: \skelsem{} $-$ de-factored      & $\rsOosResidWone$ & $\rsOosResidWtwo$ & $\rsOosResidWthree$ & $\rsOosResidWfive$ \\
     \bottomrule
   \end{tabular}
 \end{table}
@@ -800,12 +604,11 @@ hump-shaped in sample, is positive at every window here. The mechanism
 reading also carries at point-estimate level: the graph-free
 de-factored control again sits within $0.011$ of \skelsem{} at three
 windows (and $0.020$ below it at two years), so out of sample too the
-covariance channel behaves like de-factoring. Two honesty notes bound
-this. The slice is a strong bull market (control Sharpe levels of
+covariance channel behaves like de-factoring. One honesty note bounds
+this: the slice is a strong bull market (control Sharpe levels of
 $0.78$--$0.92$), so the absolute magnitudes are inflated relative to
-the 2007--2024 panel and are not compared to it; and with contrast
-standard errors near $0.08$, agreement of signs is all the slice can
-certify. Within those limits, every specified sign
+the 2007--2024 panel and are not compared to it. Within the limits
+committed in advance, every specified sign
 came back consistent with the in-sample decomposition, on data that did
 not exist when the design, the family and the question were fixed.
 
@@ -828,23 +631,28 @@ net Sharpe respectively, roughly twice the observed $+0.031$ total and
 $+0.023$ orientation increments. The design could therefore only have
 certified effects about double the size actually observed, and that cuts
 both ways: the
-rejections that do occur are marginal and narrowed-family only
-($p=\rsSpaSkelWthree$--$\rsSpaDirWfive$), and the absence of rejection at
-the shorter horizons is not evidence of absence. At the pairwise level, one
+rejections that do occur are marginal and narrowed-family only, and the
+absence of rejection at
+the shorter estimation windows is not evidence of absence. At the pairwise level, one
 $p=0.048$ cell among twelve orientation contrasts is close to what
 multiplicity predicts under the null, which is why no single cell is
-claimed as a discovery. The orientation effect earns its standing not from
-any single
-cell but from the sign-consistency of the contribution across all four
-windows and both orientation-aware treatments against the primary anchor,
-positive from one year out under the alternative anchor as well
-(Section~\ref{sec:decomposition}), with the narrowed-family rejections
-landing on that anchor-robust region.
+claimed as a discovery; the orientation effect earns its standing from
+the sign-consistency of the contribution across windows and treatments
+(Section~\ref{sec:decomposition}), not from any single cell.
 
 \paragraph{Forking-paths risk.} Three design choices were informed by
 earlier results, and this section is their record. The choice of question
-was informed by the first phase's results. The window grid reached its
-four-horizon form in two stages: the conventional 252- and 504-day windows
+was informed by the results of the project's first phase, which took
+Hierarchical Sensitivity Parity \cite{rodriguez2023hsp}
+(Section~\ref{sec:hrp-theme}) as its starting point and replaced the
+method's correlation-based driver selection with selection from the
+discovered graph. That phase contributes \rsNtrialsPhaseI\ of the
+\rsNtrials\ configurations in the deflation universe, including the two
+skeleton cells that the replication gate of
+Section~\ref{sec:ablation-design} targets; the graph route of this study
+contributes the remaining \rsNtrialsPhaseII. Its two null results are
+recorded in Appendix~\ref{app:hsp}. The window grid reached its
+four-window form in two stages: the conventional 252- and 504-day windows
 were evaluated first, and the 189- and 378-day windows were added when the
 initial results suggested a composition shift that a two-point design
 cannot distinguish from noise. Three disciplines bound the associated
@@ -861,26 +669,26 @@ sits on an added window, while the two-year rejections
 start, which bounds the concern for them.
 
 The third informed choice is the family itself, and it is the most
-consequential. The plan's grid contained seven allocators,
-including the structural-shock risk parity on $\Sigma_{\mathrm{SEM}}$
-and the co-ancestry-distance variant; the narrowing to the five
+consequential. The plan's grid contained seven allocators; the
+narrowing to the five
 allocators of the two-entry-point taxonomy of
 Chapter~\ref{chap:sensitivity} was made after the four-window results
 had been seen. The taxonomy is a principled reason for the smaller
 family (the thesis question is about HRP's two entry points, and those
-two arms enter the graph elsewhere), but the timing means the narrowed
+two arms enter the graph elsewhere: both are further
+orientation-consuming allocators, one replacing the hierarchy with risk
+parity over structural shocks, the other building the clustering
+distance from shared upstream ancestry), but the timing means the narrowed
 family's rejections cannot be read as
 confirmatory, and it is exactly the choice
 the significance turns on: every family-wise number is therefore
-reported for both families in Section~\ref{sec:believe-rigour}, and
-under the full grid nothing on the window axis rejects
-($p=\rsSpaSkelWthreePre$, $\rsSpaSkelWfivePre$, $\rsSpaDirWfivePre$
-where the narrowed family gives $\rsSpaSkelWthree$, $\rsSpaSkelWfive$,
-$\rsSpaDirWfive$). The two excluded arms stay in the deflation universe,
+reported for both families in Table~\ref{tab:spa}, where the full grid
+rejects nowhere on the window axis and the narrowed family supplies
+every rejection. The two excluded arms stay in the deflation universe,
 and their results are directionally consistent with the family they were
 excluded from (above the control in all sixteen of their cells, both
-discovery methods and all four windows, by $+0.002$ to $+0.024$;
-Appendix~\ref{app:tables}), so the exclusion is not results-driven in
+discovery methods and all four windows, by $+0.002$ to $+0.024$), so
+the exclusion is not results-driven in
 direction, but the reader should weigh the narrowed-family rejections
 with the timing in view. Separately, the two mechanism controls of
 Section~\ref{sec:orientation-role} were added after this chapter's
@@ -908,23 +716,5 @@ to future work.
 effect exists under DYNOTEARS graphs only. Until a second discovery method
 reproduces it, the safest interpretation is ``DYNOTEARS' contemporaneous
 structure supports orientation-aware allocation'', not ``causal orientation
-in markets is allocatively valuable''.
-
-\paragraph{What the evidence supports, and does not.} It supports: the
-graph's consistent, modest improvement over the correlation matrix (36 of
-40 cells); the horizon-dependent composition of that gain (skeleton
-hump-shaped, orientation U-shaped and positive throughout); the
-regulariser role of the SEM covariance, now identified by the direct
-controls as de-factoring rather than directional content; a
-narrowed-family edge over the stronger controls at the longest horizons,
-marginal and reported as such; and the dominance of
-deterministic graph-based allocation over the seed-unstable,
-feedback-inert driver route.
-It does not support: any family-wise rejection under the full
-allocator grid; family-wise significance near the one-year
-convention under either family; attribution of the covariance-channel
-gain to edge direction; any orientation effect under VARLiNGAM; or the
-stress hypothesis. That profile, precise point estimates whose
-suggestive family-wise support appears only under a post-hoc narrowing,
-and whose leading mechanism a direction-free control reproduces,
-is the finding.
+in markets is allocatively valuable''. The verdict of
+Section~\ref{sec:believe-rigour} stands as this chapter's summary.

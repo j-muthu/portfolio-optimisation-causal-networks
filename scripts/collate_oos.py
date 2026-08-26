@@ -19,8 +19,7 @@ RESULTS = THESIS_ROOT / "results"
 WINDOWS = (189, 252, 378, 504)
 ALLOCS = ("CORR", "D0", "D0s", "D1", "D2", "D2s", "D0df")
 
-GEN_DIRS = (THESIS_ROOT / "final_report" / "_generated",
-            THESIS_ROOT / "final_report_no_hsp" / "_generated")
+GEN_DIRS = (THESIS_ROOT / "final_report" / "_generated",)
 # Window suffixes follow the robust_stats macro convention.
 WINDOW_SUFFIX = {189: "Wone", 252: "Wtwo", 378: "Wthree", 504: "Wfive"}
 MACRO_STEMS = {"skeleton (D0-CORR)": "rsOosSkel",

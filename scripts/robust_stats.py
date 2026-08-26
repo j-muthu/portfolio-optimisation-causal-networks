@@ -4,7 +4,7 @@ Computes PSR/DSR, White's Reality Check, Hansen's SPA, the Model Confidence
 Set, and the closed-loop reward SNR over every evaluated configuration.
 Reads the gitignored results/<tag>/closed_loop.pkl bundles, so it must run
 locally. Writes results/robust_stats.csv and the _generated/robust_stats.tex
-macros for both report variants.
+macros for the report.
 
 Run:  python -m scripts.robust_stats
 """
@@ -30,10 +30,12 @@ log = logging.getLogger("robust_stats")
 REPO = pathlib.Path(__file__).resolve().parent.parent
 RESULTS = REPO / "results"
 GEN = REPO / "final_report" / "_generated"
-GEN_NO_HSP = REPO / "final_report_no_hsp" / "_generated"
 
 # The trial universe the DSR deflates against. Missing bundles are skipped
-# and logged, so this runs on whatever subset is present.
+# and logged, so this runs on whatever subset is present. The full counts
+# are asserted (as warnings) at load time; the report quotes both.
+EXPECTED_TRIALS_PHASE_I = 41     # HSP driver route: 12 headline + 20 K-sweep + 9 alpha/gamma
+EXPECTED_TRIALS_PHASE_II = 146   # ... plus the 105 graph-route cells (--phase-ii)
 WINDOWS = (252, 504)
 KS = (10, 14, 17, 20, 25)
 AG_GRID = ((0.4, 0.1), (0.4, 0.3), (0.4, 0.5),
@@ -339,9 +341,18 @@ def main(argv: list[str] | None = None) -> None:
                   "gitignored closed_loop.pkl bundles live.", RESULTS)
         return
     n_trials = returns.shape[1]
-    log.info("loaded %d configurations over %d common days", n_trials, len(returns))
-    if not args.phase_ii and n_trials != 41:
-        log.warning("expected 41 trials, loaded %d (partial result set)", n_trials)
+    # Phase split of the deflation universe: Phase I is the HSP driver route
+    # (incl. the two V0prime skeleton cells), Phase II the graph route.
+    phase_i_names = set(_all_trial_tags())
+    n_phase_i = sum(c in phase_i_names for c in returns.columns)
+    n_phase_ii = n_trials - n_phase_i
+    log.info("loaded %d configurations over %d common days (phase I %d, phase II %d)",
+             n_trials, len(returns), n_phase_i, n_phase_ii)
+    expected = EXPECTED_TRIALS_PHASE_II if args.phase_ii else EXPECTED_TRIALS_PHASE_I
+    if n_trials != expected:
+        log.warning("expected %d trials, loaded %d (partial result set); "
+                    "the report's \\rsNtrials and every DSR would change",
+                    expected, n_trials)
 
     # PSR / DSR table over every trial (baseline = V0 at w252).
     baseline = "V0_w252" if "V0_w252" in returns.columns else loaded[0]
@@ -515,12 +526,12 @@ def main(argv: list[str] | None = None) -> None:
     # The informative quantity is who is EXCLUDED from the MCS. Excluded names
     # are rendered with the report's display macros (no codenames in prose).
     display = {
-        "V0": r"\hspbase{}",
+        "V0": "HSP as published",
         "V0prime": r"\skelsamp{}",
-        "V1-DYNOTEARS": r"\hspcausal{}",
-        "V1-VARLiNGAM": r"\hspcausal{} (VARLiNGAM)",
-        "V2-DYNOTEARS": r"\hsploop{}",
-        "V2-VARLiNGAM": r"\hsploop{} (VARLiNGAM)",
+        "V1-DYNOTEARS": "causal-selection HSP",
+        "V1-VARLiNGAM": "causal-selection HSP (VARLiNGAM)",
+        "V2-DYNOTEARS": "closed-loop HSP",
+        "V2-VARLiNGAM": "closed-loop HSP (VARLiNGAM)",
         "CORR-HRP": r"\HRP{}",
         "DYNO-D0": r"\skelsamp{}", "DYNO-D0s": r"\skelalt{}",
         "DYNO-D1": r"\skelsem{}", "DYNO-D2": r"\orientsamp{}",
@@ -552,16 +563,13 @@ def main(argv: list[str] | None = None) -> None:
 
     macros = {
         "rsNtrials": str(n_trials),
+        "rsNtrialsPhaseI": str(n_phase_i),
+        "rsNtrialsPhaseII": str(n_phase_ii),
         "rsKurtosis": _fmt(pooled_excess_kurtosis(returns), 1),
-        # per-variant PSR (vs zero) and DSR, w252
-        "rsVzeroPSR":    _fmt(cell("V0_w252", "psr_vs_zero")),
-        "rsVzeroDSR":    _fmt(cell("V0_w252", "dsr")),
+        # skeleton PSR (vs zero) and DSR, w252. (The other V0-era per-variant
+        # PSR/DSR macros were dropped once no report used them.)
         "rsVprimePSR":   _fmt(cell("V0prime_w252", "psr_vs_zero")),
         "rsVprimeDSR":   _fmt(cell("V0prime_w252", "dsr")),
-        "rsVoneDynoPSR": _fmt(cell("V1-DYNOTEARS_w252", "psr_vs_zero")),
-        "rsVoneDynoDSR": _fmt(cell("V1-DYNOTEARS_w252", "dsr")),
-        "rsVoneVarPSR":  _fmt(cell("V1-VARLiNGAM_w252", "psr_vs_zero")),
-        "rsVoneVarDSR":  _fmt(cell("V1-VARLiNGAM_w252", "dsr")),
         # window suffixes: Wone=189, Wthree=378, Wfive=504; unsuffixed = w252
         "rsCorrSharpe":       _fmt(cell("CORR-HRP_w252", "sharpe_ann")),
         "rsCorrSharpeWone":   _fmt(cell("CORR-HRP_w189", "sharpe_ann")),
@@ -637,7 +645,6 @@ def main(argv: list[str] | None = None) -> None:
         "rsMcsSize":       str(len(mcs_in)),
         "rsMcsUniverse":   str(len(mcs_universe)),
         "rsMcsExcluded":   pretty_excluded,
-        "rsMcsVzeroIn":    "is" if "V0_w252" in mcs_in else "is not",
         # closed-loop measurement problem
         "rsRewardMean": _fmt(mp.get("reward_mean", float("nan"))),
         "rsRewardStd":  _fmt(mp.get("reward_std", float("nan"))),
@@ -654,12 +661,6 @@ def main(argv: list[str] | None = None) -> None:
     write_macros(GEN / "robust_stats.tex", macros)
     print(f"\nsaved → {out_csv}")
     print(f"saved → {GEN}/robust_stats.tex (report macros, unified battery)")
-    if GEN_NO_HSP.parent.is_dir():
-        # rsMcsExcluded names an HSP allocator, unused in the no-HSP report,
-        # so it is emitted empty there.
-        write_macros(GEN_NO_HSP / "robust_stats.tex",
-                     {**macros, "rsMcsExcluded": ""})
-        print(f"saved → {GEN_NO_HSP}/robust_stats.tex (no-HSP variant)")
 
 
 if __name__ == "__main__":

@@ -46,26 +46,9 @@ magnitudes, not to serve as a third full arm.
     \multicolumn{2}{l}{\HRP{} control (windows 189/252/378/504):} &
     \multicolumn{5}{l}{$\rsCorrSharpeWone$ / $\rsCorrSharpe$ /
       $\rsCorrSharpeWthree$ / $\rsCorrSharpeWfive$.} \\
-    \multicolumn{2}{l}{Driver route (windows 252/504):} &
-    \multicolumn{5}{l}{\hspbase{} $0.371/0.370$;\quad \hspcausal{}
-      $0.381/0.371$;\quad
-      \hspcausal{} (VARLiNGAM) $0.399/0.357$.} \\
     \bottomrule
   \end{tabular}
 \end{table}
-
-\paragraph{Allocators narrowed out of the reported
-family.} Two further graph-consuming allocators belonged to the
-full grid but sit outside the two-entry-point taxonomy; the
-narrowing, its timing, and both families' test numbers are disclosed in
-Sections~\ref{sec:believe-rigour} and~\ref{sec:believe}. They are: a
-structural-shock
-risk parity on $\Sigma_{\mathrm{SEM}}$ (net Sharpe $0.400/0.397/0.400/0.387$
-under DYNOTEARS at the four windows; $0.400/0.392/0.394/0.375$ under
-VARLiNGAM) and a co-ancestry-distance variant
-($0.403/0.393/0.406/0.387$; $0.391/0.402/0.397/0.370$). All sixteen
-cells are above the \HRP{} control; both are priced into the
-\rsNtrials-trial deflation universe.
 
 \paragraph{Mechanism controls.} The two direction-free covariance
 controls of Section~\ref{sec:orientation-role} (\skelsamp{}'s clustering,
@@ -88,8 +71,39 @@ of Section~\ref{sec:decomposition} (pre-committed in
 \texttt{PREDICTIONS\_HERC.md}), net Sharpe across the four windows:
 correlation-distance control $0.325/0.320/0.292/0.245$; skeleton member
 (\skelsamp{}'s distance) $0.122/0.128/0.303/0.205$; orientation member
-($\Sigma_{\mathrm{SEM}}$) $0.240/0.259/0.322/0.297$. All twelve cells
+($\Sigma_{\mathrm{SEM}}$) $0.240/0.259/0.321/0.297$. The orientation
+contrast (orientation member $-$ skeleton member) is positive at every
+window: $+0.119$, $+0.131$, $+0.018$, $+0.092$ (unadjusted bootstrap
+$p=0.03$, $0.03$, $0.81$, $0.21$); the skeleton contrast (skeleton
+member $-$ control) is not: $-0.203$, $-0.193$, $+0.011$, $-0.040$
+($p \geq 0.16$). A mechanical reading of the level shortfall is an
+interface interaction: under the house single-linkage pattern the
+dendrogram is deeply chained, and walking its topology compounds
+roughly a hundred sequential budget splits, which HRP's balanced
+bisection never does; Raffinot's cluster-cut variant, which prunes the
+walk, is the natural next member to test. All twelve cells
 join the deflation universe and neither SPA family.
+
+\begin{figure}[tbp]
+  \centering
+  \includegraphics[width=0.99\textwidth]{figures/phase_ii_decomposition.png}
+  \caption{The per-window levels behind Figure~\ref{fig:gradient}
+    (DYNOTEARS graphs, net annualised Sharpe): \HRP{} $\to$ \skelsamp{}
+    ($+$skeleton) $\to$ \skelsem{}/\orientsem{} ($+$orientation) at each estimation window,
+    steps annotated with the pairwise bootstrap $\Delta$ and $p$-value.
+    Section~\ref{sec:believe-rigour} adjudicates these steps family-wise.}
+  \label{fig:decomp}
+\end{figure}
+
+\begin{figure}[tbp]
+  \centering
+  \includegraphics[width=0.7\textwidth]{figures/returns_distribution.png}
+  \caption{Distribution of daily net returns (pooled across variants) against
+    a fitted normal, log-density axis. The heavy tails (excess kurtosis
+    ${\approx}\,\rsKurtosis$) are why the plain Sharpe ratio is supplemented
+    by the Probabilistic and Deflated Sharpe ratios throughout.}
+  \label{fig:retdist}
+\end{figure}
 
 \section{Headline configurations in return terms}
 
@@ -142,13 +156,10 @@ Table~\ref{tab:matrix-full} for orientation.
 
 \begin{table}[h]
   \centering
-  \caption{Transaction-cost sweep (DYNOTEARS): net Sharpe by one-way cost.
-    The covariance-channel increment (\skelsem{}$-$\skelsamp{}) is
-    cost-invariant at both windows; the ordering-route increment
-    (\orientsem{}$-$\skelsamp{}) is cost-invariant at two years but erodes
-    from $+0.004$ to $0.000$ across the sweep at the one-year window,
-    \orientsem{} carrying the family's highest turnover.
-    Turnover is mean one-way per rebalance.}
+  \caption{Transaction-cost sweep (DYNOTEARS): net Sharpe by one-way
+    cost at the one-year and two-year windows. Turnover is mean one-way
+    per rebalance; Section~\ref{sec:decomposition} draws the
+    conclusions.}
   \label{tab:cost}
   \begin{tabular}{l c c c c c}
     \toprule
@@ -166,6 +177,17 @@ Table~\ref{tab:matrix-full} for orientation.
 
 \section{Regime-conditional Sharpe (one-year window)}
 
+\begin{figure}[tbp]
+  \centering
+  \includegraphics[width=0.9\textwidth]{figures/phase_ii_regime.png}
+  \caption{Regime-conditional Sharpe excess over the \HRP{} control
+    (one-year window).
+    The
+    orientation-aware edge concentrates in the VIX bottom quintile (calm
+    markets), not in stress: the stress hypothesis is rejected.}
+  \label{fig:regime}
+\end{figure}
+
 \begin{table}[h]
   \centering
   \caption{Regime-conditional annualised net Sharpe, window 252. High-vol
@@ -181,41 +203,81 @@ Table~\ref{tab:matrix-full} for orientation.
     Variant & All & NBER rec. & NBER exp. & High-vol & Low-vol \\
     \midrule
     \HRP{}     & 0.381 & $-0.589$ & 0.737 & $\mathbf{-1.313}$ & 5.564 \\
-    \hspbase{} & 0.371 & $-0.638$ & 0.731 & $-1.351$ & 5.630 \\
     \skelsamp{} (skeleton)     & 0.403 & $\mathbf{-0.575}$ & 0.758 & $-1.317$ & 5.744 \\
     \skelsem{}                & \textbf{0.411} & $-0.577$ & \textbf{0.762} & $-1.347$ & 5.854 \\
     \orientsem{}               & 0.406 & $-0.606$ & 0.761 & $-1.361$ & \textbf{5.876} \\
-    \hspcausal{} & 0.381 & $-0.616$ & 0.740 & $-1.342$ & 5.642 \\
     \bottomrule
   \end{tabular}
 \end{table}
 
-\section{The seed audit (full table)}
+\section{The first phase: the driver route and its two null results}
+\label{app:hsp}
 
-\begin{table}[h]
+The project's first phase built on Hierarchical Sensitivity Parity (HSP;
+Section~\ref{sec:hrp-theme}) and asked whether replacing its
+correlation-based driver selection with selection from a discovered causal
+graph improves the allocation. Three configurations were evaluated on the
+panel and protocol of Chapter~\ref{chap:evaluation}: HSP as published
+(correlation-selected drivers, neural sensitivities, HRP on the sensitivity
+distance); a causal-selection variant that chooses the $K{=}17$ drivers by
+their aggregate outgoing influence in the DYNOTEARS graph (also run under
+VARLiNGAM); and a closed-loop variant that feeds each month's realised
+excess Sharpe over equal weight back into the driver scores through an
+exponentially weighted utility with blend weight $\alpha$ and decay
+$\gamma$. Over the one- and two-year windows, a sweep over
+$K\in\{10,14,17,20,25\}$ and a $3\times3$ grid over $(\alpha,\gamma)$,
+the phase contributes \rsNtrialsPhaseI\ of the \rsNtrials\ trials in the
+deflation universe (two of them the skeleton cells that the replication
+gate of Section~\ref{sec:ablation-design} targets); the remaining
+\rsNtrialsPhaseII\ are the graph-route cells of this study. Both of the
+phase's results were null.
+
+\paragraph{The claimed improvement is inside the method's own noise.} At
+the one-year window and $K{=}17$, causal selection beats HSP as published
+by $+0.010$ net Sharpe ($p=0.27$); the sign reverses at $K=10$, $20$ and
+$25$ ($-0.015$, $-0.016$, $-0.010$), and no difference at any $K$ is
+significant ($p=0.10$--$0.77$). Re-running the identical causal-selection
+configuration under \rsSeedN\ network seeds, with discovery cached so that
+the initialisation is the only varying ingredient, moves its net Sharpe
+across $[\rsSeedMin, \rsSeedMax]$ (median $\rsSeedMedian$;
+Figure~\ref{fig:seed}). The seed
+range ($\rsSeedRange$) is more than twice the $+0.010$ edge, and the
+committed seed sits at the $\rsSeedPct$th percentile of its own
+distribution, so at the least favourable seed the edge all but vanishes.
+Plain correlation-distance HRP (\HRP{}) beats HSP as published at the same
+window ($\rsCorrSharpe$ against $0.371$), so the driver-and-network
+machinery subtracts value relative to textbook HRP, and the $90\%$ Model
+Confidence Set over the \rsMcsUniverse\ distinct one-year strategies of
+Section~\ref{sec:believe-rigour} retains \rsMcsSize\ of them and
+eliminates only HSP as published. Every graph-route allocator of
+Chapter~\ref{chap:sensitivity} is deterministic, and at the one-year window
+each sits above the seed cloud's maximum.
+
+\begin{figure}[tbp]
   \centering
-  \caption{The seed audit: the committed driver-route configuration
-    (\hspcausal{},
-    window 252, $K{=}17$) re-run under \rsSeedN\ network seeds; only the
-    initialisation varies. Committed value $=$ seed 0.}
-  \label{tab:seed-full}
-  \begin{tabular}{c c c c | c c c c}
-    \toprule
-    Seed & Sharpe & CAGR & MaxDD & Seed & Sharpe & CAGR & MaxDD \\
-    \midrule
-    0 & 0.381 & 5.06\% & $-51.2$\% & 10 & 0.389 & 5.20\% & $-51.0$\% \\
-    1 & 0.392 & 5.24\% & $-51.0$\% & 11 & 0.385 & 5.12\% & $-51.0$\% \\
-    2 & 0.396 & 5.31\% & $-51.2$\% & 12 & 0.390 & 5.20\% & $-50.8$\% \\
-    3 & 0.387 & 5.15\% & $-50.8$\% & 13 & 0.389 & 5.19\% & $-51.1$\% \\
-    4 & 0.394 & 5.26\% & $-50.7$\% & 14 & 0.382 & 5.07\% & $-51.6$\% \\
-    5 & 0.391 & 5.22\% & $-51.4$\% & 15 & 0.375 & 4.95\% & $-52.0$\% \\
-    6 & 0.390 & 5.21\% & $-50.6$\% & 16 & 0.385 & 5.14\% & $-50.6$\% \\
-    7 & 0.387 & 5.14\% & $-50.5$\% & 17 & 0.385 & 5.13\% & $-51.3$\% \\
-    8 & 0.393 & 5.25\% & $-50.5$\% & 18 & 0.394 & 5.28\% & $-50.8$\% \\
-    9 & 0.389 & 5.20\% & $-51.1$\% & 19 & 0.387 & 5.15\% & $-51.1$\% \\
-    \bottomrule
-  \end{tabular}
-\end{table}
+  \includegraphics[width=0.85\textwidth]{figures/phase_ii_seed.png}
+  \caption{The seed audit: net Sharpe of the causal-selection HSP variant
+    across \rsSeedN\ network seeds at the one-year window, against HSP as
+    published (dotted line) and the deterministic graph-route allocators
+    of this study. The seed range exceeds the variant's claimed edge over
+    its baseline, and every graph-route allocator shown sits above the
+    seed cloud's maximum.}
+  \label{fig:seed}
+\end{figure}
+
+\paragraph{The monthly feedback loop cannot learn.} Across the full
+$\alpha\in\{0.4,0.6,0.8\}\times\gamma\in\{0.1,0.3,0.5\}$ grid the
+closed loop's weights equal the open-loop variant's at every rebalance,
+because the utility blend can only re-rank drivers within the causally
+selected set. Even where it could act, its signal is too weak to act on:
+the monthly reward is a Sharpe ratio estimated from 21 daily observations,
+whose sampling standard error is about $\rsSharpeSE$, and across 215
+rebalances it has mean $\rsRewardMean$ and standard deviation
+$\rsRewardStd$, a per-update signal-to-noise ratio of about
+$\rsRewardSNR$. A feedback rule at this frequency receives one number a
+month that is almost entirely noise, so no learning rule could extract the
+signal without lengthening the reward window or raising the update
+frequency.
 
 \section{Universe and driver lists}
 \label{app:universe}
@@ -241,25 +303,22 @@ change; EURUSD, JPYUSD, GBPUSD and CNYUSD log returns. Commodities: WTI,
 Brent, gold, natural gas, silver and copper log returns. Volatility and
 international equity: VIX level; EFA, EEM, EWJ, EWG and EWU log returns.
 (The catalogue's \texttt{hyg\_lqd\_logret} and \texttt{vvix} series are
-excluded, as in Phase I.)
+excluded, as in the first phase.)
 
 \section{Hyperparameters}
 
-For reproducibility, the operative settings. \emph{Discovery:} DYNOTEARS lag
+For reproducibility, the operative settings. Discovery: DYNOTEARS lag
 $p=1$, $\lambda_W=\lambda_A=0.05$, fit-time edge threshold $0.01$ (the
 extraction threshold $\tau$ of Section~\ref{sec:asset-graph} defaults to $0$
 on top of this); VARLiNGAM with lingam pruning disabled (adaptive lasso
 fails at $d>n$); ridge-Granger ridge $\lambda=10^{-2}$ scaled by window length,
 density-matched per window to the paired DYNOTEARS graph.
-\emph{Allocators:} single-linkage where clustering is used;
+Allocators: single-linkage where clustering is used;
 $\Sigma_{\mathrm{SEM}}$ with diagonal shock variances from fit-window
 residuals, nearest-PSD projection and ridge load
 $10^{-6}\operatorname{tr}(\Sigma)/N$; topological tie-break by
-total downstream influence then name. \emph{Driver route:} $K=17$ (Kneedle,
-2006 burn-in); sensitivity networks searched depth $\{1,2\}\times$ width
-$\{16,32,64\}$ by held-out RMSE; feedback grid
-$\alpha\in\{0.4,0.6,0.8\}\times\gamma\in\{0.1,0.3,0.5\}$.
-\emph{Protocol:} 5\,bps one-way (swept $\{0,5,10,20\}$); windows
+total downstream influence then name.
+Protocol: 5\,bps one-way (swept $\{0,5,10,20\}$); windows
 189/252/378/504 trading days; holding and step 21 trading days; 215
 (189- and 252-day windows) / 209 (378-day) / 203 (504-day) rebalances,
 2007-01--2024-11
@@ -279,6 +338,19 @@ rebalances; re-verified on the four-window grid by an exact repeat
 of a 378-day cell). The ablation ran on 1{,}684 cache-verified graph fits
 with a 100\% hit rate; each backtest regenerates in ${\approx}40$ seconds
 from the cache.
+
+\paragraph{Cache mechanics and the determinism defect.} The discovery
+cache is keyed by the exact window bytes, column set, method and
+hyperparameters, with atomic writes; a key miss halts the run rather
+than silently refitting a subtly different graph. The data-determinism
+defect of Section~\ref{sec:cache} arose because EEM's 2003 inception
+fell inside the cache-coverage check's padding window, triggering a
+silent re-download whose auto-adjustment jittered values by
+${\approx}3\times10^{-7}$ run-to-run; the non-convex DYNOTEARS
+optimiser amplified this into graph changes of ${\approx}0.14$ in
+$\lVert W\rVert$, while VARLiNGAM's ICA-on-residuals fits were
+essentially unchanged by the same jitter, a small robustness result in
+its own right.
 
 \paragraph{Environment and data access.} Python~3.13 in the repository's
 virtual environment; \texttt{causalnex} and \texttt{lingam} are vendored
@@ -301,7 +373,7 @@ rather than silently refitting); (3) rebuild the statistics macros with
 generated macro (\path{_generated/robust_stats.tex}) or traceable to a
 committed CSV (\path{results/phase_ii_matrix.csv},
 \path{phase_ii_contrasts.csv}, \path{robust_stats_phase_ii.csv},
-\path{seed_audit.csv}, \path{regime_analysis/},
+\path{regime_analysis/},
 \path{oos_slice.csv}/\path{oos_contrasts.csv}); every figure is
 regenerated by the plotting script above. No result in the 2007--2024
 panel depends on a live network fetch.
