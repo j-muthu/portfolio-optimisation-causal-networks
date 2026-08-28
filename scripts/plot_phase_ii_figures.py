@@ -1,4 +1,4 @@
-"""Phase-II figure set (F1-F7): direction-aware allocation results.
+"""Phase-II figure set (F1-F7): oriented-allocator results.
 
 Regenerated entirely from committed artefacts so the figures always match
 FINDINGS.md. Saved to results/figures/. Window sets come from the matrix
@@ -38,10 +38,10 @@ C = {
 # The reported family. D3/D4 were run but fall outside the crossing.
 ALLOC_ORDER = ["D0", "D0s", "D1", "D2", "D2s"]
 
-# Report display names; CSV tags stay D0/D0s/D1/D2/D2s. Mirrors the \HRP,
-# \skelsamp, ... macros in final_report/main.tex; keep the two in step.
-DISPLAY = {"D0": "skeleton-hrp", "D0s": "alt-skeleton-hrp", "D1": "skeleton-sem-hrp",
-           "D2": "ordered-hrp", "D2s": "ordered-sem-hrp", "CORR-HRP": "correlation-hrp",
+# Report display names; CSV tags stay D0/D0s/D1/D2/D2s. Mirrors the \corrhrp,
+# \skelhrp, ... macros in final_report/main.tex; keep the two in step.
+DISPLAY = {"D0": "skeleton-hrp", "D0s": "undirected-hrp", "D1": "semcov-hrp",
+           "D2": "topo-hrp", "D2s": "topo-semcov-hrp", "CORR-HRP": "correlation-hrp",
            "V0": "hsp-baseline", "V1": "causal-hsp",
            "V2": "causal-hsp-feedback"}
 METHOD_LABEL = {"dynotears": "DYNOTEARS", "varlingam": "VARLiNGAM", "granger": "ridge-Granger"}
@@ -148,8 +148,8 @@ def f3_nav() -> None:
         "correlation-hrp  correlation-distance HRP": ("phase_ii_corr_hrp_w252", "#000000", ":"),
         "hsp-baseline  HSP as published": ("phase_i_v0_w252", C["V0"], "-"),
         "skeleton-hrp  skeleton": ("phase_ii_dynotears_D0_w252", C["D0"], "-"),
-        "skeleton-sem-hrp  SEM-implied covariance": ("phase_ii_dynotears_D1_w252", C["D1"], "-"),
-        "ordered-sem-hrp  causal-ordered + SEM cov.": ("phase_ii_dynotears_D2s_w252", C["D2s"], "-"),
+        "semcov-hrp  SEM-implied covariance": ("phase_ii_dynotears_D1_w252", C["D1"], "-"),
+        "topo-semcov-hrp  topological order + SEM cov.": ("phase_ii_dynotears_D2s_w252", C["D2s"], "-"),
         "causal-hsp  causal drivers + FFNN": ("phase_i_v1_w252", C["V1"], "--"),
     }
     fig, ax = plt.subplots(figsize=(9, 4.2), constrained_layout=True)
@@ -189,7 +189,7 @@ def f4_seed(matrix: pd.DataFrame) -> None:
     v0 = 0.371
     ax.axhline(v0, color=C["V0"], lw=1, ls=":")
     ax.annotate("hsp-baseline", (1.5, v0 + 0.0005), fontsize=8, color=C["V0"])
-    ax.set_xticks(range(4), ["causal-hsp\n(FFNN)", "skeleton-hrp", "skeleton-sem-hrp", "ordered-sem-hrp"], rotation=12, ha="right",
+    ax.set_xticks(range(4), ["causal-hsp\n(FFNN)", "skeleton-hrp", "semcov-hrp", "topo-semcov-hrp"], rotation=12, ha="right",
                fontsize=8)
     ax.set_ylabel("net Sharpe (252-day window)")
     ax.set_title("FFNN-seed variability of the neural driver route vs the seed-free graph-based allocators",
@@ -210,8 +210,8 @@ def f5_regime() -> None:
     regimes = ["nber_recession", "nber_expansion", "high_vol", "low_vol"]
     df = df[df.regime.isin(regimes)]
     base = df[df.variant == "V0"].set_index("regime")["sharpe"]
-    show = [("V0prime", "skeleton-hrp", C["D0"]), ("DYNO-D1", "skeleton-sem-hrp", C["D1"]),
-            ("DYNO-D2s", "ordered-sem-hrp", C["D2s"]),
+    show = [("V0prime", "skeleton-hrp", C["D0"]), ("DYNO-D1", "semcov-hrp", C["D1"]),
+            ("DYNO-D2s", "topo-semcov-hrp", C["D2s"]),
             ("V1-DYNOTEARS", "causal-hsp", C["V1"])]
     fig, ax = plt.subplots(figsize=(8.5, 3.8), constrained_layout=True)
     width = 0.8 / len(show)
@@ -313,7 +313,7 @@ def f7_window_gradient(contrasts: pd.DataFrame) -> None:
                                   constrained_layout=True)
     for (w, d, lo, hi, _), label, color, marker in (
             (skel, "skeleton  (skeleton-hrp − correlation-hrp)", C["D0"], "o"),
-            (orient, "orientation  (skeleton-sem-hrp − skeleton-hrp)", C["D1"], "s")):
+            (orient, "orientation  (semcov-hrp − skeleton-hrp)", C["D1"], "s")):
         ax.errorbar(w, d, yerr=[d - lo, hi - d], fmt=f"-{marker}", ms=6,
                     capsize=3, lw=1.6, color=color, label=label)
     if len(orient_var[0]):

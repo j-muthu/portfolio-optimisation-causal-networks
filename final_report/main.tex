@@ -9,13 +9,16 @@
 \usepackage{enumitem}
 
 % Allocator names
-\newcommand{\HRP}{\textsc{correlation-hrp}}
-\newcommand{\skelsamp}{\textsc{skeleton-hrp}}
-\newcommand{\skelalt}{\textsc{alt-skeleton-hrp}}
-\newcommand{\skelsem}{\textsc{skeleton-sem-hrp}}
-\newcommand{\orientsamp}{\textsc{ordered-hrp}}
-\newcommand{\orientsem}{\textsc{ordered-sem-hrp}}
-\newcommand{\orientany}{\textsc{direction-aware}}
+\newcommand{\corrhrp}{\textsc{correlation-hrp}}
+\newcommand{\skelhrp}{\textsc{skeleton-hrp}}
+\newcommand{\undirhrp}{\textsc{undirected-hrp}}
+\newcommand{\semcovhrp}{\textsc{semcov-hrp}}
+\newcommand{\topohrp}{\textsc{topo-hrp}}
+\newcommand{\toposemcovhrp}{\textsc{topo-semcov-hrp}}
+\newcommand{\oriented}{\textsc{oriented}}
+
+% One-sentence captions; anything further goes in a note under the float
+\newcommand{\floatnote}[1]{\par\vspace{3pt}\begin{minipage}{0.92\textwidth}\footnotesize\emph{Note.} #1\end{minipage}\par}
 
 % Referencing (Vancouver)
 \addbibresource{references.bib}
@@ -141,7 +144,7 @@ the adjacency matrix representation of the graph. The edge
 orientations cannot, as symmetrisation discards directionality,
 so incorporating their information requires novel allocators.
 
-\section{The research question}
+\section{Research question}
 \label{sec:question}
 
 The thesis addresses a central research question:
@@ -183,7 +186,7 @@ Finally, I compare the relative performance gain attributable to
 the graph's skeleton versus its edge orientations using a 
 ``fixed-graph ablation'', where an identical graph $M$ feeds
 a variety of allocators that differ only in the information they
-extract from the graph. The skeleton-only allocator, \skelsamp{},
+extract from the graph. The skeleton-only allocator, \skelhrp{},
 symmetrises $M$ before clustering, while three 
 orientation-aware allocators consume the directed matrix itself
 (either through the allocation step, the ordering step, or both).
@@ -194,7 +197,7 @@ The research question rests on two premises, both of which I test:
     \item There must be a gain to decompose: the causal graph must
     improve on the correlation matrix for portfolio allocation. I test
     this in Section~\ref{sec:r1} by feeding HRP the symmetrised causal
-    graph (the allocator denoted \skelsamp{}) and comparing it with
+    graph (the allocator denoted \skelhrp{}) and comparing it with
     standard sample-correlation HRP. The decomposition remains
     informative even if this premise fails, since it compares graph-fed
     allocators against each other on identical inputs.
@@ -278,9 +281,9 @@ novel contributions below:
     discovery pipeline (attribution; Chapter~\ref{chap:discovery}). 
     The same per-window DYNOTEARS or VARLiNGAM graph feeds several different
     allocators that incrementally take in more information from the DAG,
-    from none (correlational \HRP{}), to skeleton-only, to orientation-aware.
+    from none (\corrhrp{}), to skeleton-only, to orientation-aware.
     This means that each increment isolates one aspect of the graph:
-    the skeleton's contribution is the skeleton-only allocator minus \HRP{}, and the
+    the skeleton's contribution is the skeleton-only allocator minus \corrhrp{}, and the
     orientations' contribution is the orientation-aware allocator minus the
     skeleton-only one. 
     I ensure that the allocators receive the identical graph and are replicable.
@@ -289,11 +292,10 @@ novel contributions below:
     of my research. I provide HRP with two directed inputs, one per step of the
     algorithm. At the allocation step, the sample covariance is replaced by
     the covariance implied by the DAG's structural equation model.
-    At the bisection step, HRP's clustering dendrogram is replaced by
-    the DAG's topological order. The skeleton-only allocator uses the
-    implied covariance (\skelsem{}), then there are two allocators that use
-    the DAG's topological order: \orientsamp{} uses it alone, while
-    \orientsem{} uses both the topological order and the implied covariance.
+    At the clustering (ordering) step, HRP's clustering dendrogram is replaced by
+    the DAG's topological order. \semcovhrp{} uses the
+    implied covariance at the allocation step, \topohrp{} uses the topological ordering at the ordering step, while
+    \toposemcovhrp{} uses both the topological ordering and the implied covariance.
   \item Conducting a pre-registered, controlled evaluation with multiple metrics (Chapter~\ref{chap:evaluation}). Each comparison is tested using
   a stationary block bootstrap \cite{politis1994stationary},
     which resamples the daily return series in blocks so the
@@ -315,37 +317,25 @@ novel contributions below:
     I also test on 2025--2026 out-of-sample data, and check that there is still a positive performance gain for both the skeleton-only allocator over the HRP baseline and the orientation-aware allocators over the skeleton-only allocator, matching the in-sample positive values. 
     As a robustness check, I also rerun the whole experimental design using a second hierarchical allocator, HERC. This verifies whether the conclusions are specifically dependent on HRP as a choice of hierarchical allocator.
 \end{itemize}
+
 \section{Quantified benefits}
 \label{sec:benefits}
 
-All of the numbers below come from the protocol described in
-Section~\ref{sec:question}: net of 5\,bps transaction costs, monthly
-rebalances, 2007--2024. Significance comes from the Politis--Romano
-stationary block bootstrap \cite{politis1994stationary}. I report the
-numbers as they came out, including where the effect is small or zero.
-No published method sets hierarchical portfolio weights from a discovered
-causal graph (Howard et al.\ \cite{howard2025causal} build causal graphs
-on the S\&P~500 but never allocate from them), so there is no external
-number to compare against. The external benchmark is therefore the
-\HRP{} baseline, L\'opez de Prado's published HRP construction, run on the
-identical protocol. Chapter~\ref{chap:evaluation} gives the full detail.
+Below I set out the key numerical results of my research. For further detail, see Chapter~\ref{chap:evaluation}.
 
 \begin{itemize}[itemsep=2pt, topsep=3pt]
-  \item The causal graph improves on the correlation matrix at every
-    estimation window. \skelsem{} beats \HRP{} by $+0.018$ to $+0.032$ net
-    Sharpe across the 4 windows, which is worth $+0.4$ to $+0.7$ percentage
-    points of net CAGR per year. 19 of the 20 DYNOTEARS graph-versus-\HRP{}
-    comparisons are positive (36 of 40 across both discovery methods). At
-    the 378-day window, \orientsem{} has the highest Deflated Sharpe ratio
-    of all \rsNtrials\ configurations I evaluated ($\rsDtwosDSRWthree$). On
-    the 2025--26 out-of-sample data, every sign I specified in advance came
-    back consistent with the in-sample decomposition.
-  \item The edge orientations contribute at every window ($+0.009$ to
+  \item The causal graph yields a performance improvement over the correlation matrix at every
+    estimation window. \semcovhrp{}, the allocator that takes in the DAG's implied covariance at the allocation step, beats \corrhrp{} by $+0.018$ to $+0.032$ Sharpe Ratio (net of 5\,bps transaction costs) across the 4 windows, which is worth $+0.4$ to $+0.7$ percentage
+    points of net CAGR per year. 19 of the 20 comparisons between DYNOTEARS and \corrhrp{}, and 17 of the 20 VARLiNGAM comparisons, are positive. At
+    the 378-day window, \toposemcovhrp{} has the highest Deflated Sharpe ratio
+    out of all \rsNtrials\ configurations I evaluated ($\rsDtwosDSRWthree$). On
+    the 2025--26 out-of-sample data, I predicted that the sign of the performance improvements would match what I found on the in-sample data: at a majority of windows, the majority of marginal gains from edge orientations would be positive, and the total performance gain would also be positive.
+  \item The edge orientations have a positive contribution at every window ($+0.009$ to
     $+0.023$), and most at the 189-day and 504-day extremes. At the
-    504-day window they repair the skeleton-only allocator's collapse
-    (\rsDoneSharpeWfive{} for \skelsem{} against \rsDzeroSharpeWfive{} for
-    \skelsamp{}). This gain is unchanged when costs rise from 0 to 20\,bps,
-    and \skelsem{} trades less than \skelsamp{}. Family-wise, Hansen's SPA
+    504-day window, the skeleton's own contribution falls to a very small amount
+    (\rsDzeroSharpeWfive{} for \skelhrp{} against \rsCorrSharpeWfive{} for
+    \corrhrp{}), but the edge orientations' relatively larger gain compensates for that. This gain is robust to different transaction costs, from 0 to 20\,bps,
+    and \semcovhrp{} trades less than \skelhrp{}. Family-wise, Hansen's SPA
     over the narrowed family gives $p=\rsSpaDirWfive$ at 504 days, and
     nothing rejects once the 4 windows are pooled into one test.
   \item The skeleton contributes $+0.022$ at the 252-day window. There it
@@ -357,7 +347,7 @@ identical protocol. Chapter~\ref{chap:evaluation} gives the full detail.
   \item The mechanism behind the orientation gain is market-factor
     removal. A de-factored covariance built without any graph reproduces
     the orientation gain at every window (the residual is between $-0.011$
-    and $+0.004$), whereas Ledoit--Wolf shrinkage does not (\skelsem{}
+    and $+0.004$), whereas Ledoit--Wolf shrinkage does not (\semcovhrp{}
     beats it by $+0.018$ to $+0.042$). So the gain from the SEM-implied
     covariance comes from its assumption of independent shocks, which
     removes the common market factor, and not from the direction of the
@@ -368,7 +358,7 @@ identical protocol. Chapter~\ref{chap:evaluation} gives the full detail.
     depends on the discovery method. It is absent under VARLiNGAM graphs
     at all 4 windows.
   \item The graph route beats the driver-and-sensitivity route (HSP) that
-    it replaces. Plain \HRP{} (\rsCorrSharpe) already beats HSP as
+    it replaces. Plain \corrhrp{} (\rsCorrSharpe) already beats HSP as
     published ($0.371$) at 252 days on the identical protocol. Every
     graph-route allocator is seed-free, runs in about 40 seconds per
     backtest, and sits above the maximum of HSP's \rsSeedN-seed
@@ -613,7 +603,7 @@ themselves, and the magnitudes fitted to propagate shocks.
 \section{Research gap}
 \label{sec:gap}
 
-Table~\ref{tab:gap} positions the work. The \HRP{} baseline of
+Table~\ref{tab:gap} positions the work. The \corrhrp{} baseline of
 Section~\ref{sec:question} is the HRP row. Reading across the columns:
 HRP fixes the allocator but is blind to direction at the clustering
 step; HSP changes what HRP clusters on, but selects its drivers by
@@ -648,15 +638,14 @@ what this thesis delivers.
 \begin{table}[t]
   \centering
   \small
-  \caption{Positioning against the closest related approaches. The HRP row
-  is the graph-blind \HRP{} baseline of this study.}
+  \caption{Positioning against the closest related approaches.}
   \label{tab:gap}
   \begin{tabular}{l l c c c c}
     \toprule
     Approach & Clusters on & Causal & Weights & Asymmetric & Skeleton vs \\
              &             & discovery? & from graph? & allocation? & orientation? \\
     \midrule
-    HRP \cite{lopezdeprado2016hrp} ($\equiv$ \HRP{}) & correlation & no & n/a & no & n/a \\
+    HRP \cite{lopezdeprado2016hrp} ($\equiv$ \corrhrp{}) & correlation & no & n/a & no & n/a \\
     HSP \cite{rodriguez2023hsp}            & driver sens.\    & no  & no  & no & no \\
     MST/PMFG networks \cite{pozzi2013spread,peralta2016network} & corr.\ network & no & yes & no & n/a \\
     Granger networks \cite{vyrost2019network} & (no clustering) & no & yes & yes & no \\
@@ -664,6 +653,7 @@ what this thesis delivers.
     \textbf{This work}                     & \textbf{causal graph} & \textbf{yes} & \textbf{yes} & \textbf{yes} & \textbf{yes} \\
     \bottomrule
   \end{tabular}
+  \floatnote{The HRP row is the graph-blind \corrhrp{} baseline of this study.}
 \end{table}
 % ===== chapters/03_discovery.tex =====
 % ============================================================
@@ -798,14 +788,9 @@ jointly with the rest, it protects the graph that the allocators use.
 \begin{figure}[tbp]
   \centering
   \includegraphics[width=0.92\textwidth]{figures/directional_prior.png}
-  \caption{Verification of the asset$\to$driver directional prior. Bars:
-    the fraction of total DYNOTEARS edge mass that would fall on
-    implausible asset$\to$driver edges if the prior were removed
-    (35--48\% across the 6 regime windows). Line (right axis): Jaccard
-    overlap of the top drivers by edge mass with versus without the
-    prior. The prior removes a large block of spurious reverse-causation
-    mass, and matters most in the 2008 and 2022 stress regimes.}
+  \caption{Verification of the asset$\to$driver directional prior across the 6 regime windows.}
   \label{fig:prior}
+  \floatnote{Bars: the fraction of total DYNOTEARS edge mass that would fall on implausible asset$\to$driver edges if the prior were removed (35--48\%). Line (right axis): Jaccard overlap of the top drivers by edge mass with versus without the prior. The prior matters most in the 2008 and 2022 stress regimes.}
 \end{figure}
 
 \section{Extracting the asset graph}
@@ -1028,14 +1013,14 @@ stress-window graphs cannot produce a singular input.
 \section{The controls: correlation and skeleton}
 \label{sec:controls}
 
-\paragraph{\HRP{} (the correlation baseline).} This is textbook HRP
+\paragraph{\corrhrp{} (the correlation baseline).} This is textbook HRP
 \cite{lopezdeprado2016hrp}: the distance
 $\sqrt{\tfrac{1}{2}(1-\rho_{ij})}$ on the lookback window's sample
 correlation, with the sample covariance for bisection. It is graph-blind,
 which I verify by unit test (changing the graph cannot change its
 weights), and it anchors the decomposition.
 
-\paragraph{\skelsamp{} (the skeleton control).} The graph replaces the
+\paragraph{\skelhrp{} (the skeleton control).} The graph replaces the
 correlation matrix, but symmetrically. Each asset is embedded by its edge
 profile $e_i = [\,M_{i\cdot},\, M_{\cdot i}\,]$, the clustering distance
 is $D_{ij} = \lVert e_i - e_j \rVert_2$, and bisection uses the sample
@@ -1045,27 +1030,27 @@ leaves all pairwise distances, and hence the dendrogram and the weights,
 unchanged. A unit test enforces this property. The guarantee is exactly
 that and no more. Because $e_i$ keeps outgoing and incoming edges in
 separate halves, reversing an individual edge can move mass between
-halves and change distances. So \skelsamp{} retains each asset's profile
+halves and change distances. So \skelhrp{} retains each asset's profile
 of source and sink roles, which is information the undirected skeleton
 alone does not carry. The control with the stronger guarantee is
-\skelalt{} below, and Chapter~\ref{chap:evaluation} reads the
-decomposition against both. \skelsamp{} coincides with the skeleton
+\undirhrp{} below, and Chapter~\ref{chap:evaluation} reads the
+decomposition against both. \skelhrp{} coincides with the skeleton
 allocator I evaluated in the project's first phase
 (Section~\ref{sec:cache}), which lets me validate the new harness against
 a committed historical result (Section~\ref{sec:ablation-design}).
 
-\paragraph{\skelalt{} (a second symmetrisation).} Hierarchical clustering
+\paragraph{\undirhrp{} (a second symmetrisation).} Hierarchical clustering
 demands a symmetric distance and $M$ is not symmetric, so building a
 skeleton control requires choosing a symmetrisation, and the choice is
 not unique. If the skeleton's measured contribution depended on which
 symmetrisation I chose, it would be a fact about the recipe rather than
-about the skeleton. \skelalt{} is a control on the control. It is the
+about the skeleton. \undirhrp{} is a control on the control. It is the
 same pipeline, but with the $\tfrac{1}{2}(|M|+|M^\top|)$ distance, so
 that two assets are close when a strong link joins them rather than when
-their edge profiles match. Of the two, \skelalt{} has the stronger
+their edge profiles match. Of the two, \undirhrp{} has the stronger
 orientation-blindness guarantee. $\tfrac{1}{2}(|M|+|M^\top|)$ is a
 function of the undirected weighted adjacency alone, so it is invariant
-to reversing any single edge, whereas \skelsamp{}'s embedding is
+to reversing any single edge, whereas \skelhrp{}'s embedding is
 invariant only to reversing all edges at once. Comparing the two tests
 whether ``the skeleton'' has been accidentally identified with one
 particular symmetrisation. Chapter~\ref{chap:evaluation} reports where
@@ -1086,19 +1071,17 @@ completely (Table~\ref{tab:crossing}).
 
 \begin{table}[h]
   \centering
-  \caption{The two entry points, crossed. The row gives where the
-    ordering comes from; the column gives what recursive bisection splits
-    on. \skelsamp{} is the control that takes orientation through
-    neither.}
+  \caption{The two entry points, crossed.}
   \label{tab:crossing}
   \begin{tabular}{l l l}
     \toprule
     Ordering from & splits on sample cov. & splits on $\Sigma_{\mathrm{SEM}}$ \\
     \midrule
-    clustering on the skeleton & \skelsamp{} (control) & \skelsem{} \\
-    topological sort           & \orientsamp{}           & \orientsem{} \\
+    clustering on the skeleton & \skelhrp{} (control) & \semcovhrp{} \\
+    topological sort           & \topohrp{}           & \toposemcovhrp{} \\
     \bottomrule
   \end{tabular}
+  \floatnote{Rows give where the ordering comes from; columns give what recursive bisection splits on. \skelhrp{} is the control that takes orientation through neither.}
 \end{table}
 
 Two points about the rows follow. The first row keeps the clustering
@@ -1106,23 +1089,23 @@ step and feeds it a graph-derived distance. The second removes the
 clustering step entirely, because a DAG already carries an ordering and
 needs no dendrogram to produce one. So what distinguishes the rows is
 where the ordering comes from, not what the clustering step reads. Each
-treatment differs from the control in exactly one respect: \skelsem{} in
-the covariance alone, \orientsamp{} in the ordering alone, and
-\orientsem{} in both. This means the results chapter can identify not
+treatment differs from the control in exactly one respect: \semcovhrp{} in
+the covariance alone, \topohrp{} in the ordering alone, and
+\toposemcovhrp{} in both. This means the results chapter can identify not
 just whether orientation carries value but where. All three are
 long-only, fully invested, deterministic and seed-free. All take the
 identical $(M,\ \text{returns window})$ inputs as the controls. None has
 an analogue in the hierarchical-allocation literature.
 
-\paragraph{\skelsem{} (SEM-implied covariance).} Clustering is as in
-\skelsamp{}. I deliberately hold the ordering at the skeleton, so that
-$\skelsem{}-\skelsamp{}$ isolates orientation's effect on the allocation
+\paragraph{\semcovhrp{} (SEM-implied covariance).} Clustering is as in
+\skelhrp{}. I deliberately hold the ordering at the skeleton, so that
+$\semcovhrp{}-\skelhrp{}$ isolates orientation's effect on the allocation
 step alone. Recursive bisection, however, allocates on
 $\Sigma_{\mathrm{SEM}}$ of Eq.~\eqref{eq:sigma-sem} instead of the sample
 covariance. Orientation enters through the asymmetric shock propagation
 in $B$.
 
-\paragraph{\orientsamp{} / \orientsem{} (causal-ordered bisection).}
+\paragraph{\topohrp{} / \toposemcovhrp{} (causal-ordered bisection).}
 \label{sec:d2}
 Here the clustering step is removed entirely. HRP's dendrogram exists
 only to produce a quasi-diagonalising leaf order, and a DAG supplies an
@@ -1130,12 +1113,12 @@ order natively. I sort the assets from upstream to downstream by a
 topological sort of $M$, with ties broken deterministically by total
 downstream influence $\sum_r |B_{ri}|$ and then by name. The existing
 recursive bisection then runs on that order, with the sample covariance
-(\orientsamp{}) or with $\Sigma_{\mathrm{SEM}}$ (\orientsem{}). This is
+(\topohrp{}) or with $\Sigma_{\mathrm{SEM}}$ (\toposemcovhrp{}). This is
 the most direct response to the observation that one cannot cluster on
 an asymmetric matrix: do not cluster. One subtlety, which the ablation's
 own tests identified, should be recorded. Recursive bisection is
 mirror-invariant: reversing the leaf order reproduces the identical
-partition tree. So \orientsamp{} responds to orientation through the
+partition tree. So \topohrp{} responds to orientation through the
 partition structure the order induces, not through the
 upstream/downstream direction itself.
 
@@ -1152,10 +1135,10 @@ the universe, the calendar, the costs, the covariance-estimation window,
 and the allocator internals downstream of the distance, covariance and
 ordering choice. So orientation is the sole treatment variable, and the
 decomposition is two differences with a common anchor:
-$\skelsamp{}-\HRP{}$ (the skeleton) and $\orientany{}-\skelsamp{}$ (the
+$\skelhrp{}-\corrhrp{}$ (the skeleton) and $\oriented{}-\skelhrp{}$ (the
 orientations). The shared anchor cancels when the two are added,
-$(\skelsamp{}-\HRP{}) + (\orientany{}-\skelsamp{}) =
-\orientany{}-\HRP{}$, so the total causal-graph gain is attributed
+$(\skelhrp{}-\corrhrp{}) + (\oriented{}-\skelhrp{}) =
+\oriented{}-\corrhrp{}$, so the total causal-graph gain is attributed
 without remainder.
 
 The reported grid is 5 graph-consuming allocators $\times$ \{DYNOTEARS,
@@ -1183,7 +1166,7 @@ orientation-sensitivity of every treatment, total-effect and
 SEM-covariance identities against hand-computed cases, and
 topological-order properties on random DAGs. The cache gate: every graph
 fit is verified as a cache hit with zero refits, so no allocator can have
-seen a different graph. The replication gate: \skelsamp{}, run through
+seen a different graph. The replication gate: \skelhrp{}, run through
 the new harness, exactly reproduces the committed first-phase bundle.
 This establishes both that the new machinery is faithful and that the
 pipeline is deterministic end-to-end. Appendix~\ref{app:tables} records
@@ -1191,8 +1174,7 @@ the gates' figures.
 
 \begin{table}[t]
   \centering
-  \caption{The allocator family. All share
-    the universe, calendar, transaction costs and rebalance schedule.}
+  \caption{The allocator family.}
   \label{tab:variants}
   \small
   \setlength{\tabcolsep}{4.5pt}
@@ -1200,14 +1182,15 @@ the gates' figures.
     \toprule
     Allocator & Ordering from & Bisection covariance & Reads orientation? \\
     \midrule
-    \HRP{} & correlation distance & sample & no (graph-blind) \\
-    \skelsamp{}            & graph embedding      & sample & no (transpose-inv.) \\
-    \skelalt{}           & $\tfrac{1}{2}(|M|{+}|M^\top|)$ & sample & no (per-edge inv.) \\
-    \skelsem{}            & graph embedding      & $\Sigma_{\mathrm{SEM}}$ & allocation step \\
-    \orientsamp{}            & topological order    & sample & ordering step \\
-    \orientsem{}           & topological order    & $\Sigma_{\mathrm{SEM}}$ & both steps \\
+    \corrhrp{} & correlation distance & sample & no (graph-blind) \\
+    \skelhrp{}            & graph embedding      & sample & no (transpose-inv.) \\
+    \undirhrp{}           & $\tfrac{1}{2}(|M|{+}|M^\top|)$ & sample & no (per-edge inv.) \\
+    \semcovhrp{}            & graph embedding      & $\Sigma_{\mathrm{SEM}}$ & allocation step \\
+    \topohrp{}            & topological order    & sample & ordering step \\
+    \toposemcovhrp{}           & topological order    & $\Sigma_{\mathrm{SEM}}$ & both steps \\
     \bottomrule
   \end{tabular}
+  \floatnote{All share the universe, calendar, transaction costs and rebalance schedule.}
 \end{table}
 % ===== chapters/05_evaluation.tex =====
 % ============================================================
@@ -1281,16 +1264,16 @@ from the pipeline of Section~\ref{sec:cache}.
 \label{sec:r1}
 
 The first premise asks whether there is any gain to decompose. The
-like-for-like comparison is the graph-blind \HRP{} baseline against the
+like-for-like comparison is the graph-blind \corrhrp{} baseline against the
 causal-graph allocators on the same machinery, at all 4 windows. The
 baseline itself earns $\rsCorrSharpeWone$, $\rsCorrSharpe$,
 $\rsCorrSharpeWthree$ and $\rsCorrSharpeWfive$ at the 189-, 252-, 378-
 and 504-day windows. The decomposition's reference treatment is
-\skelsem{}, which differs from the skeleton control in the allocation
+\semcovhrp{}, which differs from the skeleton control in the allocation
 step alone. It delivers a total causal-graph gain over the baseline of
 $+0.018$, $+0.031$, $+0.030$ and $+0.032$ respectively
-($p=0.43$--$0.11$; Table~\ref{tab:decomp}), and \orientsem{} reaches
-$+0.036$ at 504 days. There are 40 graph-versus-\HRP{} cells (5
+($p=0.43$--$0.11$; Table~\ref{tab:decomp}), and \toposemcovhrp{} reaches
+$+0.036$ at 504 days. There are 40 graph-versus-\corrhrp{} cells (5
 graph-consuming allocators, both discovery methods, 4 windows), and 36 of
 them are above the baseline. Under DYNOTEARS it is 19 of 20; the single
 exception is the skeleton-only allocator at the 189-day window.
@@ -1314,7 +1297,7 @@ identical inputs, so it remains informative about where any gain,
 whatever its size, comes from.
 
 In return terms, the gain is $+0.4$ to $+0.7$ percentage points of net
-CAGR per year ($5.62\%$ against $4.97\%$ for \skelsem{} versus the
+CAGR per year ($5.62\%$ against $4.97\%$ for \semcovhrp{} versus the
 baseline at 252 days; Table~\ref{tab:return-terms}). Two naive anchors
 bound the absolute levels. Equal weight earns $\rsEwSharpe$ and inverse
 variance earns $\rsIvpSharpe$ at 252 days
@@ -1335,8 +1318,8 @@ Table~\ref{tab:decomp} gives the numbers, Figure~\ref{fig:heatmap} the
 full allocator-by-method matrix, and Figure~\ref{fig:decomp}
 (Appendix~\ref{app:tables}) the per-window levels. Three features carry
 the answer to the research question. First, the total causal-graph gain
-is stable: $+0.018$ to $+0.032$ for \skelsem{} at every window, rising
-to $+0.036$ for \orientsem{} at 504 days. Second, the skeleton
+is stable: $+0.018$ to $+0.032$ for \semcovhrp{} at every window, rising
+to $+0.036$ for \toposemcovhrp{} at 504 days. Second, the skeleton
 contribution is hump-shaped ($-0.003$ at 189 days, peaking at $+0.022$
 at 252 days, decaying to $+0.009$ at 504 days), and it is never
 individually significant ($p \geq 0.14$). Third, the orientation
@@ -1353,45 +1336,35 @@ Section~\ref{sec:believe-rigour} reports both families and sizes that
 rejection.
 
 \paragraph{Anchor-dependence of the shapes.} The contributions above are
-measured against \skelsamp{}. Measuring them against \skelalt{} instead,
+measured against \skelhrp{}. Measuring them against \undirhrp{} instead,
 the symmetrisation with the stronger orientation-blindness guarantee
 (Section~\ref{sec:controls}), changes them. The skeleton contribution
 becomes flat ($+0.022$, $+0.018$, $+0.024$, $+0.019$ across the 4
 windows). The orientation contribution becomes
-$-0.003$/$+0.013$/$+0.006$/$+0.012$ for \skelsem{} and
-$-0.003$/$+0.008$/$+0.010$/$+0.016$ for \orientsem{} (point estimates,
+$-0.003$/$+0.013$/$+0.006$/$+0.012$ for \semcovhrp{} and
+$-0.003$/$+0.008$/$+0.010$/$+0.016$ for \toposemcovhrp{} (point estimates,
 not formally tested). The two anchors agree that orientation's increment
 is positive at every window from 1 year out, and largest at the longer
-windows. They disagree at 189 days, where \skelalt{} beats \skelsamp{}
+windows. They disagree at 189 days, where \undirhrp{} beats \skelhrp{}
 by $+0.025$ ($p=0.013$), the strongest control-versus-control divergence
 in the study. So at the shortest window, the choice of symmetrisation
 matters as much as orientation itself, and I read the 189-day column
 with that caveat throughout. The hump and the U are descriptions
-relative to \skelsamp{}. The findings that hold under both anchors are
+relative to \skelhrp{}. The findings that hold under both anchors are
 the flat-to-positive skeleton gain and the orientation increment at long
 estimation windows.
 
 \begin{figure}[tbp]
   \centering
   \includegraphics[width=0.99\textwidth]{figures/phase_ii_window_gradient.png}
-  \caption{The central result: the two components of the decomposition
-    as a function of estimation-window length (DYNOTEARS, net Sharpe).
-    Left: the skeleton contribution (\skelsamp{} $-$ \HRP{}, hump-shaped)
-    and the orientation contribution (\skelsem{} $-$ \skelsamp{}, U-shaped
-    and positive throughout), with $95\%$ block-bootstrap confidence
-    intervals. The VARLiNGAM orientation series (grey) scatters around
-    zero (mean $-0.005$) and dips below it at the 189-day window. Right:
-    the same two contributions stacked. The total gain is stable while
-    its composition shifts. Orientation contributes most where the
-    sample moments feeding the control are weakest.}
+  \caption{The two components of the decomposition as a function of estimation-window length (DYNOTEARS, net Sharpe).}
   \label{fig:gradient}
+  \floatnote{Left: the skeleton contribution (\skelhrp{} $-$ \corrhrp{}) and the orientation contribution (\semcovhrp{} $-$ \skelhrp{}), with $95\%$ block-bootstrap confidence intervals; the VARLiNGAM orientation series (grey) scatters around zero (mean $-0.005$). Right: the same two contributions stacked.}
 \end{figure}
 
 \begin{table}[t]
   \centering
-  \caption{The decomposition (DYNOTEARS): pairwise $\Delta$Sharpe with
-    Politis--Romano $p$-values at each estimation window. The total
-    splits by the shared anchor: total $=$ skeleton $+$ orientation.}
+  \caption{The decomposition (DYNOTEARS): pairwise $\Delta$Sharpe, with Politis--Romano $p$-values in parentheses, at each estimation window.}
   \label{tab:decomp}
   \small
   \setlength{\tabcolsep}{4pt}
@@ -1401,40 +1374,31 @@ estimation windows.
     \cmidrule(lr){2-5}
     Contrast & 189 & 252 & 378 & 504 \\
     \midrule
-    skeleton: \skelsamp{} $-$ \HRP{} & $-0.003$ (0.85) & $+0.022$ (0.14) & $+0.018$ (0.24) & $+0.009$ (0.53) \\
-    orientation, allocation step: \skelsem{} $-$ \skelsamp{}     & $+0.021$ (0.08) & $+0.009$ (0.45) & $+0.012$ (0.31) & $+0.023$ (0.048) \\
-    orientation, both steps: \orientsem{} $-$ \skelsamp{}   & $+0.021$ (0.19) & $+0.003$ (0.82) & $+0.017$ (0.29) & $+0.027$ (0.057) \\
+    skeleton: \skelhrp{} $-$ \corrhrp{} & $-0.003$ (0.85) & $+0.022$ (0.14) & $+0.018$ (0.24) & $+0.009$ (0.53) \\
+    orientation, allocation step: \semcovhrp{} $-$ \skelhrp{}     & $+0.021$ (0.08) & $+0.009$ (0.45) & $+0.012$ (0.31) & $+0.023$ (0.048) \\
+    orientation, both steps: \toposemcovhrp{} $-$ \skelhrp{}   & $+0.021$ (0.19) & $+0.003$ (0.82) & $+0.017$ (0.29) & $+0.027$ (0.057) \\
     \midrule
-    total: \skelsem{} $-$ \HRP{}   & $+0.018$ (0.43) & $+0.031$ (0.15) & $+0.030$ (0.15) & $+0.032$ (0.11) \\
-    total: \orientsem{} $-$ \HRP{} & $+0.019$ (0.42) & $+0.026$ (0.24) & $+0.035$ (0.10) & $+0.036$ (0.077) \\
+    total: \semcovhrp{} $-$ \corrhrp{}   & $+0.018$ (0.43) & $+0.031$ (0.15) & $+0.030$ (0.15) & $+0.032$ (0.11) \\
+    total: \toposemcovhrp{} $-$ \corrhrp{} & $+0.019$ (0.42) & $+0.026$ (0.24) & $+0.035$ (0.10) & $+0.036$ (0.077) \\
     \bottomrule
   \end{tabular}
+  \floatnote{The total splits by the shared anchor: total $=$ skeleton $+$ orientation.}
 \end{table}
 
 \begin{figure}[tbp]
   \centering
   \includegraphics[width=0.99\textwidth]{figures/phase_ii_heatmap.png}
-  \caption{Net Sharpe by discovery method and allocator at the 4
-    windows. The boxed column is the symmetrised control \skelsamp{}, and
-    the panel titles give the \HRP{} baseline. The DYNOTEARS
-    orientation-aware cells (\skelsem{}, \orientsem{}) are strong at
-    every window, and \orientsem{} at 378 days (0.419) is the best in
-    the study. The VARLiNGAM rows show no orientation effect anywhere.}
+  \caption{Net Sharpe by discovery method and allocator at the 4 windows.}
   \label{fig:heatmap}
+  \floatnote{The boxed column is the skeleton control \skelhrp{}; panel titles give the \corrhrp{} baseline. \toposemcovhrp{} at 378 days (0.419) is the best in the study.}
 \end{figure}
 
 \begin{figure}[tbp]
   \centering
   \includegraphics[width=0.99\textwidth]{figures/phase_ii_forest.png}
-  \caption{The fixed-graph orientation effect: $\Delta$Sharpe of each
-    orientation-aware allocator against the skeleton control \skelsamp{}
-    at all 4 windows, with $95\%$ block-bootstrap confidence intervals
-    ($\ast$: $p<0.05$). 11 of the 12 DYNOTEARS contrasts are positive
-    (\skelsem{} is starred at 504 days). The VARLiNGAM contrasts scatter
-    around zero (4 of 12 positive). The starred \skelalt{} cell at the
-    189-day window is a control-versus-control divergence, discussed in
-    the text.}
+  \caption{$\Delta$Sharpe of each orientation-aware allocator against the skeleton control \skelhrp{} at all 4 windows.}
   \label{fig:forest}
+  \floatnote{$95\%$ block-bootstrap confidence intervals; $\ast$: $p<0.05$. 11 of the 12 DYNOTEARS contrasts are positive, against 4 of the 12 VARLiNGAM contrasts. The starred \undirhrp{} cell at 189 days is a control-versus-control divergence, discussed in the text.}
 \end{figure}
 
 \subsection{What orientation contributes}
@@ -1443,7 +1407,7 @@ estimation windows.
 Orientation contributes robustness to the estimation window rather than
 a higher level of performance. The skeleton allocator's performance is
 window-fragile ($0.372$--$0.403$ across the 4 windows, and below the
-baseline at 189 days). \skelsem{} ($0.395$--$0.415$) and \orientsem{}
+baseline at 189 days). \semcovhrp{} ($0.395$--$0.415$) and \toposemcovhrp{}
 ($0.399$--$0.419$) are strong everywhere (Figure~\ref{fig:nav} shows the
 252-day NAV paths). The U-shape of Figure~\ref{fig:gradient} indicates
 when orientation pays: when the sample moments feeding the allocator are
@@ -1469,7 +1433,7 @@ the U depends on the anchor (Section~\ref{sec:decomposition}), so I claim
 the regulariser mechanism only for the long-window arm.
 
 \paragraph{An alternative explanation, tested directly.} The contrast
-$\skelsem{}-\skelsamp{}$ compares the SEM-implied covariance against the
+$\semcovhrp{}-\skelhrp{}$ compares the SEM-implied covariance against the
 sample covariance. However, $\Sigma_{\mathrm{SEM}}$ differs from the
 sample covariance in more ways than direction. It is a structured
 estimator with far fewer effective parameters, so it behaves like
@@ -1488,12 +1452,12 @@ uses the residual covariance. Neither control sees an edge direction.
 The shrinkage account fails. The Ledoit--Wolf control sits below the
 plain skeleton allocator at every window ($\rsDlwSharpeWone$,
 $\rsDlwSharpe$, $\rsDlwSharpeWthree$, $\rsDlwSharpeWfive$ across the 4
-windows), and \skelsem{} beats it by $+0.018$ to $+0.042$ ($p=0.05$ at
+windows), and \semcovhrp{} beats it by $+0.018$ to $+0.042$ ($p=0.05$ at
 504 days, its strongest window; $p \geq 0.08$ elsewhere). The
 de-factoring account succeeds. The de-factored control
 ($\rsDdfSharpeWone$, $\rsDdfSharpe$, $\rsDdfSharpeWthree$,
 $\rsDdfSharpeWfive$) reproduces the covariance-step gain at every
-window, leaving a residual of \skelsem{} minus control between $-0.011$
+window, leaving a residual of \semcovhrp{} minus control between $-0.011$
 and $+0.004$ ($p \geq 0.5$ throughout). Following the reading I
 committed in advance, I do not attribute the covariance-step gain to
 directional content. The operative ingredient of $\Sigma_{\mathrm{SEM}}$
@@ -1510,12 +1474,12 @@ ingredient is the de-factoring, not the direction of the edges.
 
 \paragraph{The skeleton, given the same treatment.} The covariance
 controls discipline the orientation gain, and symmetry demands the same
-scepticism of the skeleton gain. Its gain over \HRP{} ($+0.022$ at 252
+scepticism of the skeleton gain. Its gain over \corrhrp{} ($+0.022$ at 252
 days) could in principle be reproduced by any sparse
 conditional-dependence structure of the same density, with no discovery
 at all. A third control tests this directly, again with interpretations
 committed before it was run
-(\texttt{PREDICTIONS\_SKELETON\_CONTROL.md}). It is \skelsamp{}'s
+(\texttt{PREDICTIONS\_SKELETON\_CONTROL.md}). It is \skelhrp{}'s
 construction with the discovered skeleton replaced by a thresholded
 partial-correlation matrix. I invert a Ledoit--Wolf covariance to get a
 precision matrix, keep the largest-magnitude cells, and match the
@@ -1536,19 +1500,16 @@ step needs no graph, because de-factoring reproduces it. The skeleton's
 \begin{figure}[tbp]
   \centering
   \includegraphics[width=0.99\textwidth]{figures/phase_ii_nav.png}
-  \caption{Cumulative net NAV at the 252-day window: the correlation
-    baseline \HRP{}, the skeleton allocator \skelsamp{}, and the
-    orientation-aware \skelsem{} and \orientsem{}. All variants absorb
-    the full ${\approx}50\%$ GFC drawdown. The study concerns relative
-    allocation quality, not drawdown avoidance.}
+  \caption{Cumulative net NAV at the 252-day window for \corrhrp{}, \skelhrp{}, \semcovhrp{} and \toposemcovhrp{}.}
   \label{fig:nav}
+  \floatnote{All variants absorb the full ${\approx}50\%$ GFC drawdown; the study concerns relative allocation quality, not drawdown avoidance.}
 \end{figure}
 
 \subsection{Robustness to design parameters}
 
 \paragraph{Sparsity ($\tau$).} Thresholding the graph at
 $\tau\in\{0,0.01,0.05,0.10\}$ leaves the treatment flat to slightly
-better (\orientsamp{}: $0.399\to0.402$ at the heaviest threshold), while
+better (\topohrp{}: $0.399\to0.402$ at the heaviest threshold), while
 the skeleton control drifts down ($0.403\to0.394$;
 Table~\ref{tab:tau}). So the orientation-aware allocators are not
 artefacts of the regularisation threshold. These sweep differences are
@@ -1556,11 +1517,11 @@ point estimates; I did not test them formally.
 
 \paragraph{Costs and turnover.} The gain from the covariance step is
 unchanged by costs, at least in point estimates.
-\skelsem{}$-$\skelsamp{} at 504 days moves from $+0.022$ to $+0.025$ as
+\semcovhrp{}$-$\skelhrp{} at 504 days moves from $+0.022$ to $+0.025$ as
 costs rise from 0 to 20\,bps (differences on unrounded series;
-Table~\ref{tab:cost}). This is because \skelsem{}'s turnover ($0.102$
+Table~\ref{tab:cost}). This is because \semcovhrp{}'s turnover ($0.102$
 one-way per rebalance) is below the control's ($0.112$). The claim does
-not extend to the ordering route at short windows. \orientsem{} has the
+not extend to the ordering route at short windows. \toposemcovhrp{} has the
 family's highest turnover ($0.140$), and its 252-day increment erodes
 from $+0.004$ at zero cost to $0.000$ at 20\,bps, though its 504-day
 increment survives the sweep. So the covariance step does not win by
@@ -1585,8 +1546,8 @@ edge and a fitted magnitude for it, so its cells alone cannot show which
 of the two the orientation effect uses. The ridge-Granger control
 separates them: it preserves a usable ordering while degrading the
 magnitudes. On its graphs, causal-ordered bisection survives
-(\orientsamp{} $=0.393$ against DYNOTEARS' $0.399$), while the
-SEM-covariance allocator collapses (\skelsem{} $=0.352$; a gap of
+(\topohrp{} $=0.393$ against DYNOTEARS' $0.399$), while the
+SEM-covariance allocator collapses (\semcovhrp{} $=0.352$; a gap of
 $-0.060$, $p=0.11$). A ridge-VAR coefficient matrix carries a
 serviceable ordering but not structural effect sizes. So the
 dissociation indicates that orientation's contribution does not lie in
@@ -1624,9 +1585,9 @@ The prior-verification result (Section~\ref{sec:discovery-run}) showed
 that edge assignment matters most in stress windows. This motivated the
 hypothesis that orientation-aware allocation would add most value in
 crises. The regime-conditional analysis contradicts this. At the 252-day
-window, the orientation-aware allocators' edge over the \HRP{} baseline
+window, the orientation-aware allocators' edge over the \corrhrp{} baseline
 concentrates in the bottom VIX quintile ($+0.29$/$+0.31$ Sharpe for
-\skelsem{}/\orientsem{}) and is slightly negative in the top quintile.
+\semcovhrp{}/\toposemcovhrp{}) and is slightly negative in the top quintile.
 In NBER recessions the skeleton allocator is the strongest
 (Figure~\ref{fig:regime} and Table~\ref{tab:regime-full},
 Appendix~\ref{app:tables}). These figures are descriptive. I ran no
@@ -1647,13 +1608,13 @@ that their centrality alpha lives in stable regimes
 
 \paragraph{Non-normality and selection bias (PSR/DSR).} Every headline
 allocator's Probabilistic Sharpe ratio, the probability that its true
-Sharpe exceeds zero given the sample's higher moments, is high (\HRP{}
-$\rsCorrPSR$, \skelsamp{} $\rsVprimePSR$, \skelsem{} $\rsDonePSR$ at 252
+Sharpe exceeds zero given the sample's higher moments, is high (\corrhrp{}
+$\rsCorrPSR$, \skelhrp{} $\rsVprimePSR$, \semcovhrp{} $\rsDonePSR$ at 252
 days). So the levels are not fat-tail artefacts. I then deflate against
 the best Sharpe expected from \rsNtrials\ no-skill trials. The study's
-highest Deflated Sharpe ratio belongs to \orientsem{} at the 378-day
+highest Deflated Sharpe ratio belongs to \toposemcovhrp{} at the 378-day
 window ($\rsDtwosDSRWthree$), followed by the direction-free de-factored
-control ($\rsDdfDSRWthree$) and \skelsem{} ($\rsDoneDSRWthree$), against
+control ($\rsDdfDSRWthree$) and \semcovhrp{} ($\rsDoneDSRWthree$), against
 the baseline's $\rsCorrDSR$ and the skeleton's $\rsVprimeDSR$. The top
 of the deflation table is filled by the orientation-aware cells and the
 de-factored control that mimics them, which is itself consistent with
@@ -1670,32 +1631,29 @@ taxonomy defines (the $2\times2$ crossing plus the second symmetrisation
 control). I fixed the narrowing only after the 4-window results had been
 seen, so the full grid's numbers are the primary ones and the narrowed
 family's are reported second and labelled as such. The two families are
-(i) the causal family against the \HRP{} baseline and (ii) the
+(i) the causal family against the \corrhrp{} baseline and (ii) the
 orientation-aware allocators against the shared skeleton control
-(\skelsamp{} on DYNOTEARS graphs; Section~\ref{sec:decomposition}).
+(\skelhrp{} on DYNOTEARS graphs; Section~\ref{sec:decomposition}).
 Table~\ref{tab:spa} tabulates them. Its final column accounts for the
 search across both strategies and the 4 estimation windows in a single
 pooled family against the 252-day baseline.
 
 \begin{table}[t]
   \centering
-  \caption{Hansen's SPA consistent $p$-values by family, window and
-    grid. ``Pooled'' runs one SPA whose candidate set is the union of
-    the family's cells at all 4 windows against the family's 252-day
-    baseline, so it accounts for the strategy search and the window
-    search jointly. Bold: $p<0.05$.}
+  \caption{Hansen's SPA consistent $p$-values by family, window and grid.}
   \label{tab:spa}
   \small
   \begin{tabular}{l l c c c c c}
     \toprule
     Family & Grid & 189 & 252 & 378 & 504 & Pooled \\
     \midrule
-    (i) vs \HRP{}      & full     & $\rsSpaSkelWonePre$ & $\rsSpaSkelWtwoPre$ & $\rsSpaSkelWthreePre$ & $\rsSpaSkelWfivePre$ & $\rsSpaSkelPooledPre$ \\
-    (i) vs \HRP{}      & narrowed & $\rsSpaSkelWone$ & $\rsSpaSkelWtwo$ & $\mathbf{\rsSpaSkelWthree}$ & $\mathbf{\rsSpaSkelWfive}$ & $\rsSpaSkelPooled$ \\
-    (ii) vs \skelsamp{} & full     & $\rsSpaDirWonePre$ & $\rsSpaDirWtwoPre$ & $\rsSpaDirWthreePre$ & $\rsSpaDirWfivePre$ & $\rsSpaDirPooledPre$ \\
-    (ii) vs \skelsamp{} & narrowed & $\rsSpaDirWone$ & $\rsSpaDirWtwo$ & $\rsSpaDirWthree$ & $\mathbf{\rsSpaDirWfive}$ & $\rsSpaDirPooled$ \\
+    (i) vs \corrhrp{}      & full     & $\rsSpaSkelWonePre$ & $\rsSpaSkelWtwoPre$ & $\rsSpaSkelWthreePre$ & $\rsSpaSkelWfivePre$ & $\rsSpaSkelPooledPre$ \\
+    (i) vs \corrhrp{}      & narrowed & $\rsSpaSkelWone$ & $\rsSpaSkelWtwo$ & $\mathbf{\rsSpaSkelWthree}$ & $\mathbf{\rsSpaSkelWfive}$ & $\rsSpaSkelPooled$ \\
+    (ii) vs \skelhrp{} & full     & $\rsSpaDirWonePre$ & $\rsSpaDirWtwoPre$ & $\rsSpaDirWthreePre$ & $\rsSpaDirWfivePre$ & $\rsSpaDirPooledPre$ \\
+    (ii) vs \skelhrp{} & narrowed & $\rsSpaDirWone$ & $\rsSpaDirWtwo$ & $\rsSpaDirWthree$ & $\mathbf{\rsSpaDirWfive}$ & $\rsSpaDirPooled$ \\
     \bottomrule
   \end{tabular}
+  \floatnote{``Pooled'' runs one SPA whose candidate set is the union of the family's cells at all 4 windows against the family's 252-day baseline, so it accounts for the strategy search and the window search jointly. Bold: $p<0.05$.}
 \end{table}
 
 In summary, under the full grid nothing rejects. Every window-level
@@ -1773,11 +1731,7 @@ throughout it.
 
 \begin{table}[t]
   \centering
-  \caption{Out-of-sample contrasts (net $\Delta$Sharpe,
-    2025-01 to 2026-07, point estimates only). Every sign the protocol
-    specified in advance is consistent with the in-sample decomposition.
-    At this sample length the contrast standard errors are roughly
-    $0.08$, so I do not interpret the magnitudes.}
+  \caption{Out-of-sample contrasts (net $\Delta$Sharpe, 2025-01 to 2026-07, point estimates only).}
   \label{tab:oos}
   \small
   \begin{tabular}{l c c c c}
@@ -1786,24 +1740,25 @@ throughout it.
     \cmidrule(lr){2-5}
     Contrast & 189 & 252 & 378 & 504 \\
     \midrule
-    skeleton: \skelsamp{} $-$ \HRP{}          & $\rsOosSkelWone$ & $\rsOosSkelWtwo$ & $\rsOosSkelWthree$ & $\rsOosSkelWfive$ \\
-    orientation: \skelsem{} $-$ \skelsamp{}   & $\rsOosOrientWone$ & $\rsOosOrientWtwo$ & $\rsOosOrientWthree$ & $\rsOosOrientWfive$ \\
-    orientation: \orientsem{} $-$ \skelsamp{} & $\rsOosOrientBothWone$ & $\rsOosOrientBothWtwo$ & $\rsOosOrientBothWthree$ & $\rsOosOrientBothWfive$ \\
-    total: \skelsem{} $-$ \HRP{}              & $\rsOosTotalWone$ & $\rsOosTotalWtwo$ & $\rsOosTotalWthree$ & $\rsOosTotalWfive$ \\
-    residual: \skelsem{} $-$ de-factored      & $\rsOosResidWone$ & $\rsOosResidWtwo$ & $\rsOosResidWthree$ & $\rsOosResidWfive$ \\
+    skeleton: \skelhrp{} $-$ \corrhrp{}          & $\rsOosSkelWone$ & $\rsOosSkelWtwo$ & $\rsOosSkelWthree$ & $\rsOosSkelWfive$ \\
+    orientation: \semcovhrp{} $-$ \skelhrp{}   & $\rsOosOrientWone$ & $\rsOosOrientWtwo$ & $\rsOosOrientWthree$ & $\rsOosOrientWfive$ \\
+    orientation: \toposemcovhrp{} $-$ \skelhrp{} & $\rsOosOrientBothWone$ & $\rsOosOrientBothWtwo$ & $\rsOosOrientBothWthree$ & $\rsOosOrientBothWfive$ \\
+    total: \semcovhrp{} $-$ \corrhrp{}              & $\rsOosTotalWone$ & $\rsOosTotalWtwo$ & $\rsOosTotalWthree$ & $\rsOosTotalWfive$ \\
+    residual: \semcovhrp{} $-$ de-factored      & $\rsOosResidWone$ & $\rsOosResidWtwo$ & $\rsOosResidWthree$ & $\rsOosResidWfive$ \\
     \bottomrule
   \end{tabular}
+  \floatnote{Every sign the protocol specified in advance is consistent with the in-sample decomposition. Contrast standard errors are roughly $0.08$ at this sample length, so I do not interpret the magnitudes.}
 \end{table}
 
 The outcome matches the consistency reading (Table~\ref{tab:oos}). The
-total gain is positive at all 4 windows. The \skelsem{} orientation
-increment is positive at all 4. \orientsem{}'s increment is positive
+total gain is positive at all 4 windows. The \semcovhrp{} orientation
+increment is positive at all 4. \toposemcovhrp{}'s increment is positive
 from 1 year out, and its only negative cell is at 189 days, the window
 whose in-sample contributions already carried the anchor-dependence
 caveat. The skeleton contribution, hump-shaped in sample, is positive at
 every window here. The mechanism reading also carries at the
 point-estimate level: the graph-free de-factored control again sits
-within $0.011$ of \skelsem{} at 3 windows (and $0.020$ below it at 504
+within $0.011$ of \semcovhrp{} at 3 windows (and $0.020$ below it at 504
 days), so out of sample too the covariance step behaves like
 de-factoring. One caveat bounds this. The slice is a strong bull market
 (baseline Sharpe levels of $0.78$--$0.92$), so the absolute magnitudes
@@ -1822,8 +1777,8 @@ ${\approx}\,\rsSharpeSEFull$ (Lo's approximation on the $\sim$4{,}500-day
 sample). The pairwise contrasts are far more precise, because the
 strategies are highly correlated and the bootstrap differences the joint
 panel. The block-bootstrap standard error of the total contrast
-(\skelsem{}$-$\HRP{} at 252 days) is $\rsContrastSETotal$, and that of
-the orientation contrast (\orientsem{}$-$\skelsamp{}) is
+(\semcovhrp{}$-$\corrhrp{} at 252 days) is $\rsContrastSETotal$, and that of
+the orientation contrast (\toposemcovhrp{}$-$\skelhrp{}) is
 $\rsContrastSEOrient$. Those standard errors put numbers on
 ``underpowered''. At $5\%$ size and $80\%$ power, the one-sided minimum
 detectable effects are ${\approx}\,\rsContrastMDETotal$ and
@@ -1958,14 +1913,14 @@ days):
 \begin{enumerate}[itemsep=2pt]
   \item The total gain is stable across estimation windows. Replacing
         the correlation matrix with the DYNOTEARS graph is worth $+0.018$
-        to $+0.032$ net Sharpe (\skelsem{} $-$ \HRP{}) at every window,
+        to $+0.032$ net Sharpe (\semcovhrp{} $-$ \corrhrp{}) at every window,
         and 36 of 40 graph-versus-baseline cells are positive.
   \item Its composition shifts with the window. The skeleton's
         contribution is hump-shaped and peaks at 252 days. Orientation's
         is positive everywhere and U-shaped, largest where the sample
         moments are weakest. Orientation buys robustness to the
         estimation window, not level, and at the 378-day window
-        \orientsem{} has the highest Deflated Sharpe ratio of all
+        \toposemcovhrp{} has the highest Deflated Sharpe ratio of all
         \rsNtrials\ configurations evaluated ($\rsDtwosDSRWthree$).
   \item The orientation mechanism needs no graph; the skeleton does. A
         de-factored covariance with no graph reproduces the gain from
@@ -2078,10 +2033,10 @@ replication: every sign it specified came back consistent. At 19 months
 it can certify signs and nothing more, so the significance question
 stays open.
 (vii) At the shortest window the two orientation-blind controls
-themselves disagree (\skelalt{} $-$ \skelsamp{} $= +0.025$, $p=0.013$),
+themselves disagree (\undirhrp{} $-$ \skelhrp{} $= +0.025$, $p=0.013$),
 so the 189-day contributions carry extra estimator uncertainty. More
 generally, the hump and U shapes of the decomposition are measured
-against \skelsamp{}. Against \skelalt{}, the skeleton contribution is
+against \skelhrp{}. Against \undirhrp{}, the skeleton contribution is
 flat and the 189-day orientation contribution is slightly negative
 (Section~\ref{sec:decomposition}).
 (viii) I did not quantify month-to-month persistence of the discovered
@@ -2196,23 +2151,20 @@ increment by one unit in the third decimal.
 Table~\ref{tab:matrix-full} gives every cell of the fixed-graph ablation
 (net annualised Sharpe) plus the supporting arms. The ridge-Granger
 control's scope is deliberately narrow. It covers one representative
-allocator per way of using the graph (\skelsamp{} for the skeleton,
-\skelsem{} for the magnitudes, \orientsamp{} for the ordering) at the
+allocator per way of using the graph (\skelhrp{} for the skeleton,
+\semcovhrp{} for the magnitudes, \topohrp{} for the ordering) at the
 252-day window, because its role is to separate ordering from
 magnitudes, not to serve as a third full arm.
 
 \begin{table}[h]
   \centering
-  \caption{Net annualised Sharpe, 2007--2024, by graph source, allocator
-    and window; row-wise best in bold. \HRP{} is graph-blind
-    (method-independent). ``---'': outside the ridge-Granger control's
-    representative-allocator scope.}
+  \caption{Net annualised Sharpe, 2007--2024, by graph source, allocator and window.}
   \label{tab:matrix-full}
   \small
   \setlength{\tabcolsep}{4.5pt}
   \begin{tabular}{l l c c c c c}
     \toprule
-    Graph & Window (days) & \skelsamp{} & \skelalt{} & \skelsem{} & \orientsamp{} & \orientsem{} \\
+    Graph & Window (days) & \skelhrp{} & \undirhrp{} & \semcovhrp{} & \topohrp{} & \toposemcovhrp{} \\
     \midrule
     DYNOTEARS & 189 & 0.387 & \textbf{0.411} & 0.408 & 0.392 & 0.408 \\
     DYNOTEARS & 252 & 0.403 & 0.398 & \textbf{0.411} & 0.399 & 0.406 \\
@@ -2224,15 +2176,16 @@ magnitudes, not to serve as a third full arm.
     VARLiNGAM & 504 & 0.377 & \textbf{0.390} & 0.383 & 0.372 & 0.375 \\
     ridge-Granger   & 252 & 0.389 & --- & 0.352 & \textbf{0.393} & --- \\
     \midrule
-    \multicolumn{2}{l}{\HRP{} baseline (windows 189/252/378/504):} &
+    \multicolumn{2}{l}{\corrhrp{} baseline (windows 189/252/378/504):} &
     \multicolumn{5}{l}{$\rsCorrSharpeWone$ / $\rsCorrSharpe$ /
       $\rsCorrSharpeWthree$ / $\rsCorrSharpeWfive$.} \\
     \bottomrule
   \end{tabular}
+  \floatnote{Row-wise best in bold. \corrhrp{} is graph-blind (method-independent). ``---'': outside the ridge-Granger control's representative-allocator scope.}
 \end{table}
 
 \paragraph{Mechanism controls.} The two direction-free covariance
-controls of Section~\ref{sec:orientation-role} use \skelsamp{}'s
+controls of Section~\ref{sec:orientation-role} use \skelhrp{}'s
 clustering on DYNOTEARS graphs with the allocation covariance swapped.
 The Ledoit--Wolf shrunk control earns
 $\rsDlwSharpeWone/\rsDlwSharpe/\rsDlwSharpeWthree/\rsDlwSharpeWfive$
@@ -2252,7 +2205,7 @@ corresponding control was run.
 of Section~\ref{sec:decomposition} (pre-committed in
 \texttt{PREDICTIONS\_HERC.md}) gives the following net Sharpe across the
 4 windows. The correlation-distance control earns
-$0.325/0.320/0.292/0.245$. The skeleton member (\skelsamp{}'s distance)
+$0.325/0.320/0.292/0.245$. The skeleton member (\skelhrp{}'s distance)
 earns $0.122/0.128/0.303/0.205$. The orientation member
 ($\Sigma_{\mathrm{SEM}}$) earns $0.240/0.259/0.321/0.297$. The
 orientation contrast (orientation member $-$ skeleton member) is
@@ -2271,24 +2224,17 @@ neither SPA family.
 \begin{figure}[tbp]
   \centering
   \includegraphics[width=0.99\textwidth]{figures/phase_ii_decomposition.png}
-  \caption{The per-window levels behind Figure~\ref{fig:gradient}
-    (DYNOTEARS graphs, net annualised Sharpe): \HRP{} $\to$ \skelsamp{}
-    ($+$skeleton) $\to$ \skelsem{}/\orientsem{} ($+$orientation) at each
-    estimation window. Each step is annotated with the pairwise
-    bootstrap $\Delta$ and $p$-value. Section~\ref{sec:believe-rigour}
-    tests these steps family-wise.}
+  \caption{The per-window Sharpe levels behind Figure~\ref{fig:gradient} (DYNOTEARS graphs, net annualised Sharpe).}
   \label{fig:decomp}
+  \floatnote{\corrhrp{} $\to$ \skelhrp{} ($+$skeleton) $\to$ \semcovhrp{}/\toposemcovhrp{} ($+$orientation) at each window, with each step annotated with the pairwise bootstrap $\Delta$ and $p$-value. Section~\ref{sec:believe-rigour} tests these steps family-wise.}
 \end{figure}
 
 \begin{figure}[tbp]
   \centering
   \includegraphics[width=0.7\textwidth]{figures/returns_distribution.png}
-  \caption{Distribution of daily net returns (pooled across variants)
-    against a fitted normal, on a log-density axis. The heavy tails
-    (excess kurtosis ${\approx}\,\rsKurtosis$) are why I supplement the
-    plain Sharpe ratio with the Probabilistic and Deflated Sharpe ratios
-    throughout.}
+  \caption{Distribution of daily net returns (pooled across variants) against a fitted normal, on a log-density axis.}
   \label{fig:retdist}
+  \floatnote{Excess kurtosis ${\approx}\,\rsKurtosis$; this is why I supplement the plain Sharpe ratio with the Probabilistic and Deflated Sharpe ratios.}
 \end{figure}
 
 \section{Headline configurations in return terms}
@@ -2301,12 +2247,7 @@ Table~\ref{tab:matrix-full} for orientation.
 
 \begin{table}[h]
   \centering
-  \caption{Net CAGR, maximum drawdown and mean one-way turnover per
-    rebalance for the headline configurations at the 252-day window
-    (DYNOTEARS graphs; baseline from the shared harness). The naive
-    anchors (equal weight, inverse variance) run on the identical
-    calendar and cost model. Equal weight's higher CAGR at lower Sharpe
-    reflects its higher volatility and its deeper GFC drawdown.}
+  \caption{Net CAGR, maximum drawdown and mean one-way turnover per rebalance for the headline configurations at the 252-day window (DYNOTEARS graphs).}
   \label{tab:return-terms}
   \begin{tabular}{l c c c c}
     \toprule
@@ -2314,13 +2255,14 @@ Table~\ref{tab:matrix-full} for orientation.
     \midrule
     Equal weight ($1/N$) & 0.364 & 5.32\% & $-61.9$\% & 0.003 \\
     Inverse variance     & 0.388 & 5.21\% & $-51.0$\% & 0.027 \\
-    \HRP{}       & 0.381 & 4.97\% & $-50.7$\% & 0.100 \\
-    \skelsamp{}  & 0.403 & 5.43\% & $-50.5$\% & 0.112 \\
-    \skelalt{}   & 0.398 & 5.33\% & $-50.6$\% & 0.125 \\
-    \skelsem{}   & 0.411 & 5.62\% & $-49.9$\% & 0.102 \\
-    \orientsem{} & 0.406 & 5.52\% & $-50.6$\% & 0.140 \\
+    \corrhrp{}       & 0.381 & 4.97\% & $-50.7$\% & 0.100 \\
+    \skelhrp{}  & 0.403 & 5.43\% & $-50.5$\% & 0.112 \\
+    \undirhrp{}   & 0.398 & 5.33\% & $-50.6$\% & 0.125 \\
+    \semcovhrp{}   & 0.411 & 5.62\% & $-49.9$\% & 0.102 \\
+    \toposemcovhrp{} & 0.406 & 5.52\% & $-50.6$\% & 0.140 \\
     \bottomrule
   \end{tabular}
+  \floatnote{The naive anchors (equal weight, inverse variance) run on the identical calendar and cost model. Equal weight's higher CAGR at lower Sharpe reflects its higher volatility and deeper GFC drawdown.}
 \end{table}
 
 \section{Sparsity and cost sweeps}
@@ -2334,31 +2276,29 @@ Table~\ref{tab:matrix-full} for orientation.
     \toprule
     Allocator & $\tau=0$ & $\tau=0.01$ & $\tau=0.05$ & $\tau=0.10$ \\
     \midrule
-    \skelsamp{} (skeleton) & 0.403 & 0.403 & 0.393 & 0.394 \\
-    \orientsamp{}            & 0.399 & 0.399 & 0.403 & 0.402 \\
+    \skelhrp{} (skeleton) & 0.403 & 0.403 & 0.393 & 0.394 \\
+    \topohrp{}            & 0.399 & 0.399 & 0.403 & 0.402 \\
     \bottomrule
   \end{tabular}
 \end{table}
 
 \begin{table}[h]
   \centering
-  \caption{Transaction-cost sweep (DYNOTEARS): net Sharpe by one-way
-    cost at the 252-day and 504-day windows. Turnover is mean one-way
-    per rebalance. Section~\ref{sec:decomposition} draws the
-    conclusions.}
+  \caption{Transaction-cost sweep (DYNOTEARS): net Sharpe by one-way cost at the 252-day and 504-day windows.}
   \label{tab:cost}
   \begin{tabular}{l c c c c c}
     \toprule
     Allocator (window) & 0\,bps & 5\,bps & 10\,bps & 20\,bps & turnover \\
     \midrule
-    \skelsamp{} (252)  & 0.407 & 0.403 & 0.399 & 0.391 & 0.112 \\
-    \skelsem{} (252)  & 0.415 & 0.411 & 0.408 & 0.400 & 0.102 \\
-    \orientsem{} (252) & 0.411 & 0.406 & 0.401 & 0.391 & 0.140 \\
-    \skelsamp{} (504)  & 0.376 & 0.372 & 0.368 & 0.361 & --- \\
-    \skelsem{} (504)  & 0.398 & 0.395 & 0.392 & 0.387 & --- \\
-    \orientsem{} (504) & 0.403 & 0.399 & 0.395 & 0.386 & --- \\
+    \skelhrp{} (252)  & 0.407 & 0.403 & 0.399 & 0.391 & 0.112 \\
+    \semcovhrp{} (252)  & 0.415 & 0.411 & 0.408 & 0.400 & 0.102 \\
+    \toposemcovhrp{} (252) & 0.411 & 0.406 & 0.401 & 0.391 & 0.140 \\
+    \skelhrp{} (504)  & 0.376 & 0.372 & 0.368 & 0.361 & --- \\
+    \semcovhrp{} (504)  & 0.398 & 0.395 & 0.392 & 0.387 & --- \\
+    \toposemcovhrp{} (504) & 0.403 & 0.399 & 0.395 & 0.386 & --- \\
     \bottomrule
   \end{tabular}
+  \floatnote{Turnover is mean one-way per rebalance.}
 \end{table}
 
 \section{Regime-conditional Sharpe (252-day window)}
@@ -2366,33 +2306,26 @@ Table~\ref{tab:matrix-full} for orientation.
 \begin{figure}[tbp]
   \centering
   \includegraphics[width=0.9\textwidth]{figures/phase_ii_regime.png}
-  \caption{Regime-conditional Sharpe excess over the \HRP{} baseline
-    (252-day window). The orientation-aware edge concentrates in the VIX
-    bottom quintile (calm markets), not in stress. The stress hypothesis
-    is rejected.}
+  \caption{Regime-conditional Sharpe excess over the \corrhrp{} baseline (252-day window).}
   \label{fig:regime}
+  \floatnote{The orientation-aware allocators' edge concentrates in the VIX bottom quintile (calm markets), not in stress.}
 \end{figure}
 
 \begin{table}[h]
   \centering
-  \caption{Regime-conditional annualised net Sharpe, 252-day window.
-    High-vol and Low-vol are the top and bottom VIX quintiles; the NBER
-    columns condition on recession and expansion dates. Column-wise best
-    in bold; the orientation-aware edge concentrates in the
-    low-volatility regime. Conditional Sharpe levels are mechanically
-    inflated in the calm regime (the volatility denominator conditions
-    on low-VIX days), so only within-column differences are meaningful.}
+  \caption{Regime-conditional annualised net Sharpe, 252-day window.}
   \label{tab:regime-full}
   \begin{tabular}{l c c c c c}
     \toprule
     Variant & All & NBER rec. & NBER exp. & High-vol & Low-vol \\
     \midrule
-    \HRP{}     & 0.381 & $-0.589$ & 0.737 & $\mathbf{-1.313}$ & 5.564 \\
-    \skelsamp{} (skeleton)     & 0.403 & $\mathbf{-0.575}$ & 0.758 & $-1.317$ & 5.744 \\
-    \skelsem{}                & \textbf{0.411} & $-0.577$ & \textbf{0.762} & $-1.347$ & 5.854 \\
-    \orientsem{}               & 0.406 & $-0.606$ & 0.761 & $-1.361$ & \textbf{5.876} \\
+    \corrhrp{}     & 0.381 & $-0.589$ & 0.737 & $\mathbf{-1.313}$ & 5.564 \\
+    \skelhrp{} (skeleton)     & 0.403 & $\mathbf{-0.575}$ & 0.758 & $-1.317$ & 5.744 \\
+    \semcovhrp{}                & \textbf{0.411} & $-0.577$ & \textbf{0.762} & $-1.347$ & 5.854 \\
+    \toposemcovhrp{}               & 0.406 & $-0.606$ & 0.761 & $-1.361$ & \textbf{5.876} \\
     \bottomrule
   \end{tabular}
+  \floatnote{High-vol and Low-vol are the top and bottom VIX quintiles; the NBER columns condition on recession and expansion dates. Column-wise best in bold. Conditional Sharpe levels are mechanically inflated in the calm regime (the volatility denominator conditions on low-VIX days), so only within-column differences are meaningful.}
 \end{table}
 
 \section{The first phase: the driver route and its two null results}
@@ -2430,7 +2363,7 @@ Figure~\ref{fig:seed}). The seed range ($\rsSeedRange$) is more than
 twice the $+0.010$ edge, and the committed seed sits at the
 $\rsSeedPct$th percentile of its own distribution, so at the least
 favourable seed the edge all but vanishes. Plain correlation-distance
-HRP (\HRP{}) beats HSP as published at the same window ($\rsCorrSharpe$
+HRP (\corrhrp{}) beats HSP as published at the same window ($\rsCorrSharpe$
 against $0.371$), so the driver-and-network machinery subtracts value
 relative to textbook HRP. The $90\%$ Model Confidence Set over the
 \rsMcsUniverse\ distinct 252-day strategies of
@@ -2442,13 +2375,9 @@ window each sits above the seed distribution's maximum.
 \begin{figure}[tbp]
   \centering
   \includegraphics[width=0.85\textwidth]{figures/phase_ii_seed.png}
-  \caption{The seed audit: net Sharpe of the causal-selection HSP
-    variant across \rsSeedN\ network seeds at the 252-day window, against
-    HSP as published (dotted line) and the deterministic graph-route
-    allocators of this study. The seed range exceeds the variant's
-    claimed edge over its baseline, and every graph-route allocator
-    shown sits above the seed distribution's maximum.}
+  \caption{The seed audit: net Sharpe of the causal-selection HSP variant across \rsSeedN\ network seeds at the 252-day window.}
   \label{fig:seed}
+  \floatnote{Dotted line: HSP as published. The seed range exceeds the variant's claimed edge over its baseline, and every graph-route allocator shown sits above the seed distribution's maximum.}
 \end{figure}
 
 \paragraph{The monthly feedback loop cannot learn.} Across the full
@@ -2516,7 +2445,7 @@ resamples, mean block 21 trading days.
 All results derive from committed code and cached data and are exactly
 reproducible. After the data-determinism fix of Section~\ref{sec:cache},
 two independent end-to-end runs produce identical graphs, weights and
-NAVs. The replication gate verifies this: \skelsamp{} against the prior
+NAVs. The replication gate verifies this: \skelhrp{} against the prior
 phase's committed bundle gives $\Delta$Sharpe $= 0$ and a maximum weight
 difference of $0.0$ over all 215 rebalances, and I re-verified it on the
 4-window grid by an exact repeat of a 378-day cell. The ablation ran on
