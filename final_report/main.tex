@@ -17,6 +17,10 @@
 \newcommand{\toposemcovhrp}{\textsc{topo-semcov-hrp}}
 \newcommand{\oriented}{\textsc{oriented}}
 
+% Discovery-method names in small caps (uniform; the lowercase i of VARLiNGAM is not preserved)
+\newcommand{\dynotears}{\textsc{dynotears}}
+\newcommand{\varlingam}{\textsc{varlingam}}
+
 % One-sentence captions; anything further goes in a note under the float
 \newcommand{\floatnote}[1]{\par\vspace{3pt}\begin{minipage}{0.92\textwidth}\footnotesize\emph{Note.} #1\end{minipage}\par}
 
@@ -65,7 +69,7 @@ the two aspects of the DAG. I then compare these allocators
 to HRP as a baseline. I estimate this decomposition over 
 2007--2024, using 4 estimation windows 
 (9 months to 2 years), on a 99-asset subset of the S\&P~500. 
-I use DYNOTEARS and VARLiNGAM as causal discovery algorithms,
+I use \dynotears{} and \varlingam{} as causal discovery algorithms,
 with ridge-Granger as a robustness check.
 
 I find that replacing the correlation matrix with a causal DAG
@@ -125,7 +129,7 @@ correlation \cite{simon1954spurious}.
 Causal discovery algorithms provide a directed alternative
 to the correlation matrix. Score-based structure learning algorithms
 (such as NOTEARS \cite{zheng2018notears} and its temporal extension
-DYNOTEARS \cite{pamfil2020dynotears}) can fit directed acyclic graphs
+\dynotears{} \cite{pamfil2020dynotears}) can fit directed acyclic graphs
 (DAGs) that can represent which assets are linked and the direction
 of influence between them. Some papers have applied these DAGs to
 equity markets \cite{howard2025causal,tang2024trading}, 
@@ -170,7 +174,7 @@ the lookback window's sample correlation
 \cite{lopezdeprado2016hrp}. This feeds into the baseline HRP
 control (see Chapter~\ref{chap:sensitivity}).
 Third, a discovered causal graph is the output of one of the causal
-discovery algorithms (DYNOTEARS, VARLiNGAM, with ridge-regularised
+discovery algorithms (\dynotears{}, \varlingam{}, with ridge-regularised
 Granger as a robustness check). It is a contemporaneous (no lags)
 asset-to-asset graph that's re-fitted at each rebalance
 at 4 different estimation windows 
@@ -279,7 +283,7 @@ novel contributions below:
 \begin{itemize}[itemsep=2pt, topsep=3pt]
   \item A fixed-graph decomposition design, plus a reproducible
     discovery pipeline (attribution; Chapter~\ref{chap:discovery}). 
-    The same per-window DYNOTEARS or VARLiNGAM graph feeds several different
+    The same per-window \dynotears{} or \varlingam{} graph feeds several different
     allocators that incrementally take in more information from the DAG,
     from none (\corrhrp{}), to skeleton-only, to orientation-aware.
     This means that each increment isolates one aspect of the graph:
@@ -326,7 +330,7 @@ Below I set out the key numerical results of my research. For further detail, se
 \begin{itemize}[itemsep=2pt, topsep=3pt]
   \item The causal graph yields a performance improvement over the correlation matrix at every
     estimation window. \semcovhrp{}, the allocator that takes in the DAG's implied covariance at the allocation step, beats \corrhrp{} by $+0.018$ to $+0.032$ Sharpe Ratio (net of 5\,bps transaction costs) across the 4 windows, which is worth $+0.4$ to $+0.7$ percentage
-    points of net CAGR per year. 19 of the 20 comparisons between DYNOTEARS and \corrhrp{}, and 17 of the 20 VARLiNGAM comparisons, are positive. At
+    points of net CAGR per year. 19 of the 20 comparisons between \dynotears{} and \corrhrp{}, and 17 of the 20 \varlingam{} comparisons, are positive. At
     the 378-day window, \toposemcovhrp{} has the highest Deflated Sharpe ratio
     out of all \rsNtrials\ configurations I evaluated ($\rsDtwosDSRWthree$). On
     the 2025--26 out-of-sample data, I predicted that the sign of the performance improvements would match what I found on the in-sample data: at a majority of windows, the majority of marginal gains from edge orientations would be positive, and the total performance gain would also be positive.
@@ -355,7 +359,7 @@ Below I set out the key numerical results of my research. For further detail, se
     Section~\ref{sec:question}. The observed effects are about half the
     minimum detectable effect, so the result is a bounded null: the edge
     orientations are worth roughly $0$ to $0.04$ Sharpe. The effect also
-    depends on the discovery method. It is absent under VARLiNGAM graphs
+    depends on the discovery method. It is absent under \varlingam{} graphs
     at all 4 windows.
   \item The graph route beats the driver-and-sensitivity route (HSP) that
     it replaces. Plain \corrhrp{} (\rsCorrSharpe) already beats HSP as
@@ -531,7 +535,7 @@ result.
 \label{sec:howard-theme}
 
 Howard, Lohre and Mudde \cite{howard2025causal} is the closest prior
-work. It is a large-scale application of DYNOTEARS to S\&P~500
+work. It is a large-scale application of \dynotears{} to S\&P~500
 constituents over 1989--2022 (about 357 names per estimated network),
 re-estimated on a rolling basis. Structurally, this is the same discovery
 machinery as Chapter~\ref{chap:discovery}. Three of their empirical
@@ -560,7 +564,7 @@ discovered network, and the direction of the edges is used only
 implicitly (through centrality). So their pipeline cannot ask how much of
 the graph's allocation value lies in its orientations. Tang
 \cite{tang2024trading} builds trading signals from time-series causal
-discovery (including VARLiNGAM) and finds that computational cost is the
+discovery (including \varlingam{}) and finds that computational cost is the
 binding constraint. I address this warning with a content-keyed discovery
 cache (Section~\ref{sec:cache}) rather than by shrinking the experiment.
 
@@ -577,7 +581,7 @@ leave causally connected pairs with near-zero marginal correlation
 \cite{howard2025causal}. NOTEARS \cite{zheng2018notears} recasts
 acyclicity as the smooth constraint
 $h(W)=\operatorname{tr}(e^{W\circ W})-d=0$, which turns DAG learning into
-a continuous optimisation. DYNOTEARS \cite{pamfil2020dynotears} extends
+a continuous optimisation. \dynotears{} \cite{pamfil2020dynotears} extends
 it to the structural VAR $X = XW + \sum_p Y_p A_p + Z$, with acyclicity
 enforced on the contemporaneous $W$ only. It natively supports
 forbidden-edge lists, which is how I enforce the directional prior
@@ -585,7 +589,7 @@ described in Chapter~\ref{chap:discovery}. It is the primary method here.
 
 Second, non-Gaussianity identifies direction. The LiNGAM family
 \cite{shimizu2006lingam} exploits non-Gaussian residuals to identify a
-unique causal ordering. VARLiNGAM \cite{hyvarinen2010varlingam} is its
+unique causal ordering. \varlingam{} \cite{hyvarinen2010varlingam} is its
 structural-VAR form and serves as my robustness comparator. Its
 identification rests on heavy-tailed residuals. Financial returns satisfy
 this at short windows, but lose it progressively at longer ones, because
@@ -748,12 +752,12 @@ scale to the ${\sim}132$-variable joint panel at every rebalance of a
 sweepable grid. It must accept the directional prior natively, rather
 than by deleting edges after the fit. And it must return a DAG, because
 the allocators of Chapter~\ref{chap:sensitivity} rely on the exact
-total-effect algebra that a DAG's nilpotent adjacency provides. DYNOTEARS
+total-effect algebra that a DAG's nilpotent adjacency provides. \dynotears{}
 meets all three. The comparators of Section~\ref{sec:comparators} each
 relax one requirement, so they double as probes of whether that
 requirement mattered.
 
-At each rebalance date $t$, I fit DYNOTEARS \cite{pamfil2020dynotears} on
+At each rebalance date $t$, I fit \dynotears{} \cite{pamfil2020dynotears} on
 the $z$-scored joint panel $X=[\,D \mid A\,]$ over the lookback window
 (189 to 504 trading days, the 4-window grid of
 Chapter~\ref{chap:evaluation}) with lag $p=1$. Lagged structure beyond one
@@ -765,14 +769,14 @@ Appendix~\ref{app:tables} tabulates the hyperparameters.
 
 \paragraph{Enforcing the prior.} The directional prior is that drivers
 may cause assets, but individual large-cap stocks do not move the 10-year
-Treasury yield at these scales. DYNOTEARS accepts a forbidden-edge list
+Treasury yield at these scales. \dynotears{} accepts a forbidden-edge list
 (\texttt{tabu\_edges}). I populate it with every asset$\to$driver pair at
-every lag, which forces those entries of $W$ and $A_1$ to zero. VARLiNGAM
+every lag, which forces those entries of $W$ and $A_1$ to zero. \varlingam{}
 enforces the same prior through its prior-knowledge mechanism, plus a
 projection after the fit.
 
 \paragraph{Verification of the prior.} A prior should only be kept if it
-has a measurable effect. I refit DYNOTEARS with and without the prior on
+has a measurable effect. I refit \dynotears{} with and without the prior on
 6 windows spanning distinct regimes (2008, 2011, 2014, 2018Q4, 2020 and
 2022). Without the prior, the optimiser spends 35--48\% of total edge
 mass on economically implausible asset$\to$driver edges. Admitting those
@@ -790,7 +794,7 @@ jointly with the rest, it protects the graph that the allocators use.
   \includegraphics[width=0.92\textwidth]{figures/directional_prior.png}
   \caption{Verification of the asset$\to$driver directional prior across the 6 regime windows.}
   \label{fig:prior}
-  \floatnote{Bars: the fraction of total DYNOTEARS edge mass that would fall on implausible asset$\to$driver edges if the prior were removed (35--48\%). Line (right axis): Jaccard overlap of the top drivers by edge mass with versus without the prior. The prior matters most in the 2008 and 2022 stress regimes.}
+  \floatnote{Bars: the fraction of total \dynotears{} edge mass that would fall on implausible asset$\to$driver edges if the prior were removed (35--48\%). Line (right axis): Jaccard overlap of the top drivers by edge mass with versus without the prior. The prior matters most in the 2008 and 2022 stress regimes.}
 \end{figure}
 
 \section{Extracting the asset graph}
@@ -812,7 +816,7 @@ the graph was fitted on.
 
 \paragraph{What the graphs look like.} The DAGs are far from degenerate,
 and stably so across estimation windows. At every window length from 189
-to 504 days, the DYNOTEARS asset graphs average ${\sim}614$--$673$
+to 504 days, the \dynotears{} asset graphs average ${\sim}614$--$673$
 directed edges (a density of $6.3$--$6.9\%$ of possible ordered pairs).
 Their mean longest directed path is ${\approx}50$ nodes out of 99, which
 indicates deep chains of influence rather than a shallow hub-and-spoke
@@ -821,9 +825,9 @@ the orientation-aware allocators to use. Whatever the evaluation finds,
 it will not be because the graphs are trivially symmetric. One diagnostic
 is missing: I did not quantify month-to-month edge persistence
 (Section~\ref{sec:limitations}). The same diagnostic flags a comparator
-limitation. VARLiNGAM's unpruned $B_0$ saturates to $32\%$ density at the
+limitation. \varlingam{}'s unpruned $B_0$ saturates to $32\%$ density at the
 189-day window, where there are $n=189$ observations against $d=132$
-variables, whereas DYNOTEARS' $\ell_1$ penalty holds density steady.
+variables, whereas \dynotears{}' $\ell_1$ penalty holds density steady.
 
 \paragraph{What ``credible'' can mean without ground truth.} One
 objection must be addressed directly. No true causal graph of the market
@@ -849,7 +853,7 @@ so the design carries two further graph sources that perturb exactly
 that ingredient. Both feed the same extraction function, so every
 allocator runs unchanged on them.
 
-VARLiNGAM \cite{hyvarinen2010varlingam} supplies differently identified
+\varlingam{} \cite{hyvarinen2010varlingam} supplies differently identified
 orientations. Its instantaneous matrix $B_0$ is identified through
 non-Gaussianity rather than through a score. LiNGAM's causal order makes
 the asset block a DAG by construction. Its identification assumption
@@ -860,7 +864,7 @@ Chapter~\ref{chap:evaluation} observes it.
 Ridge-Granger supplies orientations with degraded magnitudes. It is a
 ridge-regularised VAR(1) on the asset panel, computed in closed form,
 with $M[i,j] = |{\rm coef}(x_{i,t-1}\!\to\!x_{j,t})|$. I threshold it in
-each window to match the edge density of the paired DYNOTEARS graph, so
+each window to match the edge density of the paired \dynotears{} graph, so
 the comparison is at like-for-like sparsity. Its lagged, shrunken
 coefficients still order the assets directionally, but they are not
 structural effect sizes. It is also not guaranteed to be acyclic, which
@@ -869,7 +873,7 @@ total effects, and minimal feedback-arc removal before topological
 ordering).
 
 The two controls therefore split ``orientation'' into its parts. If an
-effect needs DYNOTEARS' specific arrows, VARLiNGAM should not reproduce
+effect needs \dynotears{}' specific arrows, \varlingam{} should not reproduce
 it. If an effect needs trustworthy edge magnitudes rather than arrows
 alone, then on ridge-Granger graphs the ordering-based allocators should
 survive where the shock-propagation allocators fail. This is the
@@ -899,7 +903,7 @@ mechanics.
 \paragraph{A data-determinism defect, found and fixed.} Building the
 cache exposed a latent reproducibility bug. One driver series (the
 emerging-markets ETF EEM) was silently re-downloaded on every call. The
-resulting micro-jitter, amplified by the non-convex DYNOTEARS optimiser,
+resulting micro-jitter, amplified by the non-convex \dynotears{} optimiser,
 made the pipeline irreproducible at the bit level. Two conclusions I had
 drawn in the project's first phase did not survive the fix. That first
 phase was an exploratory precursor on the same panel and protocol. It
@@ -914,7 +918,7 @@ by that replication gate. A result that does not survive a determinism
 fix was never real, so I treat reproducibility as a prerequisite rather
 than an afterthought \cite{lopezdeprado2023causal}.
 Appendix~\ref{app:tables} records the defect's mechanism, and the
-observation that VARLiNGAM's ICA-based fits were robust to the same
+observation that \varlingam{}'s ICA-based fits were robust to the same
 jitter.
 % ===== chapters/04_sensitivity.tex =====
 % ============================================================
@@ -963,7 +967,7 @@ DAG implies one.
 \section{The structural model: total effects and the implied covariance}
 \label{sec:sem}
 
-Both DYNOTEARS' $W$ and VARLiNGAM's $B_0$, restricted to the asset block
+Both \dynotears{}' $W$ and \varlingam{}'s $B_0$, restricted to the asset block
 and written in the $i\to j$ convention, define the structural equation
 model
 \begin{equation}
@@ -1141,8 +1145,8 @@ $(\skelhrp{}-\corrhrp{}) + (\oriented{}-\skelhrp{}) =
 \oriented{}-\corrhrp{}$, so the total causal-graph gain is attributed
 without remainder.
 
-The reported grid is 5 graph-consuming allocators $\times$ \{DYNOTEARS,
-VARLiNGAM\} $\times$ \{189, 252, 378, 504\}-day windows, plus the
+The reported grid is 5 graph-consuming allocators $\times$ \{\dynotears{},
+\varlingam{}\} $\times$ \{189, 252, 378, 504\}-day windows, plus the
 ridge-Granger control, a sparsity sweep and a cost sweep. The evaluated
 grid is wider. The original experiment plan contained 7 allocators. I
 added the mechanism controls (two direction-free covariance controls and
@@ -1275,7 +1279,7 @@ $+0.018$, $+0.031$, $+0.030$ and $+0.032$ respectively
 ($p=0.43$--$0.11$; Table~\ref{tab:decomp}), and \toposemcovhrp{} reaches
 $+0.036$ at 504 days. There are 40 graph-versus-\corrhrp{} cells (5
 graph-consuming allocators, both discovery methods, 4 windows), and 36 of
-them are above the baseline. Under DYNOTEARS it is 19 of 20; the single
+them are above the baseline. Under \dynotears{} it is 19 of 20; the single
 exception is the skeleton-only allocator at the 189-day window.
 
 This consistency should be read as robustness, not as significance. The
@@ -1326,7 +1330,7 @@ individually significant ($p \geq 0.14$). Third, the orientation
 contribution is positive at every window and U-shaped ($+0.021$ at
 $p=0.08$, $+0.009$ at $p=0.45$, $+0.012$ at $p=0.31$, $+0.023$ at
 $p=0.048$). It is largest at the two extremes and smallest where the
-skeleton peaks, and 11 of the 12 DYNOTEARS orientation contrasts across
+skeleton peaks, and 11 of the 12 \dynotears{} orientation contrasts across
 the grid are positive (Figure~\ref{fig:forest}). The two components are
 roughly complementary, which is why the total is flat while its
 composition shifts. Family-wise, the orientation-aware allocators
@@ -1357,14 +1361,14 @@ estimation windows.
 \begin{figure}[tbp]
   \centering
   \includegraphics[width=0.99\textwidth]{figures/phase_ii_window_gradient.png}
-  \caption{The two components of the decomposition as a function of estimation-window length (DYNOTEARS, net Sharpe).}
+  \caption{The two components of the decomposition as a function of estimation-window length (\dynotears{}, net Sharpe).}
   \label{fig:gradient}
-  \floatnote{Left: the skeleton contribution (\skelhrp{} $-$ \corrhrp{}) and the orientation contribution (\semcovhrp{} $-$ \skelhrp{}), with $95\%$ block-bootstrap confidence intervals; the VARLiNGAM orientation series (grey) scatters around zero (mean $-0.005$). Right: the same two contributions stacked.}
+  \floatnote{Left: the skeleton contribution (\skelhrp{} $-$ \corrhrp{}) and the orientation contribution (\semcovhrp{} $-$ \skelhrp{}), with $95\%$ block-bootstrap confidence intervals; the \varlingam{} orientation series (grey) scatters around zero (mean $-0.005$). Right: the same two contributions stacked.}
 \end{figure}
 
 \begin{table}[t]
   \centering
-  \caption{The decomposition (DYNOTEARS): pairwise $\Delta$Sharpe, with Politis--Romano $p$-values in parentheses, at each estimation window.}
+  \caption{The decomposition (\dynotears{}): pairwise $\Delta$Sharpe, with Politis--Romano $p$-values in parentheses, at each estimation window.}
   \label{tab:decomp}
   \small
   \setlength{\tabcolsep}{4pt}
@@ -1398,7 +1402,7 @@ estimation windows.
   \includegraphics[width=0.99\textwidth]{figures/phase_ii_forest.png}
   \caption{$\Delta$Sharpe of each orientation-aware allocator against the skeleton control \skelhrp{} at all 4 windows.}
   \label{fig:forest}
-  \floatnote{$95\%$ block-bootstrap confidence intervals; $\ast$: $p<0.05$. 11 of the 12 DYNOTEARS contrasts are positive, against 4 of the 12 VARLiNGAM contrasts. The starred \undirhrp{} cell at 189 days is a control-versus-control divergence, discussed in the text.}
+  \floatnote{$95\%$ block-bootstrap confidence intervals; $\ast$: $p<0.05$. 11 of the 12 \dynotears{} contrasts are positive, against 4 of the 12 \varlingam{} contrasts. The starred \undirhrp{} cell at 189 days is a control-versus-control divergence, discussed in the text.}
 \end{figure}
 
 \subsection{What orientation contributes}
@@ -1463,9 +1467,9 @@ committed in advance, I do not attribute the covariance-step gain to
 directional content. The operative ingredient of $\Sigma_{\mathrm{SEM}}$
 is its independent-shock assumption, which removes the common market
 component, and that removal needs no graph. What survives for the
-orientations is a weaker, conditional role. DYNOTEARS magnitudes recover
+orientations is a weaker, conditional role. \dynotears{} magnitudes recover
 the full de-factoring benefit without damaging it. The identical
-construction on VARLiNGAM graphs, which are equally structured and
+construction on \varlingam{} graphs, which are equally structured and
 equally de-factored, yields nothing, and the ridge-Granger version, with
 its degraded magnitudes, collapses (both are shown in the
 discovery-method comparison of the next subsection). So trustworthy edge
@@ -1528,32 +1532,32 @@ increment survives the sweep. So the covariance step does not win by
 trading less and is not eroded by trading more, whereas the ordering
 step at 252 days is.
 
-\paragraph{Discovery method.} Under VARLiNGAM graphs the orientation
+\paragraph{Discovery method.} Under \varlingam{} graphs the orientation
 effect is absent at all 4 windows (4 of 12 contrasts positive, mean
 $-0.005$; Figure~\ref{fig:forest}, right, and the grey series of
 Figure~\ref{fig:gradient}). So the decomposition depends on the
-discovery method. DYNOTEARS' jointly optimised, acyclicity-constrained
-$W$ supports orientation-aware allocation, and VARLiNGAM's ICA-ordered
-$B_0$ does not. This is consistent with VARLiNGAM's identification
+discovery method. \dynotears{}' jointly optimised, acyclicity-constrained
+$W$ supports orientation-aware allocation, and \varlingam{}'s ICA-ordered
+$B_0$ does not. This is consistent with \varlingam{}'s identification
 weakening as residuals become more Gaussian over longer windows. At the
 189-day window it is also consistent with its unpruned $B_0$ saturating
-in the thin-sample regime (density $32\%$ against DYNOTEARS' stable
+in the thin-sample regime (density $32\%$ against \dynotears{}' stable
 $6$--$7\%$; Section~\ref{sec:asset-graph}), so its short-window graphs
 carry little usable orientation signal either.
 
-A DYNOTEARS graph supplies two things at once, the direction of each
+A \dynotears{} graph supplies two things at once, the direction of each
 edge and a fitted magnitude for it, so its cells alone cannot show which
 of the two the orientation effect uses. The ridge-Granger control
 separates them: it preserves a usable ordering while degrading the
 magnitudes. On its graphs, causal-ordered bisection survives
-(\topohrp{} $=0.393$ against DYNOTEARS' $0.399$), while the
+(\topohrp{} $=0.393$ against \dynotears{}' $0.399$), while the
 SEM-covariance allocator collapses (\semcovhrp{} $=0.352$; a gap of
 $-0.060$, $p=0.11$). A ridge-VAR coefficient matrix carries a
 serviceable ordering but not structural effect sizes. So the
 dissociation indicates that orientation's contribution does not lie in
 merely knowing which way the arrows point (an ordering survives even a
 one-lag ridge regression). It lies in edge magnitudes trustworthy enough
-to propagate shocks, which only the jointly optimised DYNOTEARS fit
+to propagate shocks, which only the jointly optimised \dynotears{} fit
 supplies. This refines the answer to the research question rather than
 adding a separate benchmark: ``orientation'' pays through its weighted,
 propagatable form.
@@ -1633,7 +1637,7 @@ seen, so the full grid's numbers are the primary ones and the narrowed
 family's are reported second and labelled as such. The two families are
 (i) the causal family against the \corrhrp{} baseline and (ii) the
 orientation-aware allocators against the shared skeleton control
-(\skelhrp{} on DYNOTEARS graphs; Section~\ref{sec:decomposition}).
+(\skelhrp{} on \dynotears{} graphs; Section~\ref{sec:decomposition}).
 Table~\ref{tab:spa} tabulates them. Its final column accounts for the
 search across both strategies and the 4 estimation windows in a single
 pooled family against the 252-day baseline.
@@ -1699,11 +1703,11 @@ covariance, so it is robustness, not directional information as such.
 The skeleton's 252-day gain is not reproduced by a graph-free skeleton
 of matched density, so the gain at the conventional window does need the
 discovered graph. The largest defensible claim is modest. Replacing the
-correlation matrix with a DYNOTEARS graph pays through the skeleton near
+correlation matrix with a \dynotears{} graph pays through the skeleton near
 the 1-year window, and keeping the orientations costs nothing while
 improving robustness to the choice of estimation window. The evidence
 does not support attributing the covariance-step gain to edge direction,
-any orientation effect under VARLiNGAM graphs, or the stress hypothesis.
+any orientation effect under \varlingam{} graphs, or the stress hypothesis.
 That is the finding: precise, sign-consistent point estimates whose
 family-wise support appears only under the post-hoc narrowing, and whose
 leading mechanism a direction-free control reproduces.
@@ -1715,7 +1719,7 @@ Every result so far shares the 2007--2024 panel, and
 Section~\ref{sec:believe} describes three design choices that were
 informed by results on that panel. A deflation correction is not a
 substitute for out-of-sample replication, so I ran one. I ran the
-identical harness, universe, cost model and DYNOTEARS configuration on
+identical harness, universe, cost model and \dynotears{} configuration on
 2025-01 to 2026-07, a span that did not exist when the design was
 fixed. I committed the protocol and the interpretation of every possible
 outcome before fetching any out-of-sample price
@@ -1862,9 +1866,9 @@ pairwise contrasts the thesis is about. Quantifying them with a
 point-in-time universe is left to future work.
 
 \paragraph{Method-dependence is a caveat on the mechanism.} The
-orientation effect exists under DYNOTEARS graphs only. Until a second
+orientation effect exists under \dynotears{} graphs only. Until a second
 discovery method reproduces it, the safest interpretation is that
-DYNOTEARS' contemporaneous structure supports orientation-aware
+\dynotears{}' contemporaneous structure supports orientation-aware
 allocation, not that causal orientation in markets is valuable for
 allocation in general. The verdict of Section~\ref{sec:believe-rigour}
 stands as this chapter's summary.
@@ -1912,7 +1916,7 @@ days):
 
 \begin{enumerate}[itemsep=2pt]
   \item The total gain is stable across estimation windows. Replacing
-        the correlation matrix with the DYNOTEARS graph is worth $+0.018$
+        the correlation matrix with the \dynotears{} graph is worth $+0.018$
         to $+0.032$ net Sharpe (\semcovhrp{} $-$ \corrhrp{}) at every window,
         and 36 of 40 graph-versus-baseline cells are positive.
   \item Its composition shifts with the window. The skeleton's
@@ -1940,7 +1944,7 @@ days):
         window searches jointly rejects for neither family
         (Table~\ref{tab:spa}). The $90\%$ Model Confidence Set does not
         separate treatments from controls.
-  \item The effect is method- and allocator-specific. Under VARLiNGAM
+  \item The effect is method- and allocator-specific. Under \varlingam{}
         graphs orientation adds nothing at any window (limitation (ii)).
         Under the ridge-Granger control, which degrades the magnitudes,
         the ordering survives but the SEM covariance collapses, so the
@@ -2005,8 +2009,8 @@ family-wise bar, is marginal, clears it only under the post-hoc narrowed
 family and not under the full grid, and does not survive accounting for
 the window search jointly with the strategy search.
 (ii) The orientation effect exists under one discovery method
-(DYNOTEARS). Until another method reproduces it, it should be read as a
-property of DYNOTEARS' contemporaneous structure, not of markets. The
+(\dynotears{}). Until another method reproduces it, it should be read as a
+property of \dynotears{}' contemporaneous structure, not of markets. The
 de-factored control shows that its covariance-step gain is reproducible
 with no graph at all, whereas the matching control shows that the
 skeleton's 252-day gain is not.
@@ -2083,7 +2087,7 @@ were complements here, not a trade-off.
 
 (1) A second orientation source. The decomposition's biggest caveat is
 method-dependence. Repeating the fixed-graph ablation on graphs from a
-different family would test whether orientation value is a DYNOTEARS
+different family would test whether orientation value is a \dynotears{}
 artefact. The non-linear NTS-NOTEARS is the natural candidate. I
 verified in a reduced-scope probe that the directional prior transfers
 to it, but its ${\sim}10\times$ fit cost deferred a full backtest.
@@ -2166,14 +2170,14 @@ magnitudes, not to serve as a third full arm.
     \toprule
     Graph & Window (days) & \skelhrp{} & \undirhrp{} & \semcovhrp{} & \topohrp{} & \toposemcovhrp{} \\
     \midrule
-    DYNOTEARS & 189 & 0.387 & \textbf{0.411} & 0.408 & 0.392 & 0.408 \\
-    DYNOTEARS & 252 & 0.403 & 0.398 & \textbf{0.411} & 0.399 & 0.406 \\
-    DYNOTEARS & 378 & 0.402 & 0.409 & 0.415 & 0.405 & \textbf{0.419} \\
-    DYNOTEARS & 504 & 0.372 & 0.383 & 0.395 & 0.382 & \textbf{0.399} \\
-    VARLiNGAM & 189 & 0.393 & 0.388 & 0.364 & 0.387 & \textbf{0.394} \\
-    VARLiNGAM & 252 & \textbf{0.397} & 0.396 & 0.385 & 0.388 & 0.386 \\
-    VARLiNGAM & 378 & 0.399 & 0.392 & \textbf{0.407} & 0.398 & 0.399 \\
-    VARLiNGAM & 504 & 0.377 & \textbf{0.390} & 0.383 & 0.372 & 0.375 \\
+    \dynotears{} & 189 & 0.387 & \textbf{0.411} & 0.408 & 0.392 & 0.408 \\
+    \dynotears{} & 252 & 0.403 & 0.398 & \textbf{0.411} & 0.399 & 0.406 \\
+    \dynotears{} & 378 & 0.402 & 0.409 & 0.415 & 0.405 & \textbf{0.419} \\
+    \dynotears{} & 504 & 0.372 & 0.383 & 0.395 & 0.382 & \textbf{0.399} \\
+    \varlingam{} & 189 & 0.393 & 0.388 & 0.364 & 0.387 & \textbf{0.394} \\
+    \varlingam{} & 252 & \textbf{0.397} & 0.396 & 0.385 & 0.388 & 0.386 \\
+    \varlingam{} & 378 & 0.399 & 0.392 & \textbf{0.407} & 0.398 & 0.399 \\
+    \varlingam{} & 504 & 0.377 & \textbf{0.390} & 0.383 & 0.372 & 0.375 \\
     ridge-Granger   & 252 & 0.389 & --- & 0.352 & \textbf{0.393} & --- \\
     \midrule
     \multicolumn{2}{l}{\corrhrp{} baseline (windows 189/252/378/504):} &
@@ -2186,7 +2190,7 @@ magnitudes, not to serve as a third full arm.
 
 \paragraph{Mechanism controls.} The two direction-free covariance
 controls of Section~\ref{sec:orientation-role} use \skelhrp{}'s
-clustering on DYNOTEARS graphs with the allocation covariance swapped.
+clustering on \dynotears{} graphs with the allocation covariance swapped.
 The Ledoit--Wolf shrunk control earns
 $\rsDlwSharpeWone/\rsDlwSharpe/\rsDlwSharpeWthree/\rsDlwSharpeWfive$
 across the 4 windows, and the de-factored (single-factor residual)
@@ -2224,7 +2228,7 @@ neither SPA family.
 \begin{figure}[tbp]
   \centering
   \includegraphics[width=0.99\textwidth]{figures/phase_ii_decomposition.png}
-  \caption{The per-window Sharpe levels behind Figure~\ref{fig:gradient} (DYNOTEARS graphs, net annualised Sharpe).}
+  \caption{The per-window Sharpe levels behind Figure~\ref{fig:gradient} (\dynotears{} graphs, net annualised Sharpe).}
   \label{fig:decomp}
   \floatnote{\corrhrp{} $\to$ \skelhrp{} ($+$skeleton) $\to$ \semcovhrp{}/\toposemcovhrp{} ($+$orientation) at each window, with each step annotated with the pairwise bootstrap $\Delta$ and $p$-value. Section~\ref{sec:believe-rigour} tests these steps family-wise.}
 \end{figure}
@@ -2247,7 +2251,7 @@ Table~\ref{tab:matrix-full} for orientation.
 
 \begin{table}[h]
   \centering
-  \caption{Net CAGR, maximum drawdown and mean one-way turnover per rebalance for the headline configurations at the 252-day window (DYNOTEARS graphs).}
+  \caption{Net CAGR, maximum drawdown and mean one-way turnover per rebalance for the headline configurations at the 252-day window (\dynotears{} graphs).}
   \label{tab:return-terms}
   \begin{tabular}{l c c c c}
     \toprule
@@ -2269,7 +2273,7 @@ Table~\ref{tab:matrix-full} for orientation.
 
 \begin{table}[h]
   \centering
-  \caption{Graph-sparsity sweep (DYNOTEARS, 252-day window): net Sharpe
+  \caption{Graph-sparsity sweep (\dynotears{}, 252-day window): net Sharpe
     as the edge-magnitude threshold $\tau$ rises.}
   \label{tab:tau}
   \begin{tabular}{l c c c c}
@@ -2284,7 +2288,7 @@ Table~\ref{tab:matrix-full} for orientation.
 
 \begin{table}[h]
   \centering
-  \caption{Transaction-cost sweep (DYNOTEARS): net Sharpe by one-way cost at the 252-day and 504-day windows.}
+  \caption{Transaction-cost sweep (\dynotears{}): net Sharpe by one-way cost at the 252-day and 504-day windows.}
   \label{tab:cost}
   \begin{tabular}{l c c c c c}
     \toprule
@@ -2339,7 +2343,7 @@ on the panel and protocol of Chapter~\ref{chap:evaluation}. The first is
 HSP as published: correlation-selected drivers, neural sensitivities,
 and HRP on the sensitivity distance. The second is a causal-selection
 variant that chooses the $K{=}17$ drivers by their aggregate outgoing
-influence in the DYNOTEARS graph (also run under VARLiNGAM). The third
+influence in the \dynotears{} graph (also run under \varlingam{}). The third
 is a closed-loop variant that feeds each month's realised excess Sharpe
 over equal weight back into the driver scores, through an exponentially
 weighted utility with blend weight $\alpha$ and decay $\gamma$. Over the
@@ -2422,12 +2426,12 @@ excluded, as in the first phase.)
 
 \section{Hyperparameters}
 
-The settings used, for reproducibility. Discovery: DYNOTEARS lag $p=1$,
+The settings used, for reproducibility. Discovery: \dynotears{} lag $p=1$,
 $\lambda_W=\lambda_A=0.05$, fit-time edge threshold $0.01$ (the
 extraction threshold $\tau$ of Section~\ref{sec:asset-graph} defaults to
-$0$ on top of this); VARLiNGAM with lingam pruning disabled (adaptive
+$0$ on top of this); \varlingam{} with lingam pruning disabled (adaptive
 lasso fails at $d>n$); ridge-Granger ridge $\lambda=10^{-2}$ scaled by
-window length, density-matched per window to the paired DYNOTEARS graph.
+window length, density-matched per window to the paired \dynotears{} graph.
 Allocators: single-linkage where clustering is used;
 $\Sigma_{\mathrm{SEM}}$ with diagonal shock variances from fit-window
 residuals, nearest-PSD projection and ridge load
@@ -2459,9 +2463,9 @@ than silently refitting a subtly different graph. The data-determinism
 defect of Section~\ref{sec:cache} arose because EEM's 2003 inception
 fell inside the padding window of the cache-coverage check. This
 triggered a silent re-download whose auto-adjustment jittered values by
-${\approx}3\times10^{-7}$ from run to run. The non-convex DYNOTEARS
+${\approx}3\times10^{-7}$ from run to run. The non-convex \dynotears{}
 optimiser amplified this into graph changes of ${\approx}0.14$ in
-$\lVert W\rVert$. VARLiNGAM's ICA-on-residuals fits were essentially
+$\lVert W\rVert$. \varlingam{}'s ICA-on-residuals fits were essentially
 unchanged by the same jitter, which is a small robustness result in its
 own right.
 
@@ -2501,7 +2505,7 @@ outcome interpretations were committed in advance in
 caches (\path{cache/prices_oos}, \path{cache/drivers_oos}) so the
 2007--2024 CRSP caches are never rewritten. Its asset prices come from
 Yahoo Finance because CRSP daily data ends on 2024-12-31 (verified
-against WRDS on 2026-08-15). Its DYNOTEARS fits join the shared
+against WRDS on 2026-08-15). Its \dynotears{} fits join the shared
 content-keyed discovery cache under their own keys.
 
 \end{document}
