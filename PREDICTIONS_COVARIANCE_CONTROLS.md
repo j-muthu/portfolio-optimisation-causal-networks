@@ -104,7 +104,9 @@ D1 0.408/0.411/0.415/0.395; D0lw 0.384/0.394/0.383/0.353;
 D0df 0.405/0.408/0.416/0.406.
 
 * Shrinkage account: FAILS. D0lw sits below D0 at every window;
-  D1 − D0lw = +0.018 to +0.042, p = 0.035 at two years.
+  D1 − D0lw = +0.018 to +0.042, p = 0.050 at two years (10,000-resample
+  battery in results/phase_ii_contrasts.csv; the same-day 2,000-resample
+  pass that this note was first written from gave 0.035).
 * De-factoring account: SUCCEEDS. D0df reproduces the D1 − D0 gap at
   every window; residual D1 − D0df = −0.011 to +0.004, p ≥ 0.51
   throughout. Gap-closure rho ≥ 0.6 at all four windows, ≥ 1 at the

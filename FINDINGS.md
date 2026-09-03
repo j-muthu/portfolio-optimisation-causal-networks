@@ -39,7 +39,8 @@ Full backtest: approximate S&P 100 (top-99 by CRSP market cap, fixed universe),
 33 exogenous driver candidates, **215 monthly rebalances, 2007-01 → 2024-11**,
 net of 5 bps one-way costs, K=17 calibrated once on a 2006 burn-in. Two lookback
 windows (252 / 504 trading days) as a robustness check. Significance via
-Politis–Romano stationary block bootstrap (2000 resamples).
+Politis–Romano stationary block bootstrap (2000 resamples in this June 2026
+pass; the report's final battery uses 10,000).
 
 ### The full matrix (annualised net Sharpe)
 

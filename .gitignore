@@ -72,3 +72,7 @@ examiner-precision.bundle
 causal-network-representations-in-factor-investing.md
 WRITING_STYLE.md
 WriteHuman API — LLM Integration Refer.md
+Pangram documentation.md
+# Pangram scoring outputs (contain the thesis text + API results)
+results/pangram/
+PANGRAM_REPORT.md

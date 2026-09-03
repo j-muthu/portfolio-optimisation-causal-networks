@@ -212,7 +212,7 @@ def fig_directional_prior():
     # Left/right tick positions coincide (0..50 step 10 <-> 0..1 step 0.2),
     # so one set of gridlines serves both axes.
     ax.set_ylim(0, 55); ax.set_yticks(np.arange(0, 51, 10))
-    ax.grid(True, axis="y", alpha=0.3, zorder=0); ax.set_axisbelow(True)
+    ax.grid(True, axis="y", alpha=0.5, zorder=0); ax.set_axisbelow(True)
     ax2 = ax.twinx()
     for k, col, colour in PRIOR_K_SERIES:
         if col not in df:
