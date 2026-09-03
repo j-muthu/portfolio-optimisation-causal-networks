@@ -95,8 +95,6 @@ def f1_heatmap(matrix: pd.DataFrame) -> None:
         base = f"   (correlation-hrp baseline: {float(corr.iloc[0]):.3f})" if len(corr) else ""
         ax.set_title(f"{w}-day window{base}", fontsize=10)
     fig.colorbar(im, ax=list(axes[:len(ws)]), shrink=0.85, label="net Sharpe")
-    fig.suptitle("Net Sharpe by discovery method × allocator (boxed = skeleton control skeleton-hrp)",
-                 fontsize=11)
     fig.savefig(FIG / "phase_ii_heatmap.png", dpi=200)
     plt.close(fig)
 
@@ -136,8 +134,6 @@ def f2_forest(contrasts: pd.DataFrame) -> None:
         # Legend goes upper left; lower right holds the D0s/w189 star.
         ax.margins(y=0.14)
         ax.legend(loc="upper left", fontsize=8, framealpha=0.9)
-    fig.suptitle("The direction effect, graph held fixed (Politis–Romano 95% CI; * p<0.05)",
-                 fontsize=11)
     fig.savefig(FIG / "phase_ii_forest.png", dpi=200)
     plt.close(fig)
 
@@ -159,8 +155,6 @@ def f3_nav() -> None:
             ax.plot(nav.index, nav.values, color=color, ls=ls, lw=1.4, label=label)
     ax.set_ylabel("cumulative net NAV (start = 1.0)")
     ax.legend(fontsize=8.5, loc="upper left")
-    ax.set_title("Direction-aware allocation from the same DYNOTEARS graphs (252-day window, net of 5 bps)",
-                 fontsize=10.5)
     fig.savefig(FIG / "phase_ii_nav.png", dpi=200)
     plt.close(fig)
 
@@ -192,8 +186,6 @@ def f4_seed(matrix: pd.DataFrame) -> None:
     ax.set_xticks(range(4), ["causal-hsp\n(FFNN)", "skeleton-hrp", "semcov-hrp", "topo-semcov-hrp"], rotation=12, ha="right",
                fontsize=8)
     ax.set_ylabel("net Sharpe (252-day window)")
-    ax.set_title("FFNN-seed variability of the neural driver route vs the seed-free graph-based allocators",
-                 fontsize=10)
     ax.legend(fontsize=8, loc="lower right")
     fig.savefig(FIG / "phase_ii_seed.png", dpi=200)
     plt.close(fig)
@@ -225,8 +217,6 @@ def f5_regime() -> None:
     ax.set_xticks(xs, ["NBER\nrecession", "NBER\nexpansion", "VIX\ntop quintile",
                        "VIX\nbottom quintile"], fontsize=9)
     ax.set_ylabel("Sharpe excess over hsp-baseline")
-    ax.set_title("Regime-conditional edge over hsp-baseline (252-day window)",
-                 fontsize=10.5)
     ax.legend(fontsize=8.5)
     fig.savefig(FIG / "phase_ii_regime.png", dpi=200)
     plt.close(fig)
@@ -285,9 +275,6 @@ def f6_decomposition(matrix: pd.DataFrame, contrasts: pd.DataFrame) -> None:
         ax.set_title(f"{w}-day window", fontsize=10)
     for k in range(0, len(ws), ncol):
         axes[k].set_ylabel("net Sharpe")
-    fig.suptitle(
-        "Decomposing the causal-graph gain over the correlation matrix: "
-        "skeleton vs edge orientation (DYNOTEARS)", fontsize=10.5)
     fig.savefig(FIG / "phase_ii_decomposition.png", dpi=200)
     plt.close(fig)
 
@@ -324,7 +311,6 @@ def f7_window_gradient(contrasts: pd.DataFrame) -> None:
     ax.set_xlabel("estimation window (trading days)")
     ax.set_ylabel("ΔSharpe added")
     ax.legend(fontsize=8.5)
-    ax.set_title("The two additions vs horizon (95% CI)", fontsize=10)
 
     # Right panel: stacked additions, the split of the total gain.
     wsx = np.arange(len(skel[0]))
@@ -343,10 +329,6 @@ def f7_window_gradient(contrasts: pd.DataFrame) -> None:
     axr.set_xticks(wsx, [f"{int(x)} d" for x in skel[0]])
     axr.set_ylabel("ΔSharpe over correlation-hrp")
     axr.legend(fontsize=8.5)
-    axr.set_title("Stacked: the total gain over correlation-hrp, split", fontsize=10)
-
-    fig.suptitle("Skeleton vs orientation: relative additions across estimation "
-                 "horizons (DYNOTEARS, net Sharpe)", fontsize=10.5)
     fig.savefig(FIG / "phase_ii_window_gradient.png", dpi=200)
     plt.close(fig)
 

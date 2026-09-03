@@ -43,7 +43,8 @@ SAMPLE_DATES = [
 ]
 # DYNOTEARS hyperparameters, matching the Phase I defaults.
 DISC_KWARGS = dict(p=1, lambda_w=0.05, lambda_a=0.05, w_threshold=0.01, max_iter=100)
-TOP_K = 17  # the calibrated Phase I K
+TOP_K = 17  # the calibrated Phase I K (kept for the figure's headline series)
+TOP_KS = (5, 10, 15, 20, 25)  # sweep, so the overlap does not rest on one cut-off
 
 
 def _jaccard(a: list[str], b: list[str]) -> float:
@@ -116,11 +117,12 @@ def main() -> None:
         ad_frac = ad_mass / total_free_mass if total_free_mass > 0 else float("nan")
 
         # (3) Does the prior change which drivers Stage A ranks at the top?
-        top_masked = stage_a_score(masked, method="dynotears").scores.sort_values(
-            ascending=False).head(TOP_K).index.tolist()
-        top_free = stage_a_score(free, method="dynotears").scores.sort_values(
-            ascending=False).head(TOP_K).index.tolist()
-        topk_jac = _jaccard(top_masked, top_free)
+        rank_masked = stage_a_score(masked, method="dynotears").scores.sort_values(
+            ascending=False).index.tolist()
+        rank_free = stage_a_score(free, method="dynotears").scores.sort_values(
+            ascending=False).index.tolist()
+        topk_jac = _jaccard(rank_masked[:TOP_K], rank_free[:TOP_K])
+        jac_by_k = {k: _jaccard(rank_masked[:k], rank_free[:k]) for k in TOP_KS}
 
         rows.append({
             "window_end": t.date(),
@@ -130,6 +132,7 @@ def main() -> None:
             "ad_edges": ad_edges,
             "ad_frac_of_total": round(ad_frac, 4),
             "topK_jaccard": round(topk_jac, 3),
+            **{f"jaccard_k{k}": round(jac_by_k[k], 3) for k in TOP_KS},
         })
         log.info("%s: da_rel_change=%.3f, ad_mass=%.3f (%d edges, %.1f%% of total), topK_jac=%.3f",
                  t.date(), da_rel, ad_mass, ad_edges, 100 * ad_frac, topk_jac)
@@ -146,6 +149,7 @@ def main() -> None:
     print("  ad_suppressed_mass: L1 mass of asset->driver edges that appear WITHOUT the prior")
     print("  ad_frac_of_total  : that suppressed mass as a fraction of total edge mass (unconstrained)")
     print("  topK_jaccard      : overlap of top-%d Stage-A drivers, masked vs free" % TOP_K)
+    print("  jaccard_k<K>      : the same overlap at K in %s" % (TOP_KS,))
     print()
     print("Interpretation: large ad_frac + low da_rel_change => the prior cheaply removes a real")
     print("chunk of (spurious) asset->driver mass without distorting the driver->asset block it")

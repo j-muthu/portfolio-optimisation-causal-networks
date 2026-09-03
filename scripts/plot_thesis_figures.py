@@ -184,27 +184,51 @@ def fig_regime_excess():
 
 
 # 6. Directional prior (J1)
+# Regime label per sampled window (matches SAMPLE_DATES in verify_directional_prior).
+PRIOR_REGIME = {
+    "2008-10": "GFC", "2011-09": "Euro crisis", "2014-06": "Calm bull",
+    "2018-12": "2018Q4 selloff", "2020-03": "COVID crash", "2022-06": "Rate hikes",
+}
+# One-hue ordinal ramp for the top-K cut-offs (light -> dark as K grows).
+PRIOR_K_SERIES = [
+    (10, "jaccard_k10", "#E8904A"), (15, "jaccard_k15", "#C25400"),
+    (20, "jaccard_k20", "#6E3000"),
+]
+
+
 def fig_directional_prior():
     df = _csv("directional_prior_verification.csv")
     if df is None:
         return
-    labels = [str(w)[:7] for w in df.window_end]
+    dates = [str(w)[:7] for w in df.window_end]
+    labels = [f"{PRIOR_REGIME.get(d, d)}\n{d}" for d in dates]
     x = np.arange(len(df))
-    fig, ax = plt.subplots(figsize=(9.5, 5))
-    ax.bar(x, df.ad_frac_of_total * 100, color="#0072B2",
-           label="asset→driver edge mass if prior removed (% of total)")
-    ax.set_ylabel("Implausible asset→driver mass (%)", color="#0072B2")
-    ax.set_xticks(x); ax.set_xticklabels(labels, rotation=30, ha="right", fontsize=8)
+    fig, ax = plt.subplots(figsize=(9.5, 5.8))
+    ax.bar(x, df.ad_frac_of_total * 100, width=0.55, color="#0072B2", alpha=0.6,
+           zorder=2, label="asset→driver edge mass if prior removed (% of total, left axis)")
+    ax.set_ylabel("Implausible asset→driver mass (%)")
+    ax.set_xlabel("Regime")
+    ax.set_xticks(x); ax.set_xticklabels(labels, fontsize=8)
+    # Left/right tick positions coincide (0..50 step 10 <-> 0..1 step 0.2),
+    # so one set of gridlines serves both axes.
+    ax.set_ylim(0, 55); ax.set_yticks(np.arange(0, 51, 10))
+    ax.grid(True, axis="y", alpha=0.3, zorder=0); ax.set_axisbelow(True)
     ax2 = ax.twinx()
-    ax2.plot(x, df.topK_jaccard, "o-", color="#D55E00", label="top-K driver Jaccard (with vs without prior)")
-    ax2.set_ylabel("top-K Jaccard", color="#D55E00")
-    ax2.set_ylim(0, 1.05)
-    ax.set_title("The asset→driver prior is consequential:\nit suppresses 35–48% spurious reverse-causation mass and shifts selection",
-                 fontsize=11)
-    lines = ax.get_legend_handles_labels()[0] + ax2.get_legend_handles_labels()[0]
-    labs = ax.get_legend_handles_labels()[1] + ax2.get_legend_handles_labels()[1]
-    ax.legend(lines, labs, frameon=False, fontsize=8, loc="lower center")
-    fig.tight_layout()
+    for k, col, colour in PRIOR_K_SERIES:
+        if col not in df:
+            continue
+        ax2.plot(x, df[col], marker="o", ms=5, lw=1.6, color=colour, zorder=3,
+                 label=f"top-{k} IoU")
+    ax2.set_ylabel("Top-K driver intersection over union")
+    ax2.set_ylim(0, 1.1); ax2.set_yticks(np.arange(0, 1.01, 0.2))
+    # Two legend rows below the plot: the bar series, then the K series in order.
+    fig.legend(*ax.get_legend_handles_labels(), frameon=False, fontsize=8,
+               loc="lower center", ncol=1, bbox_to_anchor=(0.5, 0.045))
+    h2, l2 = ax2.get_legend_handles_labels()
+    fig.legend(h2, [l2[0] + " (right axis)"] + l2[1:], frameon=False, fontsize=8,
+               loc="lower center", ncol=len(h2), bbox_to_anchor=(0.5, 0.0),
+               columnspacing=1.6, handlelength=2.2)
+    fig.tight_layout(rect=(0, 0.09, 1, 1))
     _save(fig, "directional_prior.png")
 
 
@@ -258,10 +282,6 @@ def fig_returns_distribution():
     ax.set_yscale("log")  # log-y exposes the tails
     ax.set_xlabel("daily net return")
     ax.set_ylabel("density (log)")
-    # No kurtosis in the title: the caption quotes \rsKurtosis, and a second,
-    # differently-pooled estimate here would conflict with it.
-    ax.set_title("Daily returns are heavy-tailed\n"
-                 "— why the Sharpe is supplemented by PSR/DSR", fontsize=11)
     ax.legend(frameon=False, loc="upper right")
     ax.grid(True, alpha=0.3, which="both")
     fig.tight_layout()

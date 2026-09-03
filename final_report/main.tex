@@ -7,6 +7,7 @@
 \usepackage{booktabs}
 \usepackage{array}
 \usepackage{enumitem}
+\usepackage{rotating}
 
 % Allocator names
 \newcommand{\corrhrp}{\textsc{correlation-hrp}}
@@ -18,7 +19,7 @@
 \newcommand{\oriented}{\textsc{oriented}}
 
 % One-sentence captions; anything further goes in a note under the float
-\newcommand{\floatnote}[1]{\par\vspace{3pt}\begin{minipage}{0.92\textwidth}\footnotesize\emph{Note.} #1\end{minipage}\par}
+\newcommand{\floatnote}[1]{\par\vspace{3pt}\begin{minipage}{0.92\textwidth}\footnotesize Note. #1\end{minipage}\par}
 
 % Referencing (Vancouver)
 \addbibresource{references.bib}
@@ -165,7 +166,7 @@ rebalanced monthly between 2007 and 2024. The asset ``universe''
 is discussed in further detail in Chapter~\ref{chap:discovery},
 the allocation protocol in Chapter~\ref{chap:evaluation}.
 Second, the correlation matrix is the matrix originally used in HRP,
-the lookback window's sample correlation
+the estimation window's sample correlation
 \cite{lopezdeprado2016hrp}. This feeds into the baseline HRP
 control (see Chapter~\ref{chap:sensitivity}).
 Third, a discovered causal graph is the output of one of the causal
@@ -277,7 +278,7 @@ novel contributions below:
 
 \begin{itemize}[itemsep=2pt, topsep=3pt]
   \item A fixed-graph decomposition design, plus a reproducible
-    discovery pipeline (attribution; Chapter~\ref{chap:discovery}). 
+    discovery pipeline (Chapter~\ref{chap:discovery}). 
     The same per-window DYNOTEARS or VARLiNGAM graph feeds several different
     allocators that incrementally take in more information from the DAG,
     from none (\corrhrp{}), to skeleton-only, to orientation-aware.
@@ -295,9 +296,9 @@ novel contributions below:
     the DAG's topological order. \semcovhrp{} uses the
     implied covariance at the allocation step, \topohrp{} uses the topological ordering at the ordering step, while
     \toposemcovhrp{} uses both the topological ordering and the implied covariance.
-  \item Conducting a pre-registered, controlled evaluation with multiple metrics (Chapter~\ref{chap:evaluation}). Each comparison is tested using
+  \item Evaluating the allocators' performance using multiple metrics (Chapter~\ref{chap:evaluation}). Each comparison is tested using
   a stationary block bootstrap \cite{politis1994stationary},
-    which resamples the daily return series in blocks so the
+    which uses block resampling to ensure that the
     resulting $p$-values account for autocorrelation and heavy tails.
     To account for all \rsNtrials\ configurations evaluated, I use the Deflated Sharpe
     ratio, which corrects the best-performing configuration based on the number of trials examined. I also use Hansen's SPA test and the Model Confidence Set
@@ -308,13 +309,12 @@ novel contributions below:
     \rsContrastMDETotal{} for the total). This means that any null results
     act as upper bounds on the effect, rather than as evidence of no effect at all.
     I also test whether the causal graph is the real driver of any performance gain over the correlational allocator: given that the DAG provides a different covariance as an input to HRP, that difference in covariance, rather than the informational value of the edge orientations, may be the driver.
-    To test this, I create three other allocators that make a similar change to covariance without providing a graph. The first replaces the sample
-    covariance with a Ledoit--Wolf shrunk covariance to identify whether the performance gain was purely an artefact of shrinkage. The second removes the common market factor from the returns before
-    computing the covariance to identify whether that market-factor removal alone was the driver of performance gains.
+    To test this, I create three other allocators that make a similar change to covariance without providing a graph. The first applies Ledoit--Wolf shrinkage to the covariance matrix, to identify whether the shrinkage effect of the graph was the driver of performance gain.
+    In the second allocator, before computing the return covariance matrix, I remove the common market factor from the returns. This identifies the extent to which the DAG's removal of the common market factor drives performance gains.
     The third just clusters on a partial-correlation
     network that has the same density as the skeleton, which indicates whether the performance gain was achievable by any sparse network (rather than needing a causal network specifically).
     I also test on 2025--2026 out-of-sample data, and check that there is still a positive performance gain for both the skeleton-only allocator over the HRP baseline and the orientation-aware allocators over the skeleton-only allocator, matching the in-sample positive values. 
-    As a robustness check, I also rerun the whole experimental design using a second hierarchical allocator, HERC. This verifies whether the conclusions are specifically dependent on HRP as a choice of hierarchical allocator.
+    As a robustness check, I also rerun the whole experimental design using a second hierarchical allocator, Hierarchical Equal Risk Contribution (HERC). This verifies whether my results are specific to HRP as a choice of hierarchical allocator.
 \end{itemize}
 
 \section{Quantified benefits}
@@ -367,148 +367,62 @@ The full result tables, hyperparameters, and reproduction instructions are locat
 \chapter{Background and Related Work}
 \label{chap:background}
 
-This project sits between two literatures: portfolio construction and
-causal discovery. I organise this chapter around the two works that the
-project builds on directly, one from each literature, and I place each
-one within the work around it. The first is L\'opez de Prado's
-Hierarchical Risk Parity and his later work on backtest rigour
-(Section~\ref{sec:hrp-theme}). HRP is the allocator whose clustering
-step I modify in Chapter~\ref{chap:sensitivity}, and the backtest work
-sets the standard of statistical inference I use in
-Chapter~\ref{chap:evaluation}. Around it, I cover the HRP variants and
-the graph-free covariance estimators that I use as controls in
-Chapter~\ref{chap:evaluation}. The second is Howard, Lohre and Mudde's
-work on causal networks over the S\&P~500
-(Section~\ref{sec:howard-theme}). It is the closest causal-finance work
-to this thesis, and it stops one step short of the question I ask.
-Section~\ref{sec:cd-tools} then summarises the facts from the
-causal-discovery literature that my pipeline relies on, including what
-observational data can and cannot identify about edge orientations.
-Section~\ref{sec:gap} states the research gap.
+This project is underpinned by three key areas of research: hierarchical portfolio allocation, applying causal graphs to investing, and causal discovery. 
 
-\section{Theme I: hierarchical allocation and honest backtests
-(L\'opez de Prado)}
+\section{Hierarchical portfolio allocation}
 \label{sec:hrp-theme}
 
-Mean--variance optimisation \cite{markowitz1952portfolio} requires the
-inverse of a covariance matrix. For a 100-asset universe estimated on a
-1-year window, that matrix is noisy and near-singular, so the optimiser
-amplifies the estimation error and produces concentrated, unstable
-weights. Hierarchical Risk Parity \cite{lopezdeprado2016hrp} avoids the
-inversion with a three-step scheme. First, clustering: convert the
-correlation matrix $\rho$ into the distance
-$d_{ij} = \sqrt{\tfrac{1}{2}(1-\rho_{ij})}$ and build a single-linkage
-dendrogram. Second, quasi-diagonalisation: reorder the assets by the
-dendrogram's leaf order, so that large covariances sit near the diagonal.
-Third, recursive bisection: split the ordered list in half, allocate
-between the two halves in inverse proportion to their cluster variances,
-and recurse into each half. No matrix is inverted, so HRP is robust to
-ill-conditioning. In the paper's Monte Carlo experiments it beats both
-mean--variance and inverse-variance portfolios out of sample
-\cite{lopezdeprado2016hrp}.
+In order to weight assets in a portfolio to minimise risk (variance) while maximising return, mean-variance optimisation \cite{markowitz1952portfolio} requires inverting the covariance matrix of asset returns.
+For a large set of assets at a standard window size (around 1 year), that matrix is ill-conditioned, which means that the resulting weights are highly concentrated and unstable.
+Hierarchical Risk Parity \cite{lopezdeprado2016hrp} sidesteps this matrix inversion problem. It uses a three-step approach to optimisation. First, it clusters assets by converting the
+correlation matrix $\rho$ into a distance matrix $d$, where $d_{ij} = \sqrt{\tfrac{1}{2}(1-\rho_{ij})}$, and builds a binary tree (dendrogram) so closely related assets cluster together.
+The second step is quasi-diagonalisation, where assets are ordered in the dendrogram's leaf order, so that large covariances sit near the diagonal.
+Finally, assets are weighted in the portfolio using recursive bisection: the ordered list is split in half, the two halves are then weighted in inverse proportion to their cluster variances,
+then each half of the list is recursed into. 
+HRP is robust to ill-conditioning as no matrix is inverted.
+This yields performance improvements over mean-variance and inverse-variance portfolios out of sample \cite{lopezdeprado2016hrp}.
 
-Two observations about this scheme drive the thesis. First, the
-dendrogram exists only to produce an ordering. The allocation step
-(recursive bisection) takes an ordered list and cluster variances, and it
-never reads the tree itself. This means that any procedure which produces
-an economically meaningful ordering of the assets can replace the
-clustering step entirely. This observation motivates the causal-ordered
-bisection of Section~\ref{sec:d2}. Second, every input to the clustering
-and quasi-diagonalisation steps is symmetric by necessity. Linkage
-clustering merges clusters by comparing distances, and a distance is
-symmetric by definition. This means that if the true data-generating
-process contains one-way influence (asset $A$ moves asset $B$, and $B$
-does not move $A$ back), no correlation-fed hierarchical allocator can
-represent that fact. This is the problem raised in
-Section~\ref{sec:motivation}. The problem lies in what the clustering
-step can accept, rather than in how correlation is estimated.
-Chapter~\ref{chap:sensitivity} addresses how to get directional
-information into HRP without breaking what makes it work.
+Note that the allocation step (recursive bisection) takes in an ordered list, plus the variances from the clustering step. In standard HRP, that ordered list comes from a dendrogram, however this need not be the case: any procedure which produces
+an economically meaningful asset ordering of the assets can be used in place of the clustering step.
+In Section~\ref{sec:d2}, I do so using a causal-ordered bisection.
+Also, as stated in Sections~\ref{sec:motivation} and \ref{sec:challenges}, HRP clustering requires symmetric matrices, which means
+it cannot represent directed causal influence.
+In Chapter~\ref{chap:sensitivity}, I address the problem of augmenting HRP with directional information.
 
-The limitation applies to the whole family of hierarchical allocators,
-not just to HRP. HRP has spawned several variants: hierarchical
-clustering-based asset allocation and its equal-risk-contribution version
-\cite{raffinot2017hierarchical}, and nested clustered optimisation
+There are several variants of HRP, including hierarchical
+clustering-based asset allocation \cite{raffinot2017hierarchical} and nested clustered optimisation
 \cite{lopezdeprado2020mlam}. Lohre, Rother and Sch\"afer
-\cite{lohre2020hrp} extend HRP to multi-asset, multi-factor allocation
-and replace correlation with a tail-dependence measure at the clustering
-step. These vary the linkage rule, the distance measure, the risk
-measure or the within-cluster optimiser, but every one of them clusters
-on a symmetric similarity matrix at the first step. This means that a
-decomposition of what directed structure is worth at that step applies
-to the whole family rather than to one algorithm. I use HRP because it
-is the simplest and most studied member, so any effect I find is
-attributable to the input rather than to the allocator's elaborations.
-Whether the measured decomposition also transfers to a second member of
-the family is an empirical question. I test it on a HERC variant
-\cite{raffinot2018herc} in Section~\ref{sec:decomposition}, with a mixed
-result.
+\cite{lohre2020hrp} extend HRP across multiple asset classes rather than just stocks, and allocate over risk factors. Also, instead of using correlation at the clustering step, they use a tail-dependence measure, measuring how assets co-move when they are performing poorly. This provides better assurance of portfolio performance during crises.
 
-One member of the family changes the input rather than the way the tree
-is read. Hierarchical Sensitivity Parity (HSP) \cite{rodriguez2023hsp}
-keeps HRP's clustering and recursive bisection, but clusters assets on
-the similarity of their sensitivities to a set of common drivers rather
-than on return correlation. For each asset, a feed-forward neural network
-maps $K$ macro-financial drivers (rates, commodities, currencies,
-volatility indices) to the asset's return. The gradient of the fitted
-network with respect to the drivers, obtained by automatic
-differentiation, is the asset's sensitivity vector $s_i$. The distance
-$\lVert s_i - s_j \rVert_2$ then replaces the correlation distance. The
-motivation is the commonality principle
-\cite{rodriguez2023hsp,rodriguez2025causal}. If the drivers are common
-causes of the assets, in the sense of Reichenbach's common-cause
-principle \cite{hitchcock2020reichenbach}, then distance in sensitivity
-space measures shared exposure to those causes, and clustering on it is
-argued to diversify systematic and idiosyncratic risk at the same time.
-HSP is therefore the published hierarchical allocator closest to this
-thesis, because it clusters on something other than correlation.
-However, it is not a causal method. The drivers are selected by their
-cumulative correlation with the assets, the sensitivities are gradients
-of a conditional expectation rather than structural effects, and the
-distance it gives to HRP is symmetric, so the limitation above applies
-to it unchanged. Also, because the sensitivities come from a trained
-network, the allocation inherits a source of randomness (the network
-initialisation) that correlation-based HRP does not have.
+While I focus on HRP and its variants in this project, I want to verify whether my results hold across other hierarchical portfolio allocators.
+One such allocator is Hierarchical Equal Risk Contribution (HERC)
+\cite{raffinot2018herc}, which, rather than allocating by recursively bisecting the order of the leaves of the dendrogram, 
+allocates based on the order the assets were clustered in.
+Risk contributions are then equalised across the clusters it finds.
+I test a HERC variant in Section~\ref{sec:decomposition}, and find mixed results.
 
-A separate and well-established way to improve allocation is to improve
-the covariance input rather than the allocator. Linear shrinkage pulls
-the noisy sample covariance towards a structured target with an
-analytically optimal intensity, trading a small bias for a large
-reduction in estimation variance \cite{ledoitwolf2004}. Removing a common
-market factor through a single-factor model \cite{sharpe1963simplified},
-and keeping the residual (de-factored) covariance, suppresses the
-dominant source of co-movement noise in equity panels. The random-matrix
-literature identifies that factor with the largest eigenvalue of the
-correlation matrix, which sits well apart from the noise bulk in equity
-data \cite{laloux1999noise}. Both methods condition the covariance
-estimate without asserting any graph over the assets. In
-Chapter~\ref{chap:evaluation}, I use exactly these two estimators,
-Ledoit--Wolf shrinkage and a de-factored residual covariance, as
-graph-free controls for the mechanism behind the SEM-implied covariance.
+While most of the HRP variants use the return correlation matrix as their input, Hierarchical Sensitivity Parity (HSP) \cite{rodriguez2023hsp} clusters assets on the similarity of their sensitivities to a set of common drivers instead. For each asset, a feed-forward neural network is created which uses $K$ macrofinancial drivers (such as interest rates, commodities, currencies, and volatility indices) to predict the asset's return.
+The gradient of the neural network with respect to the macro drivers is the asset's sensitivity vector $s_i$. Then, to cluster the assets, the distance $\lVert s_i - s_j \rVert_2$ replaces the correlation distance.
+The motivation is Reichenbach's common-cause principle \cite{rodriguez2023hsp,rodriguez2025causal, hitchcock2020reichenbach}: if the drivers are common causes of the assets, then the distance, measured between sensitivity vectors, measures how similarly assets are exposed to those causes.
+Clustering on this sensitivity distance is therefore argues to diversify both systematic and idiosyncratic risk simultaneously.
+HSP is therefore linked to the novel allocators in this thesis insofar as its clustering step does not just use correlation. However, it is not a causal allocator, as the drivers themselves are just selected on the basis of their cumulative correlation with the assets. Also, as the sensitivities are produced by a randomly initialised neural network (and may also be trained on GPUs whose threads finish at non-deterministic times), the allocation is not reproducible exactly.
 
-A third graph-free object is the partial-correlation network. The
-precision matrix (the inverse of the covariance) records the dependence
-between each pair of assets conditional on all the others. Thresholding
-it, or estimating it sparsely with the graphical lasso
-\cite{friedman2008glasso}, gives a sparse undirected network with no
-causal discovery. Kenett et al.\ \cite{kenett2010partial} apply such
-networks to equities and find that they expose a dominant financial
-sector that the plain correlation network hides. In
-Chapter~\ref{chap:evaluation}, I use a thresholded partial-correlation
-network, matched in density to the discovered skeleton, as the
-graph-free control for the skeleton-only allocator.
+Aside from simply improving the allocator mechanism as a whole, another way to improve portfolio optimisation is to improve the input. Linear shrinkage can reduce noise in the sample covariance matrix by punishing deviation from a structured target like an identity matrix, trading off a small bias for a large reduction in variance \cite{ledoitwolf2004}.
+Another method for de-noising assets' co-movement is to use a single-factor model \cite{sharpe1963simplified} to remove the factor common to all assets' returns, and then using the resulting residual (de-factored) covariance.
+This ``common-market factor'' is identified by the largest eigenvalue of the correlation matrix \cite{laloux1999noise}.
+Both of these methods de-noise the input to the allocator without the need for any DAG. 
+I therefore use these estimators in Chapter~\ref{chap:evaluation} to identify whether the performance improvements that I identify from the edge-orientation-aware allocators are due to the DAG itself or these de-noising estimators.
 
-L\'opez de Prado's later work supplies the standard of inference I
-adopt. The core claim of the backtest-overfitting literature
-\cite{bailey2014deflated,lopezdeprado2023causal} is that the hard problem
-in quantitative finance is establishing that a configuration's
-performance is not an artefact of the search that found it, rather than
-finding a configuration that looks good in a backtest. Two instruments
-follow. The Probabilistic Sharpe Ratio \cite{bailey2012psr} replaces the
+In the same chapter, I similarly use a graph-free simulacrum of the skeleton-only allocator to identify the drivers of its performance improvements. This graph-free control is a ``thresholded partial-correlation network''. 
+The inverse of the covariance matrix (the precision matrix) gives the conditional dependence between pairs of assets. Thresholding it (using graphical lasso to sparsely estimate it \cite{friedman2008glasso}) yields a sparse, undirected network, with no need for causal discovery. Kenett et al.\ \cite{kenett2010partial} apply these thresholded networks to equities and find that they reveal a dominant financial sector that a standard correlation network does not find.
+
+L\'opez de Prado has also done work on overfitting to backtests. This literature \cite{bailey2014deflated,lopezdeprado2023causal} focuses on establishing whether the performance of a particular allocator configuration has not just been cherry-picked out of many other allocator configurations attempted. 
+The literature has produced metrics that account for this search space when evaluating performance on backtests.
+First, the Probabilistic Sharpe Ratio \cite{bailey2012psr} replaces the
 Gaussian sampling theory of the Sharpe ratio, which is untenable at the
 excess kurtosis of ${\approx}\,\rsKurtosis$ I measure here, with a
 version that corrects for the sample's skewness, kurtosis and length.
-The Deflated Sharpe Ratio \cite{bailey2014deflated} then raises the
+Second, the Deflated Sharpe Ratio \cite{bailey2014deflated} then raises the
 benchmark from zero to the best Sharpe expected from $N$ independent
 trials under the null of no skill, which directly discounts selection
 bias. For comparing a family of strategies against a benchmark, White's
@@ -523,323 +437,143 @@ evaluated, while the SPA and MCS run over the smaller family of
 candidates relevant to each question. Several effects that look
 important at first do not survive it, and I report those as well.
 
-\section{Theme II: causal graphs on equities, without allocation
-(Howard, Lohre and Mudde)}
+\section{Applying causal graphs to investing}
 \label{sec:howard-theme}
 
-Howard, Lohre and Mudde \cite{howard2025causal} is the closest prior
-work. It is a large-scale application of DYNOTEARS to S\&P~500
-constituents over 1989--2022 (about 357 names per estimated network),
-re-estimated on a rolling basis. Structurally, this is the same discovery
-machinery as Chapter~\ref{chap:discovery}. Three of their empirical
-findings shape my design. First, lagged edges are negligible at
-daily-to-monthly horizons: the contemporaneous block $W$ contains
-essentially all the structure. This justifies my use of the
-contemporaneous asset-to-asset block as ``the graph'', and the truncation
-to one lag in Section~\ref{sec:asset-graph}. Second, causal networks
-carry regime information that correlation misses. Rising network density
-precedes lower returns and flags recessions, and their centrality-based
-signal earns its alpha in stable rather than stressed periods. This
-motivates the regime-conditional evaluation of Section~\ref{sec:regimes},
-where I find that the orientation effect follows their calm-regime
-pattern. Third, their overall verdict is measured: causal networks
-complement, rather than consistently beat, correlation-based methods. My
-research question sharpens that claim into a decomposition, by asking
-whether the complement operates through the skeleton or through the edge
-orientations.
+The closest prior work to this project is Howard, Lohre and Mudde's application of DYNOTEARS to equities from the S\&P~500, re-estimated on a rolling basis \cite{howard2025causal}.
+They find that causal networks carry information about macrofinancial regimes that correlation alone does not, such as the fact that denser networks are associated with recessions. 
+The paper has two other findings that influence my research. First, they find that contemporaneous matrix from the structural model explains almost all of the structure, with the lagged matrices being almost empty, particularly after the first lag order. As a result, I only fit up to one lag in Section~\ref{sec:asset-graph}, and I only use the contemporaneous matrix as an input to my allocators.
+The authors find that causal networks outperform correlation-based methods in some regards, but not consistently. I want to see whether a more comprehensive usage of causal graphs can yield a performance gain over correlational methods, and also whether that performance gain is due to the graph's skeleton or its edge orientations.
+Also, they do not use the graph as a direct input into portfolio allocation, instead using it to represent similarity or compressing it into a single metric: this is a gap my research seeks to address.
 
-However, they do not allocate from the graph, and that is the gap this
-project fills. Their three use-cases (peer groups for factor
-neutralisation, a low-centrality factor, and a density-based
-market-timing signal) all use the graph as a similarity structure or as
-a scalar diagnostic. The graph is never handed to an allocator. No
-portfolio weights are ever computed from the discovered network, and the
-direction of the edges is used only implicitly (through centrality).
-This means that their pipeline cannot ask how much of the graph's
-allocation value lies in its orientations. Tang \cite{tang2024trading}
-builds trading signals from time-series causal discovery (including
-VARLiNGAM) and finds that computational cost is the binding constraint.
-I address this warning with a content-keyed discovery cache
-(Section~\ref{sec:cache}) rather than by shrinking the experiment.
-
-\section{The causal-discovery toolkit}
+\section{Causal discovery}
 \label{sec:cd-tools}
 
-The pipeline needs four facts from the causal-discovery literature
-\cite{spirtes2000causation,peters2017elements,kaddour2022causalml}.
+There are two main types of causal discovery algorithms: score-based and constraint-based. Constraint-based algorithms, such as Peter-Clark and FCI, scale poorly as dimensionality increases, and rely on the faithfulness assumption (that statistical independence identified in the sample reflects true statistical separation -- d-separation). This assumption is weak in real-world markets, as counterbalancing effects can yield a negligible correlation between assets despite a true causal connection existing \cite{howard2025causal}. Even more modern constraint-based methods such as PCMCI \cite{runge2019pcmci} and PCMCI+ \cite{runge2020pcmciplus}, which are built for large time-series datasets, are unsuitable for this project: the former only tests lagged causal links, while the latter returns only a partially directed graph.
+Score-based algorithms offer a better alternative. One example is NOTEARS \cite{zheng2018notears}, which turns graph discovery into a continuous optimisation problem by recasting the acyclicality requirement as a smooth constraint. DYNOTEARS \cite{pamfil2020dynotears} extends this to a structural VAR representation for time series data, and is the primary causal discovery algorithm I use.
 
-First, observational data identifies a graph's skeleton more firmly than
-its edge orientations. Under the Markov and faithfulness assumptions, the
-conditional independences in the data determine the skeleton and the
-v-structures (pairs of edges that collide at one node). They do not
-determine the direction of the remaining edges. Every DAG with the same
-skeleton and the same v-structures implies the same independences, and
-these DAGs form a Markov equivalence class \cite{verma1990equivalence}.
-This means that the direction of an edge can only be identified with an
-extra assumption, such as non-Gaussian shocks, equal shock variances
-\cite{peters2014identifiability} or time order. The two objects my
-research question separates therefore differ in how well the data can
-identify them. I should expect the skeleton to be the more stable of the
-two, and I should expect any performance gain from the edge orientations
-to depend on which extra assumption the discovery method makes.
-Chapter~\ref{chap:evaluation} finds that the orientation contribution
-does depend on the discovery method (see
-Section~\ref{sec:orientation-role}).
+However, NOTEARS methods do have a limitation regarding edge orientations: the fact that the least-squares score it uses to fit the DAG implicitly assumes that variables' shocks have equal variance. This assumption means NOTEARS tends to orient directed edges from lower-variance variables to higher-variance ones \cite{peters2014identifiability}. On that basis, Reisach, Seiler and Weichwald \cite{reisach2021beware} find that simply regressing each variable on higher-variance variables yields graphs that are approximately as good as NOTEARS' ones. Once the variables are standardised (each variable has its mean subtracted and is divided by its standard deviation, so it has mean 0 and variance 1), NOTEARS' accuracy falls to the level of PC. As a result of the above, I standardise the variables before fitting the discovery methods (see Section~\ref{sec:discovery-run}). Another paper by Reisach et al.\ also shows that, even after standardisation, ordering by explained variance ($R^2$) survives in NOTEARS graphs; I discuss this in Section~\ref{sec:believe}.
 
-Second, score-based discovery scales and accepts priors. Constraint-based
-methods (PC, FCI) scale poorly with dimension and rely on faithfulness.
-That assumption is fragile in markets, where offsetting mechanisms can
-leave causally connected pairs with near-zero marginal correlation
-\cite{howard2025causal}. PCMCI \cite{runge2019pcmci} is the
-constraint-based method built for large time-series panels. However, it
-tests lagged links only, and its contemporaneous extension PCMCI+
-\cite{runge2020pcmciplus} returns a partially directed graph in which
-some contemporaneous edges stay unoriented. The allocators of
-Chapter~\ref{chap:sensitivity} need a fully directed acyclic graph, so I
-do not use it. NOTEARS \cite{zheng2018notears} recasts acyclicity as the
-smooth constraint $h(W)=\operatorname{tr}(e^{W\circ W})-d=0$, which
-turns DAG learning into a continuous optimisation. DYNOTEARS
-\cite{pamfil2020dynotears} extends it to the structural VAR
-$X = XW + \sum_p Y_p A_p + Z$, with acyclicity enforced on the
-contemporaneous $W$ only. It natively supports forbidden-edge lists,
-which is how I enforce the directional prior described in
-Chapter~\ref{chap:discovery}. It is the primary method here.
+Another causal discovery family is LiNGAM \cite{shimizu2006lingam}, which uses non-Gaussian residuals to identify causal orderings for DAGs. VARLiNGAM \cite{hyvarinen2010varlingam} is its structural-VAR form, and serves as my robustness comparator to DYNOTEARS. Its identification rests on heavy-tailed residuals, which financial returns exhibit in short windows. However, at longer windows, this is not the case, as aggregation pulls residuals towards Gaussianity \cite{cont2001stylized}.
 
-The NOTEARS family has a known weakness that concerns edge orientations
-directly. Its least-squares score implicitly assumes equal shock
-variances across variables. Under that assumption the score orients an
-edge from the lower-variance variable to the higher-variance one
-\cite{peters2014identifiability}. Reisach, Seiler and Weichwald
-\cite{reisach2021beware} show that in the standard simulated benchmarks
-the marginal variance rises along the causal order (they call this
-varsortability). Sorting the variables by variance and regressing each
-on its predecessors recovers those benchmark graphs about as well as
-NOTEARS does. Once the data are standardised, NOTEARS' accuracy falls to
-the level of PC and GES. Kaiser and Sipos \cite{kaiser2022unsuitability}
-show the same scale dependence through a change of measurement units.
-There are two consequences for this thesis. First, I fit every discovery
-method on a per-window $z$-scored panel (see
-Section~\ref{sec:discovery-run}), so raw-variance ordering cannot drive
-the orientations. Second, I set my expectations of orientation accuracy
-by the standardised-data results, which are modest. The original
-NOTEARS benchmarks overstate them. A later paper by the same group
-\cite{reisach2023r2} shows that a related ordering by explained variance
-($R^2$) survives standardisation, so scaling does not remove every such
-shortcut. I return to this in Section~\ref{sec:believe}.
-
-Third, non-Gaussianity identifies direction. The LiNGAM family
-\cite{shimizu2006lingam} exploits non-Gaussian residuals to identify a
-unique causal ordering. VARLiNGAM \cite{hyvarinen2010varlingam} is its
-structural-VAR form and serves as my robustness comparator. Its
-identification rests on heavy-tailed residuals. Financial returns satisfy
-this at short windows, but lose it progressively at longer ones, because
-aggregation pulls residuals towards Gaussianity. This is a standard
-stylised fact of asset returns \cite{cont2001stylized}. The results
-repeatedly show this mechanism.
-
-Fourth, a directed graph without trustworthy magnitudes exists in closed
-form. A ridge-regularised VAR(1) coefficient matrix is a Granger-causal
-\cite{granger1969investigating} directed graph. It gives a defensible
-directional ordering, but its shrunken one-lag coefficients are not
-structural effect sizes. This combination makes it a natural control for
-separating the two things that ``orientation'' might contain: the arrows
-themselves, and the magnitudes fitted to propagate shocks.
+The final causal discovery algorithm I use is a VAR(1) coefficent matrix that has been ridge-regularised, which yields a Granger-causal
+\cite{granger1969investigating} directed graph. 
+This gives a reasonable directional ordering, 
+but its shrunken one-lag coefficients are biased. 
+As a result, I use it as a control to separate out the two aspects of orientation:
+the directionality itself, and the magnitudes of the edges.
 
 \section{Research gap}
 \label{sec:gap}
 
-Table~\ref{tab:gap} positions the work. The \corrhrp{} baseline of
-Section~\ref{sec:question} is the HRP row. Reading across the columns:
-HRP fixes the allocator but is blind to direction at the clustering
-step; HSP changes what HRP clusters on, but selects its drivers by
-correlation and still gives the allocator a symmetric distance; Howard et
-al.\ discover directed graphs at scale but never allocate from them. None
-of the three sets hierarchical portfolio weights from a discovered
-asset-to-asset causal graph. This means that none of them can decompose
-the graph's allocation value into skeleton and edge orientations, which
-is what the research question demands and
-Chapters~\ref{chap:sensitivity}--\ref{chap:evaluation} deliver.
+Table~\ref{tab:gap} positions my research against prior work. HRP forms the baseline, \corrhrp{}, of my research. As mentioned above, HRP does not use directionality in the clustering step. HSP clusters on driver sensitivities rather than correlation, but selects the drivers themselves by correlation, and still uses a symmetric distance matrix as an input to the allocator. Howard et al.\ use causal discovery to identify DAGs but do not use them directly for portfolio allocation. None of them can separately attribute the value of the skeleton and the edge orientation of a graph, as none of them set hierarchical portfolio weights from a causal graph of assets in the first place. I do so in Chapters~\ref{chap:sensitivity} to \ref{chap:evaluation}.
 
-I need to be careful with the novelty claim, because allocating from a
-graph over assets is not itself new. The correlation-network tradition
-starts with Mantegna \cite{mantegna1999hierarchical}, who filters the
-correlation matrix to a minimum spanning tree and reads a hierarchical
-clustering of the assets from it. Tumminello et al.\
-\cite{tumminello2005pmfg} extend the filter to the planar maximally
-filtered graph (PMFG), which keeps more edges. The tradition's most
-direct allocation result is that weight placed in the peripheries of the
-network outperforms \cite{pozzi2013spread}, and there is also work on
-network-centrality portfolio selection \cite{peralta2016network}.
-Clustering assets on a graph and then allocating down its structure
-descends from that tradition, and the skeleton-only allocator in this
-thesis is its conceptual descendant. Directed-graph allocation is also
-not unprecedented. Granger-causality networks over financial
-institutions are an established systemic-risk measurement tool
-\cite{billio2012econometric}, and V\'yrost, Ly\'ocsa and Baum\"ohl set
+Allocating from a graph of assets is not itself novel: Mantegna \cite{mantegna1999hierarchical} creates a minimum spanning tree (MST) from the correlation matrix, and uses that to create a hierarchical clustering of assets. Tumminello et al.\
+\cite{tumminello2005pmfg} extend this by using a planar maximally
+filtered graph (PMFG), which keeps more edges.
+Subsequent research along these lines found that allocating portfolio weight to the periphery of the network outperforms allocating weight to central nodes \cite{pozzi2013spread,peralta2016network}, as the latter are connected to everything and 
+so diversifies least. 
+This research motivates the importance of the skeleton: \skelhrp{}, the skeleton-only
+allocator of this thesis, likewise builds a graph over the assets and allocates down its
+structure, but its graph comes from causal discovery rather than from
+filtering a correlation matrix. 
+Directed-graph allocation is also
+not unprecedented: Granger-causality networks over financial
+institutions are an established tool for measuring systemic risk
+\cite{billio2012econometric}, and prior research has set
 portfolio weights directly from such directed networks
-\cite{vyrost2019network}. What remains, to my knowledge, is a narrower
-gap. No prior work sets hierarchical portfolio weights from a discovered
-structural, score-based causal graph (as opposed to a network of pairwise
-predictive tests), and none decomposes the allocation value of such a
-graph into its skeleton and its edge orientations. That decomposition is
-what this thesis delivers.
+\cite{vyrost2019network}. 
+However, no prior work sets hierarchical portfolio weights from a discovered score-based causal graph, nor decomposes the allocation value of such a
+graph into its skeleton and its edge orientations. This thesis addresses that gap.
 
-\begin{table}[t]
+\begin{sidewaystable}[p]
   \centering
-  \small
-  \caption{Positioning against the closest related approaches.}
+  \caption{This research compared to prior work.}
+  \vspace{0.5em}
   \label{tab:gap}
-  \begin{tabular}{l l c c c c}
+  \begin{tabular}{l l >{\centering\arraybackslash}p{2.3cm} >{\centering\arraybackslash}p{2.5cm} >{\centering\arraybackslash}p{2.5cm} >{\centering\arraybackslash}p{2.6cm}}
     \toprule
-    Approach & Clusters on & Causal & Weights & Asymmetric & Skeleton vs \\
-             &             & discovery? & from graph? & allocation? & orientation? \\
+    Approach & Clusters on & Causal discovery? & Weights from graph? & Asymmetric allocation? & Skeleton vs orientation? \\
     \midrule
-    HRP \cite{lopezdeprado2016hrp} ($\equiv$ \corrhrp{}) & correlation & no & n/a & no & n/a \\
-    HSP \cite{rodriguez2023hsp}            & driver sens.\    & no  & no  & no & no \\
-    MST/PMFG networks \cite{pozzi2013spread,peralta2016network} & corr.\ network & no & yes & no & n/a \\
+    HRP \cite{lopezdeprado2016hrp} (\corrhrp{}) & correlation & no & n/a & no & n/a \\
+    HSP \cite{rodriguez2023hsp} & driver sensitivities & no & no & no & no \\
+    MST/PMFG networks \cite{pozzi2013spread,peralta2016network} & correlation network & no & yes & no & n/a \\
     Granger networks \cite{vyrost2019network} & (no clustering) & no & yes & yes & no \\
     Howard et al.\ \cite{howard2025causal} & (no allocation)  & yes & no  & no & no \\
-    \textbf{This work}                     & \textbf{causal graph} & \textbf{yes} & \textbf{yes} & \textbf{yes} & \textbf{yes} \\
+    This work                     & causal graph & yes & yes & yes & yes \\
     \bottomrule
   \end{tabular}
-  \floatnote{The HRP row is the graph-blind \corrhrp{} baseline of this study.}
-\end{table}
+  \floatnote{HRP is the baseline of this study, denoted \corrhrp{}.}
+\end{sidewaystable}
 
 \chapter{Discovering the Graph}
 \label{chap:discovery}
 
-This chapter addresses the first challenge of
-Section~\ref{sec:challenges}: attributing performance gains to specific
-aspects of the graph. To isolate the graph's skeleton, its edge
-orientations and its implied covariance, I need a graph that is
-credible, that is held fixed across every allocator, and that is cheap
-enough to refit 215 times per configuration. This chapter describes the
-pipeline that produces such a graph at every monthly rebalance of the
-2007--2024 backtest. Section~\ref{sec:data} describes the data.
-Section~\ref{sec:discovery-run} describes the rolling discovery, the
-directional prior, and my check that the prior matters.
-Section~\ref{sec:asset-graph} describes how I extract the asset graph
-and what the resulting graphs look like. Section~\ref{sec:comparators}
-describes the two comparator graphs, and Section~\ref{sec:cache} the
-caching and determinism work that makes the experiments tractable and
-reproducible.
+This chapter addresses the first of the three challenges described in
+Section~\ref{sec:challenges}: attributing performance gains to different
+aspects of the causal graph. 
+I describe the pipeline that produces the fixed graph that feeds into every allocator at every monthly rebalance of the backtest.
+Section~\ref{sec:data} describes the data,
+Section~\ref{sec:discovery-run} describes the rolling discovery and the
+directional prior, Section~\ref{sec:asset-graph} describes the extracted graph, Section~\ref{sec:comparators}
+describes the two comparator graphs, and Section~\ref{sec:cache} describes the reproducibility.
 
-\section{Data layer}
+\section{Data}
 \label{sec:data}
 
-\paragraph{Universe.} The target scale is the S\&P~100. It is large
-enough to be representative and small enough that discovery at every
-rebalance remains sweepable, since fit cost grows steeply with dimension
-(Section~\ref{sec:cache}). Official historical S\&P~100 membership is
-paywalled, and it cannot be reconstructed from S\&P~500 records because
-the index is chosen with undisclosed sector-balance discretion. I
-therefore use the standard academic substitute: the top names by CRSP
-market capitalisation among historical S\&P~500 members at each
-rebalance. The union of these across rebalances gives a fixed 99-asset
-universe over 2007--2024. Appendix~\ref{app:universe} lists the tickers
-and the drivers. Prices and point-in-time shares outstanding come from
-WRDS/CRSP, which includes names that later delisted. This is essential
-for a realistic 2008--09, when several dozen large-cap financials
-disappeared. A thin Yahoo Finance fallback covers the most recent days.
-One aspect of how I treat delistings should be noted. Names that delist
-mid-sample leave the panel at their last quoted price, and I do not apply
-CRSP delisting returns, so the final-day loss of an involuntary delisting
-is not captured. Every allocator shares this treatment. It shifts
-absolute performance levels slightly upwards, but it does not affect the
-pairwise contrasts, which difference two strategies on the same panel.
-Names that list after 2007 (post-2007 listings and merger successors) are
-kept through a per-date eligibility mask rather than by truncating every
-other series' history. The top-by-market-cap construction remains an
-approximation of the official index, and I note it as a limitation in
-Section~\ref{sec:limitations}.
+The full S\&P~500 is too large to run causal discovery over given my compute constraints. I therefore construct a subset of the 99 largest assets; my initial target was the S\&P~100, but historical data is paywalled. Instead, I use the largest market-cap assets from the S\&P~500 at each rebalance, and take the union across those rebalances to get set of 99 assets over 2007--2024. Naturally, this is just an approximation of the official index.
+The full list is located in Appendix~\ref{app:universe}.
+I use CRSP via WRDS for share prices and numbers. When an allocator delists, CRSP records a final delisting return, which measures what a
+shareholder recovered relative to the last quoted price. For an
+involuntary delisting, such as a bankruptcy or a removal from the
+exchange, that return is generally a loss. I do not account for this loss; instead, an asset
+that delists mid-sample just leaves the panel at its last quoted
+price, as if the position had been sold there.
+This biases reported performance upwards slightly, however it does not affect pairwise contrasts between allocators as they are all treated the same way.
+Assets that listed after 2007 are made eligible to be invested in by the allocators once they are listed for the full duration of an estimation window.
 
-\paragraph{Driver pool.} Discovery runs on the joint panel of the 99
-assets and 33 plausibly exogenous macro-financial series from FRED and
-Yahoo Finance: Treasury rates and slopes, credit spreads, commodities, FX
-pairs, volatility indices, and international-equity ETFs. Because the
-drivers are in the joint fit, the asset-to-asset block is estimated
-conditional on the common macro environment. This absorbs co-movement
-that the drivers explain, which would otherwise appear as asset-to-asset
-edges. I exclude series that are not exogenous to a US large-cap
-portfolio (sector ETFs, US index returns and factor portfolios).
+I run causal discovery on the joint panel of the 99
+assets and 33 plausibly exogenous macro-financial series (``drivers'') from FRED and
+Yahoo Finance, including Treasury rates and slopes, credit spreads, commodities, FX
+pairs, volatility indices, and international-equity ETFs. 
+This means that the asset-to-asset submatrix is estimated conditional on the macro drivers, which removes any co-movement explained by the drivers. I exclude series that are clearly non-exogenous, such as sector ETFs, US index returns and factor portfolios.
 
-\paragraph{Stationarity and transforms.} SVAR-based discovery assumes
-weakly stationary inputs. I transform each series according to its type:
-log-returns for price-like series; first differences for yields and
-spreads, which cross zero, so logs are undefined; year-on-year changes
-for monthly macro levels, which also removes seasonality; and no
-transform for the volatility indices, which are already stationary. A
-uniform ``log everything'' rule would break on the rates block. I fix the
-transforms a priori by series type, rather than choosing them by test in
-each window, so that each variable means the same thing in every rolling
-window. This is a prerequisite for comparing graphs across time. I then
-check stationarity with both the augmented Dickey--Fuller (ADF) and
-Kwiatkowski--Phillips--Schmidt--Shin (KPSS) tests. The two are
-complementary because their nulls are opposite, so agreement is a
-stronger signal than either alone. Failures are flagged and logged; I do
-not use them to drop series.
+SVARs require weakly stationary inputs, so I transform time series accordingly: log-returns for price-like series, first differences for yields and spreads, year-on-year changes for monthly macro levels (which also removes seasonality), and no transform for the volatility indices, which are already stationary. 
+The same transformations are applied in every estimation window to ensure a consistent definition for the variables.
+I then check stationarity with ADF and KPSS tests. 
 
-\section{Rolling discovery and the directional prior}
+\section{Discovery and the directional prior}
 \label{sec:discovery-run}
 
-I chose the primary discovery method against three requirements. It must
-scale to the ${\sim}132$-variable joint panel at every rebalance of a
-sweepable grid. It must accept the directional prior natively, rather
-than by deleting edges after the fit. And it must return a DAG, because
-the allocators of Chapter~\ref{chap:sensitivity} rely on the exact
-total-effect algebra that a DAG's nilpotent adjacency provides. DYNOTEARS
-meets all three. The comparators of Section~\ref{sec:comparators} each
-relax one requirement, so they also test whether that requirement
-mattered.
+I use DYNOTEARS as my primary causal discovery method because it meets three key requirements.
+First, the method must be scalable to process the ${\sim}132$-variable joint panel in reasonable time, across every monthly rebalance.
+Second, it must be able to accept the ``directional prior'' ex ante, rather than removing asset-to-driver edges post hoc. This directional prior is that macro drivers can cause assets, but not vice versa, as the drivers are supposed to be exogenous. Thus, there are no edges from assets to drivers.
+Third, the method must return a DAG. The allocators I use (see Chapter~\ref{chap:sensitivity}) propagate shocks along every directed path in the graph. If the graph is acyclic, I can sum the results exactly (Section~\ref{sec:sem}). 
+A DAG also has a topological order, which I use in place of a clustering dendrogram in the ordering-based allocators I develop.
+As mentioned above, VARLiNGAM's main weakness is that, at longer estimation windows, its identifying assumption of heavy-tailed residuals weakens. Ridge-Granger likewise has a weakness in that it does not guarantee an acyclic graph, and its coefficients are not structural effect sizes (Section~\ref{sec:comparators}).
 
-At each rebalance date $t$, I fit DYNOTEARS \cite{pamfil2020dynotears} on
-the $z$-scored joint panel $X=[\,D \mid A\,]$ over the lookback window
-(189 to 504 trading days, the 4-window grid of
-Chapter~\ref{chap:evaluation}) with lag $p=1$. Lagged structure beyond one
-step is negligible at these horizons (Section~\ref{sec:howard-theme}).
-The fit yields the contemporaneous matrix $W$, with acyclicity enforced,
-and the lagged matrix $A_1$, both over the joint variable set. Throughout
-the report, $M[i,j]$ is the effect of variable $i$ on variable $j$.
-Appendix~\ref{app:tables} tabulates the hyperparameters.
+At each rebalance date $t$, I fit DYNOTEARS on
+a joint panel of drivers and assets $X=[\,D \mid A\,]$, with the rows representing the trading days in the estimation window
+(note there are 4 different estimation window sizes, varying from 189 to 504 trading days -- see Chapter~\ref{chap:evaluation}), with a one-day lag. 
+As mentioned in Section~\ref{sec:howard-theme}, lags over 1 are negligible at these horizons.
+I standardise all the variables in each window because, as mentioned in Section~\ref{sec:cd-tools}, NOTEARS methods are scale dependent. I apply the same standardisation for the fits across the other two comparator discovery methods too, and convert the graph back to return units in Section~\ref{sec:sem}.
+This fitting yields two matrices: a contemporaneous matrix $W$ and a lagged matrix $A_1$, both over the joint variable set.
+Throughout the report, $M[i,j]$ defines the effect of variable $i$ on variable $j$.
+I list the hyperparameters in Appendix~\ref{app:tables}.
 
-\paragraph{Why the panel is $z$-scored.} The scaling is per window, and
-it matters for the orientations. The NOTEARS score is scale-dependent,
-and on unscaled data it orients edges from lower-variance variables to
-higher-variance ones (see Section~\ref{sec:cd-tools}). Also, the joint
-panel mixes log returns with yield changes, which are measured in
-different units. I therefore apply the same per-window $z$-scoring
-before the DYNOTEARS, VARLiNGAM and ridge-Granger fits, and
-Section~\ref{sec:sem} converts the fitted graph back to return units.
-
-\paragraph{Enforcing the prior.} The directional prior is that drivers
-may cause assets, but individual large-cap stocks do not move the 10-year
-Treasury yield at these scales. DYNOTEARS accepts a forbidden-edge list
-(\texttt{tabu\_edges}). I populate it with every asset$\to$driver pair at
-every lag, which forces those entries of $W$ and $A_1$ to zero. VARLiNGAM
-enforces the same prior through its prior-knowledge mechanism, plus a
-projection after the fit.
-
-\paragraph{Verification of the prior.} A prior should only be kept if it
-has a measurable effect. I refit DYNOTEARS with and without the prior on
-6 windows spanning distinct regimes (2008, 2011, 2014, 2018Q4, 2020 and
-2022). Without the prior, the optimiser spends 35--48\% of total edge
-mass on economically implausible asset$\to$driver edges. Admitting those
-edges distorts the legitimate driver$\to$asset block by 52--72\% in
-$L_1$. It also changes which drivers carry the most edge mass in a
-meaningful minority of windows: the Jaccard overlap of the top drivers
-with and without the prior is $0.62$--$1.00$, and is lowest in the 2008
-and 2022 stress regimes (Figure~\ref{fig:prior}). This shows that the
-prior has a real effect. It removes a large block of spurious
-reverse-causation mass at negligible cost, and because the
-asset-to-asset block is estimated jointly with the rest, it protects the
-graph that the allocators use.
+I enforce the directional prior by populating DYNOTEARS' list of forbidden edges with all asset-to-driver links at each lag, forcing them to zero.
+VARLiNGAM takes in a similar list of forbidden edges, so no forbidden edges enter the contemporaneous block. However, its pruning step refits the lagged block without referencing that list, so I simply set any asset-to-driver edges to zero after the fact.
+I also test whether the prior actually has a measurable effect by refitting DYNOTEARS with and without the prior on 6 windows; 2008, 2011, 2014, 2018Q4, 2020 and 2022. I chose them because they span different macrofinancial regimes. I find that the prior is indeed effective: without it, the economically implausible asset-to-driver edges represent 36--48\% of the total weight running between the drivers and the assets.
+Calculating the total difference between the fitted DYNOTEARS matrix with and without the directional prior reveals that the legitimate coefficients differ by 52--72\% of the total weight of the driver-to-asset block.
+The prior also affects the relative importance of drivers. Ranking drivers by the total weight of their edges to assets, I find the intersection over union between the rankings with and without the prior ranges from $0.58$ to $0.91$, across the 6 windows and across cut-offs at the top 10, 15 and 20 drivers. At the top 15, the worst window shares only 11 of the 15 drivers, so 4 of the most influential drivers change identity. The 2008 and 2022 stress windows are the two lowest at the top 15 and the top 20, and at the top 10 they tie with 2018 for the lowest, so this pattern does not depend on where I cut the ranking (see Figure~\ref{fig:prior}).
+The above results clearly point to the importance of the prior.
 
 \begin{figure}[tbp]
   \centering
   \includegraphics[width=0.92\textwidth]{figures/directional_prior.png}
-  \caption{Verification of the asset$\to$driver directional prior across the 6 regime windows.}
+  \caption{The importance of the asset-to-driver directional prior.}
   \label{fig:prior}
-  \floatnote{Bars: the fraction of total DYNOTEARS edge mass that would fall on implausible asset$\to$driver edges if the prior were removed (35--48\%). Line (right axis): Jaccard overlap of the top drivers by edge mass with versus without the prior. The prior matters most in the 2008 and 2022 stress regimes.}
+  \floatnote{Bars (left axis): the share of the driver--asset edge mass that would fall on implausible asset$\to$driver edges if the prior were removed (36--48\%). Lines (right axis): intersection over union of the top-$K$ drivers by edge mass with versus without the prior, for $K$ of 10, 15 and 20. The gridlines serve both axes. The prior matters most in the 2008 and 2022 stress regimes.}
 \end{figure}
 
 \section{Extracting the asset graph}
@@ -859,7 +593,7 @@ Section~\ref{sec:d-family} needs. It uses the window's stored
 $z$-statistics for this, so the residuals correspond exactly to the data
 the graph was fitted on.
 
-\paragraph{What the graphs look like.} The DAGs are far from degenerate,
+What the graphs look like. The DAGs are far from degenerate,
 and stably so across estimation windows. At every window length from 189
 to 504 days, the DYNOTEARS asset graphs average ${\sim}614$--$673$
 directed edges (a density of $6.3$--$6.9\%$ of possible ordered pairs).
@@ -875,7 +609,7 @@ $32\%$ density at the 189-day window, where there are $n=189$
 observations against $d=132$ variables, whereas DYNOTEARS' $\ell_1$
 penalty holds density steady.
 
-\paragraph{What ``credible'' can mean without ground truth.} One
+What ``credible'' can mean without ground truth. One
 objection must be addressed directly. No true causal graph of the market
 is available, so the discovered graphs cannot be scored against an answer
 key. I therefore validate the pipeline on everything that can be checked.
@@ -933,7 +667,7 @@ leave it as future work; see Section~\ref{sec:future}.)
 Two pieces of engineering underpin the credibility of every number in
 Chapter~\ref{chap:evaluation}.
 
-\paragraph{The discovery cache.} The graph fit is the dominant cost:
+The discovery cache. The graph fit is the dominant cost:
 about 4 minutes per window at $d\approx132$, and about 15 hours per
 backtest. However, the fit depends only on the window data and the
 discovery hyperparameters, not on anything downstream. A content-keyed
@@ -945,7 +679,7 @@ cannot see different graphs, because there is exactly one graph per
 (method, window, data) key. Appendix~\ref{app:tables} records the cache
 mechanics.
 
-\paragraph{A data-determinism defect, found and fixed.} Building the
+A data-determinism defect, found and fixed. Building the
 cache exposed a latent reproducibility bug. One driver series (the
 emerging-markets ETF EEM) was silently re-downloaded on every call. The
 resulting micro-jitter, amplified by the non-convex DYNOTEARS optimiser,
@@ -1039,7 +773,8 @@ return units is then
   \label{eq:sigma-sem}
 \end{equation}
 where the shock variances are estimated from the fit window's structural
-residuals $E = X_z (I - M)$, and $D_\sigma$ converts from the $z$-scored
+residuals $E = \tilde{X} (I - M)$, where $\tilde{X}$ is the standardised
+fit-window panel, and $D_\sigma$ converts from the standardised
 units the graph was fitted in back to return units. A note on the name:
 $\Sigma_{\mathrm{SEM}}$ is the covariance of the observables that the
 structural model implies (the $\Sigma(\theta)$ of SEM, or the reduced
@@ -1056,15 +791,15 @@ stress-window graphs cannot produce a singular input.
 \section{The controls: correlation and skeleton}
 \label{sec:controls}
 
-\paragraph{\corrhrp{} (the correlation baseline).} This is textbook HRP
+\corrhrp{} (the correlation baseline). This is textbook HRP
 \cite{lopezdeprado2016hrp}: the distance
-$\sqrt{\tfrac{1}{2}(1-\rho_{ij})}$ on the lookback window's sample
+$\sqrt{\tfrac{1}{2}(1-\rho_{ij})}$ on the estimation window's sample
 correlation, with the sample covariance for bisection. It is graph-blind,
 which I verify by unit test (changing the graph cannot change its
 weights), and every performance gain in the report is measured relative
 to it.
 
-\paragraph{\skelhrp{} (the skeleton control).} This allocator replaces
+\skelhrp{} (the skeleton control). This allocator replaces
 the correlation matrix with the graph, but symmetrically, so that it
 sees only the skeleton. Each asset is embedded by its edge profile
 $e_i = [\,M_{i\cdot},\, M_{\cdot i}\,]$, the clustering distance is
@@ -1084,7 +819,7 @@ skeleton allocator I evaluated in the project's first phase
 (Section~\ref{sec:cache}), which lets me validate the new harness against
 a committed historical result (Section~\ref{sec:ablation-design}).
 
-\paragraph{\undirhrp{} (a second symmetrisation).} Hierarchical
+\undirhrp{} (a second symmetrisation). Hierarchical
 clustering demands a symmetric distance and $M$ is not symmetric, so
 building a skeleton control requires choosing a symmetrisation, and the
 choice is not unique. If the skeleton's measured contribution depended
@@ -1143,16 +878,15 @@ seed-free. All take the identical $(M,\ \text{returns window})$ inputs
 as the controls. None has an analogue in the hierarchical-allocation
 literature.
 
-\paragraph{\semcovhrp{} (SEM-implied covariance at the allocation
-step).} Clustering is as in \skelhrp{}. I deliberately hold the ordering
+\semcovhrp{} (SEM-implied covariance at the allocation
+step). Clustering is as in \skelhrp{}. I deliberately hold the ordering
 at the skeleton, so that $\semcovhrp{}-\skelhrp{}$ isolates
 orientation's effect on the allocation step alone. Recursive bisection,
 however, allocates on $\Sigma_{\mathrm{SEM}}$ of
 Eq.~\eqref{eq:sigma-sem} instead of the sample covariance. Orientation
 enters through the asymmetric shock propagation in $B$.
 
-\paragraph{\topohrp{} / \toposemcovhrp{} (causal-ordered bisection).}
-\label{sec:d2}
+\topohrp{} / \toposemcovhrp{} (causal-ordered bisection). \label{sec:d2}
 Here the clustering step is removed entirely. HRP's dendrogram exists
 only to produce a quasi-diagonalising leaf order, and a DAG supplies an
 order natively. I sort the assets from upstream to downstream by a
@@ -1174,7 +908,7 @@ upstream/downstream direction itself.
 The experimental design is what turns the family into an answer to the
 research question.
 
-\paragraph{Design.} At every rebalance, the extraction function of
+Design. At every rebalance, the extraction function of
 Section~\ref{sec:asset-graph} hands the identical graph $M$ to every
 allocator in Table~\ref{tab:variants}. Everything else is shared code:
 the universe, the calendar, the costs, the covariance-estimation window,
@@ -1208,7 +942,7 @@ shortest window, the discovery fit has $n=189$ observations against
 $d=132$ variables. This is valid ($n>d$) but thin, and I carry the
 caveat through to the results.
 
-\paragraph{Verification before results.} Three gates preceded the grid.
+Verification before results. Three gates preceded the grid.
 The unit-test gate: 60+ tests, written before the grid was run. These
 include the orientation-blindness of the controls, the
 orientation-sensitivity of every treatment, total-effect and
@@ -1263,7 +997,7 @@ threats to validity.
 \section{Measurement protocol}
 \label{sec:method}
 
-\paragraph{Protocol.} Every configuration runs the identical walk-forward
+Protocol. Every configuration runs the identical walk-forward
 backtest: the fixed 99-name universe, monthly rebalancing over
 2007--2024, estimation windows of 189, 252, 378 and 504 trading days for
 both the graph fit and the sample covariance, weights held for 21 trading
@@ -1277,7 +1011,7 @@ Appendix~\ref{app:tables} tabulates these for the headline
 configurations). No in-sample number appears anywhere in this report,
 and gross figures appear only as the zero-cost arm of the cost sweep.
 
-\paragraph{Inference.} Pairwise contrasts use the Politis--Romano
+Inference. Pairwise contrasts use the Politis--Romano
 stationary block bootstrap \cite{politis1994stationary} with 10{,}000
 resamples and a mean block length of 21 days. It resamples the joint
 return panel, so cross-strategy correlation is preserved. Daily returns
@@ -1295,7 +1029,7 @@ for each comparison of a family of allocators against a baseline; and
 the $90\%$ Model Confidence Set \cite{hansen2011mcs}. Regimes are
 defined by NBER recession dates and by the top and bottom VIX quintiles.
 
-\paragraph{Stability.} Every allocator in the study is deterministic and
+Stability. Every allocator in the study is deterministic and
 seed-free. Two independent end-to-end runs produce identical graphs,
 weights and NAVs, a property verified by the replication gate
 (Section~\ref{sec:ablation-design}). Every number in this chapter comes
@@ -1384,7 +1118,7 @@ only at 504 days, where the pairwise effect also peaks, and only for the
 narrowed family of 5 allocators. Section~\ref{sec:believe-rigour}
 reports both families and sizes that rejection.
 
-\paragraph{Dependence on the choice of skeleton control.} The
+Dependence on the choice of skeleton control. The
 contributions above are measured against \skelhrp{}. Measuring them
 against \undirhrp{} instead, the symmetrisation with the stronger
 orientation-blindness guarantee (Section~\ref{sec:controls}), changes
@@ -1474,7 +1208,7 @@ extra return. The controls at the end of this subsection identify which
 of its properties does the regularising, and the answer is not
 direction. Two qualifications apply to this reading. First, the window
 moves the graph and the sample moments together (both are estimated on
-the same lookback), so the gradient cannot by itself separate
+the same window), so the gradient cannot by itself separate
 degradation of the moments from degradation of the graph. The stability
 of the discovered graphs across windows (density $6.3$--$6.9\%$ at every
 window; Section~\ref{sec:asset-graph}) supports the reading that the
@@ -1482,7 +1216,7 @@ moments degrade faster. Second, the 189-day arm of the U depends on the
 choice of skeleton control (Section~\ref{sec:decomposition}), so I claim
 the regulariser mechanism only for the long-window arm.
 
-\paragraph{An alternative explanation, tested directly.} The contrast
+An alternative explanation, tested directly. The contrast
 $\semcovhrp{}-\skelhrp{}$ compares the DAG's implied covariance against
 the sample covariance at the allocation step. However, the implied
 covariance has two properties that are unrelated to edge direction but
@@ -1523,7 +1257,7 @@ of the next subsection). This means that trustworthy edge magnitudes are
 necessary for the construction to work, but the working ingredient is
 the de-factoring rather than the direction of the edges.
 
-\paragraph{The skeleton, given the same treatment.} I apply the same
+The skeleton, given the same treatment. I apply the same
 scepticism to the skeleton's performance gain. Its gain over \corrhrp{}
 ($+0.022$ at 252 days) could in principle be reproduced by any sparse
 conditional-dependence structure of the same density, with no discovery
@@ -1558,7 +1292,7 @@ reproduces it. The skeleton's 252-day gain does need the graph.
 
 \subsection{Robustness to design parameters}
 
-\paragraph{Sparsity ($\tau$).} Thresholding the graph at
+Sparsity ($\tau$). Thresholding the graph at
 $\tau\in\{0,0.01,0.05,0.10\}$ leaves the treatment flat to slightly
 better (\topohrp{}, the allocator that uses the DAG's topological order
 at the ordering step: $0.399\to0.402$ at the heaviest threshold), while
@@ -1567,7 +1301,7 @@ Table~\ref{tab:tau}). This indicates that the orientation-aware
 allocators are not artefacts of the regularisation threshold. These
 sweep differences are point estimates; I did not test them formally.
 
-\paragraph{Costs and turnover.} The gain from the implied covariance at
+Costs and turnover. The gain from the implied covariance at
 the allocation step is robust to different transaction costs, at least
 in point estimates. \semcovhrp{}$-$\skelhrp{} at 504 days moves from
 $+0.022$ to $+0.025$ as costs rise from 0 to 20\,bps (differences on
@@ -1580,7 +1314,7 @@ and its 252-day gain erodes from $+0.004$ at zero cost to $0.000$ at
 implied covariance does not win by trading less and is not eroded by
 trading more, whereas the topological ordering at 252 days is.
 
-\paragraph{Discovery method.} Under VARLiNGAM graphs the orientation
+Discovery method. Under VARLiNGAM graphs the orientation
 effect is absent at all 4 windows (4 of 12 contrasts positive, mean
 $-0.005$; Figure~\ref{fig:forest}, right, and the grey series of
 Figure~\ref{fig:gradient}). This means that the decomposition depends on
@@ -1611,7 +1345,7 @@ refines the answer to the research question rather than adding a
 separate benchmark: ``orientation'' pays through its weighted,
 propagatable form.
 
-\paragraph{A second family member (HERC).} Chapter~\ref{chap:background}
+A second family member (HERC). Chapter~\ref{chap:background}
 argued that the limitation is family-wide: any hierarchical allocator
 that clusters on a symmetric matrix discards orientation, whatever rule
 it uses to read the tree. Whether the measured decomposition generalises
@@ -1662,7 +1396,7 @@ that their centrality alpha lives in stable regimes
 % Numbers in this section come from _generated/robust_stats.tex, regenerated
 % by `python -m scripts.robust_stats --phase-ii` over all evaluated bundles.
 
-\paragraph{Non-normality and selection bias (PSR/DSR).} Every headline
+Non-normality and selection bias (PSR/DSR). Every headline
 allocator's Probabilistic Sharpe ratio, the probability that its true
 Sharpe exceeds zero given the sample's higher moments, is high
 (\corrhrp{} $\rsCorrPSR$, \skelhrp{} $\rsVprimePSR$, \semcovhrp{}
@@ -1680,7 +1414,7 @@ of Section~\ref{sec:orientation-role}. The ordering of the decomposition
 survives deflation. The SPA tests below measure how much of its
 statistical separation survives.
 
-\paragraph{Comparisons over a family of allocators (SPA).} Hansen's SPA
+Comparisons over a family of allocators (SPA). Hansen's SPA
 test corrects for the search over a family of allocators. Its null
 hypothesis is that no allocator in the family outperforms the baseline,
 and the test accounts for the fact that the best-looking member was
@@ -1711,12 +1445,12 @@ allocators.
     Family & Grid & 189 & 252 & 378 & 504 & Pooled \\
     \midrule
     (i) vs \corrhrp{}      & full     & $\rsSpaSkelWonePre$ & $\rsSpaSkelWtwoPre$ & $\rsSpaSkelWthreePre$ & $\rsSpaSkelWfivePre$ & $\rsSpaSkelPooledPre$ \\
-    (i) vs \corrhrp{}      & narrowed & $\rsSpaSkelWone$ & $\rsSpaSkelWtwo$ & $\mathbf{\rsSpaSkelWthree}$ & $\mathbf{\rsSpaSkelWfive}$ & $\rsSpaSkelPooled$ \\
+    (i) vs \corrhrp{}      & narrowed & $\rsSpaSkelWone$ & $\rsSpaSkelWtwo$ & $\rsSpaSkelWthree^{*}$ & $\rsSpaSkelWfive^{*}$ & $\rsSpaSkelPooled$ \\
     (ii) vs \skelhrp{} & full     & $\rsSpaDirWonePre$ & $\rsSpaDirWtwoPre$ & $\rsSpaDirWthreePre$ & $\rsSpaDirWfivePre$ & $\rsSpaDirPooledPre$ \\
-    (ii) vs \skelhrp{} & narrowed & $\rsSpaDirWone$ & $\rsSpaDirWtwo$ & $\rsSpaDirWthree$ & $\mathbf{\rsSpaDirWfive}$ & $\rsSpaDirPooled$ \\
+    (ii) vs \skelhrp{} & narrowed & $\rsSpaDirWone$ & $\rsSpaDirWtwo$ & $\rsSpaDirWthree$ & $\rsSpaDirWfive^{*}$ & $\rsSpaDirPooled$ \\
     \bottomrule
   \end{tabular}
-  \floatnote{``Pooled'' runs one SPA whose candidate set is the union of the family's cells at all 4 windows against the family's 252-day baseline, so it accounts for the strategy search and the window search jointly. Bold: $p<0.05$.}
+  \floatnote{``Pooled'' runs one SPA whose candidate set is the union of the family's cells at all 4 windows against the family's 252-day baseline, so it accounts for the strategy search and the window search jointly. $^{*}$: $p<0.05$.}
 \end{table}
 
 Over the full family of 7 allocators, the null hypothesis is not
@@ -1736,7 +1470,7 @@ rejections as suggestive rather than established. They coincide with
 the peaks of the point estimates, but they survive neither the full
 family nor the pooled test.
 
-\paragraph{The Model Confidence Set.} The $90\%$ MCS over the distinct
+The Model Confidence Set. The $90\%$ MCS over the distinct
 252-day strategies retains every member of the reported family and both
 graph-blind controls. This is best read as a statement about power
 rather than as a vindication of everything retained. With this many
@@ -1744,8 +1478,7 @@ highly correlated long-only variants whose Sharpes span $0.35$--$0.41$,
 the equivalence test lacks the power to rank the causal family,
 including separating treatments from controls.
 
-\paragraph{Verdict on the research question, with uncertainty stated.}
-The decomposition's point estimates are clear and internally consistent.
+Verdict on the research question, with uncertainty stated. The decomposition's point estimates are clear and internally consistent.
 There is a stable total gain whose composition is sensitive to the
 estimation window: the skeleton's contribution is hump-shaped and peaks
 at 252 days, and the orientations' contribution is positive at every
@@ -1840,8 +1573,7 @@ the design, the family and the question were fixed.
 \section{Threats to validity}
 \label{sec:believe}
 
-\paragraph{Effect sizes are close to the smallest detectable effect.}
-The decomposition's components are $0.01$--$0.03$ Sharpe over 18 years,
+Effect sizes are close to the smallest detectable effect. The decomposition's components are $0.01$--$0.03$ Sharpe over 18 years,
 against a full-sample Sharpe standard error of
 ${\approx}\,\rsSharpeSEFull$ (Lo's approximation on the $\sim$4{,}500-day
 sample). The pairwise contrasts are far more precise, because the
@@ -1864,7 +1596,7 @@ as a discovery. The orientation effect rests on the sign consistency of
 the contribution across windows and treatments
 (Section~\ref{sec:decomposition}), and not on any single cell.
 
-\paragraph{Design choices informed by earlier results.} Three design
+Design choices informed by earlier results. Three design
 choices were informed by earlier results, and this paragraph records
 them. The first is the choice of question. It was informed by the
 results of the project's first phase, which took Hierarchical
@@ -1920,8 +1652,7 @@ $\Sigma_{\mathrm{SEM}}$'s gain might be generic. I wrote down their
 interpretations before either control was run, and they are counted
 among the \rsNtrials\ configurations but belong to neither SPA family.
 
-\paragraph{Single asset class, one universe, approximated index.}
-Everything here concerns long-only allocation within ${\sim}100$ US
+Single asset class, one universe, approximated index. Everything here concerns long-only allocation within ${\sim}100$ US
 large-caps, and every variant absorbs the full ${\approx}50\%$ GFC
 drawdown. Whether the decomposition transfers to universes with richer
 exogenous structure (multi-asset, credit, commodities) is untested. The
@@ -1934,10 +1665,10 @@ shares them, so they inflate the absolute levels rather than the
 pairwise contrasts the thesis is about. Quantifying them with a
 point-in-time universe is left to future work.
 
-\paragraph{Orientation identifiability.} DYNOTEARS identifies edge
+Orientation identifiability. DYNOTEARS identifies edge
 orientations through its score and its acyclicity constraint, and
 Section~\ref{sec:cd-tools} records that this score orients edges by
-marginal variance on unscaled data. I fit on $z$-scored panels, which
+marginal variance on unscaled data. I fit on standardised panels, which
 removes that effect. However, an ordering by explained variance survives
 scaling \cite{reisach2023r2}. In an equity panel, explained variance is
 dominated by market exposure. This means that some fraction of the
@@ -1954,7 +1685,7 @@ because it compares allocators on identical inputs, and
 Section~\ref{sec:orientation-role} already shows that the
 allocation-step gain needs no direction.
 
-\paragraph{Method-dependence is a caveat on the mechanism.} The
+Method-dependence is a caveat on the mechanism. The
 orientation effect exists under DYNOTEARS graphs only. Until a second
 discovery method reproduces it, the safest interpretation is that
 DYNOTEARS' contemporaneous structure supports orientation-aware
@@ -2149,7 +1880,7 @@ edge-overlap measure.
 \section{Broader impact}
 \label{sec:impact}
 
-\paragraph{For investors.} Allocation research is used by asset managers
+For investors. Allocation research is used by asset managers
 and pension schemes, so its failures are borne, diffusely and years
 later, by end savers. The characteristic harm in this literature is a
 convincing backtest of an overfit strategy, rather than a malfunctioning
@@ -2163,7 +1894,7 @@ attributable to structure that cheap symmetrisation already captures.
 The label guarantees nothing; the decomposition carries the
 information.
 
-\paragraph{For the field.} One of this project's technical choices
+For the field. One of this project's technical choices
 generalises into a norm. The determinism episode of
 Section~\ref{sec:cache}, in which a reproducibility fix overturned two
 conclusions, argues that reproducibility belongs among publication
@@ -2171,7 +1902,7 @@ prerequisites rather than aspirations. The deterministic, seed-free
 construction of the allocator family is the design corollary, and it is
 what makes every number in this report exactly replicable.
 
-\paragraph{Costs.} The content-keyed cache cut the marginal cost of a
+Costs. The content-keyed cache cut the marginal cost of a
 configuration from ${\sim}15$ hours to ${\sim}40$ seconds. That is what
 made a \rsNtrials-configuration study, and hence its multiplicity
 correction, affordable at all. The compute and energy economics of
@@ -2265,25 +1996,25 @@ magnitudes, not to serve as a third full arm.
     \toprule
     Graph & Window (days) & \skelhrp{} & \undirhrp{} & \semcovhrp{} & \topohrp{} & \toposemcovhrp{} \\
     \midrule
-    DYNOTEARS & 189 & 0.387 & \textbf{0.411} & 0.408 & 0.392 & 0.408 \\
-    DYNOTEARS & 252 & 0.403 & 0.398 & \textbf{0.411} & 0.399 & 0.406 \\
-    DYNOTEARS & 378 & 0.402 & 0.409 & 0.415 & 0.405 & \textbf{0.419} \\
-    DYNOTEARS & 504 & 0.372 & 0.383 & 0.395 & 0.382 & \textbf{0.399} \\
-    VARLiNGAM & 189 & 0.393 & 0.388 & 0.364 & 0.387 & \textbf{0.394} \\
-    VARLiNGAM & 252 & \textbf{0.397} & 0.396 & 0.385 & 0.388 & 0.386 \\
-    VARLiNGAM & 378 & 0.399 & 0.392 & \textbf{0.407} & 0.398 & 0.399 \\
-    VARLiNGAM & 504 & 0.377 & \textbf{0.390} & 0.383 & 0.372 & 0.375 \\
-    ridge-Granger   & 252 & 0.389 & --- & 0.352 & \textbf{0.393} & --- \\
+    DYNOTEARS & 189 & 0.387 & 0.411 & 0.408 & 0.392 & 0.408 \\
+    DYNOTEARS & 252 & 0.403 & 0.398 & 0.411 & 0.399 & 0.406 \\
+    DYNOTEARS & 378 & 0.402 & 0.409 & 0.415 & 0.405 & 0.419 \\
+    DYNOTEARS & 504 & 0.372 & 0.383 & 0.395 & 0.382 & 0.399 \\
+    VARLiNGAM & 189 & 0.393 & 0.388 & 0.364 & 0.387 & 0.394 \\
+    VARLiNGAM & 252 & 0.397 & 0.396 & 0.385 & 0.388 & 0.386 \\
+    VARLiNGAM & 378 & 0.399 & 0.392 & 0.407 & 0.398 & 0.399 \\
+    VARLiNGAM & 504 & 0.377 & 0.390 & 0.383 & 0.372 & 0.375 \\
+    ridge-Granger   & 252 & 0.389 & --- & 0.352 & 0.393 & --- \\
     \midrule
     \multicolumn{2}{l}{\corrhrp{} baseline (windows 189/252/378/504):} &
     \multicolumn{5}{l}{$\rsCorrSharpeWone$ / $\rsCorrSharpe$ /
       $\rsCorrSharpeWthree$ / $\rsCorrSharpeWfive$.} \\
     \bottomrule
   \end{tabular}
-  \floatnote{Row-wise best in bold. \corrhrp{} is graph-blind (method-independent). ``---'': outside the ridge-Granger control's representative-allocator scope.}
+  \floatnote{\corrhrp{} is graph-blind (method-independent). ``---'': outside the ridge-Granger control's representative-allocator scope.}
 \end{table}
 
-\paragraph{Mechanism controls.} The two direction-free covariance
+Mechanism controls. The two direction-free covariance
 controls of Section~\ref{sec:orientation-role} use \skelhrp{}'s
 clustering on DYNOTEARS graphs with the allocation covariance swapped.
 The Ledoit--Wolf shrunk control earns
@@ -2301,7 +2032,7 @@ them are in the repository files
 \texttt{PREDICTIONS\_SKELETON\_CONTROL.md}, each committed before the
 corresponding control was run.
 
-\paragraph{The HERC second family member.} The full-recursion HERC arm
+The HERC second family member. The full-recursion HERC arm
 of Section~\ref{sec:decomposition} (predictions written down in
 \texttt{PREDICTIONS\_HERC.md} before any cell was run) gives the
 following net Sharpe across the 4 windows. The correlation-distance
@@ -2420,13 +2151,13 @@ Table~\ref{tab:matrix-full} for orientation.
     \toprule
     Variant & All & NBER rec. & NBER exp. & High-vol & Low-vol \\
     \midrule
-    \corrhrp{}     & 0.381 & $-0.589$ & 0.737 & $\mathbf{-1.313}$ & 5.564 \\
-    \skelhrp{} (skeleton)     & 0.403 & $\mathbf{-0.575}$ & 0.758 & $-1.317$ & 5.744 \\
-    \semcovhrp{}                & \textbf{0.411} & $-0.577$ & \textbf{0.762} & $-1.347$ & 5.854 \\
-    \toposemcovhrp{}               & 0.406 & $-0.606$ & 0.761 & $-1.361$ & \textbf{5.876} \\
+    \corrhrp{}     & 0.381 & $-0.589$ & 0.737 & $-1.313$ & 5.564 \\
+    \skelhrp{} (skeleton)     & 0.403 & $-0.575$ & 0.758 & $-1.317$ & 5.744 \\
+    \semcovhrp{}                & 0.411 & $-0.577$ & 0.762 & $-1.347$ & 5.854 \\
+    \toposemcovhrp{}               & 0.406 & $-0.606$ & 0.761 & $-1.361$ & 5.876 \\
     \bottomrule
   \end{tabular}
-  \floatnote{High-vol and Low-vol are the top and bottom VIX quintiles; the NBER columns condition on recession and expansion dates. Column-wise best in bold. Conditional Sharpe levels are mechanically inflated in the calm regime (the volatility denominator conditions on low-VIX days), so only within-column differences are meaningful.}
+  \floatnote{High-vol and Low-vol are the top and bottom VIX quintiles; the NBER columns condition on recession and expansion dates. Conditional Sharpe levels are mechanically inflated in the calm regime (the volatility denominator conditions on low-VIX days), so only within-column differences are meaningful.}
 \end{table}
 
 \section{The first phase: the driver route and its two null results}
@@ -2452,7 +2183,7 @@ replication gate of Section~\ref{sec:ablation-design} targets. The
 remaining \rsNtrialsPhaseII\ are the graph-route cells of this study.
 Both of the phase's results were null.
 
-\paragraph{The claimed improvement is inside the method's own noise.} At
+The claimed improvement is inside the method's own noise. At
 the 252-day window and $K{=}17$, causal selection beats HSP as published
 by $+0.010$ net Sharpe ($p=0.27$). The sign reverses at $K=10$, $20$ and
 $25$ ($-0.015$, $-0.016$, $-0.010$), and no difference at any $K$ is
@@ -2481,7 +2212,7 @@ window each sits above the seed distribution's maximum.
   \floatnote{Dotted line: HSP as published. The seed range exceeds the variant's claimed edge over its baseline, and every graph-route allocator shown sits above the seed distribution's maximum.}
 \end{figure}
 
-\paragraph{The monthly feedback loop cannot learn.} Across the full
+The monthly feedback loop cannot learn. Across the full
 $\alpha\in\{0.4,0.6,0.8\}\times\gamma\in\{0.1,0.3,0.5\}$ grid, the
 closed loop's weights equal the open-loop variant's at every rebalance.
 This is because the utility blend can only re-rank drivers within the
@@ -2498,7 +2229,7 @@ frequency.
 \section{Universe and driver lists}
 \label{app:universe}
 
-\paragraph{Asset universe (99 names).} AAPL, ABBV, ABT, ACN, ADBE, ADP,
+Asset universe (99 names). AAPL, ABBV, ABT, ACN, ADBE, ADP,
 AEP, AMGN, AMT, AMZN, AXP, BA, BAC, BKNG, BLK, BMY, C, CAT, CHTR, CI, CL,
 CMCSA, COF, COP, COST, CRM, CSCO, CVS, CVX, D, DE, DHR, DIS, DUK, EBAY,
 ED, EOG, ETN, EXC, F, FDX, GE, GILD, GIS, GM, GOOGL, GS, HD, HON, IBM,
@@ -2509,7 +2240,7 @@ USB, V, VZ, WFC, WMT, XOM (tickers as of the CRSP mapping of
 Section~\ref{sec:data}; the list is committed as
 \texttt{scripts/phase\_i\_universe.txt}).
 
-\paragraph{Driver pool (33 series).} Macro releases: CPI and core CPI
+Driver pool (33 series). Macro releases: CPI and core CPI
 year-on-year, unemployment-rate change, industrial production
 year-on-year, retail sales year-on-year, housing starts year-on-year,
 Michigan sentiment change. Rates and spreads: 3-month, 2-, 5-, 10- and
@@ -2553,7 +2284,7 @@ difference of $0.0$ over all 215 rebalances, and I re-verified it on the
 1{,}684 cache-verified graph fits with a 100\% hit rate, and each
 backtest regenerates in ${\approx}40$ seconds from the cache.
 
-\paragraph{Cache mechanics and the determinism defect.} The discovery
+Cache mechanics and the determinism defect. The discovery
 cache is keyed by the exact window bytes, the column set, the method and
 the hyperparameters, with atomic writes. A key miss halts the run rather
 than silently refitting a subtly different graph. The data-determinism
@@ -2566,7 +2297,7 @@ $\lVert W\rVert$. VARLiNGAM's ICA-on-residuals fits were essentially
 unchanged by the same jitter, which is a small robustness result in its
 own right.
 
-\paragraph{Environment and data access.} I used Python~3.13 in the
+Environment and data access. I used Python~3.13 in the
 repository's virtual environment. \texttt{causalnex} and \texttt{lingam}
 are vendored (source-tree imports via \texttt{\_vendored.py}), not
 pip-installed, so the repository itself pins their exact versions. All
@@ -2575,7 +2306,7 @@ imports as a package. Raw market data requires a WRDS/CRSP licence, but
 the fitted graphs and derived series are committed to the content-keyed
 cache, so every result in this report regenerates offline without it.
 
-\paragraph{Regeneration order.} The report is reproduced in four steps,
+Regeneration order. The report is reproduced in four steps,
 each idempotent against the cache. (1) Run the unit-test suite (60+
 tests, including the orientation-blindness and orientation-sensitivity
 properties of Section~\ref{sec:ablation-design}). (2) Run the backtest
@@ -2585,7 +2316,7 @@ with \texttt{scripts/robust\_stats.py -{}-phase-ii}. (4) Rebuild the
 figures with \texttt{scripts/plot\_phase\_ii\_figures.py} and compile
 the report.
 
-\paragraph{Provenance.} Every statistic quoted in the text is either a
+Provenance. Every statistic quoted in the text is either a
 generated macro (\path{_generated/robust_stats.tex}) or traceable to a
 committed CSV (\path{results/phase_ii_matrix.csv},
 \path{phase_ii_contrasts.csv}, \path{robust_stats_phase_ii.csv},
@@ -2593,7 +2324,7 @@ committed CSV (\path{results/phase_ii_matrix.csv},
 Every figure is regenerated by the plotting script above. No result in
 the 2007--2024 panel depends on a live network fetch.
 
-\paragraph{The out-of-sample slice.} The 2025--26 slice of
+The out-of-sample slice. The 2025--26 slice of
 Section~\ref{sec:oos} is regenerated by
 \texttt{scripts/run\_oos\_slice.py} (per allocator and window) followed
 by \texttt{scripts/collate\_oos.py}. Its protocol, price-source rule and
