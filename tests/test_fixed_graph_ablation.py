@@ -100,3 +100,42 @@ def test_graph_sensitivity_leak_canary(name):
     w_a = dispatch_allocator(name, _graph(_chainlike_dag(seed=13)), rets)
     w_b = dispatch_allocator(name, _graph(_chainlike_dag(seed=99)), rets)
     assert not np.allclose(w_a.to_numpy(), w_b.to_numpy(), atol=1e-10)
+
+
+def _dag_with_edges(n_edges: int, seed: int):
+    """Random DAG on N nodes with exactly n_edges directed edges."""
+    rng = np.random.default_rng(seed)
+    seq = rng.permutation(N)
+    pairs = [(seq[a], seq[b]) for a in range(N) for b in range(a + 1, N)]
+    chosen = rng.choice(len(pairs), size=n_edges, replace=False)
+    M = np.zeros((N, N))
+    for k in chosen:
+        i, j = pairs[k]
+        M[i, j] = rng.uniform(0.2, 0.9)
+    return M
+
+
+def _factor_returns(seed=3, T=260):
+    """One-factor returns with a few strong pairwise links, so the Ledoit-Wolf
+    precision matrix has non-trivial partial correlations. On i.i.d. noise the
+    shrinkage hits 1.0, the precision is diagonal, and D0pc degenerates."""
+    rng = np.random.default_rng(seed)
+    idx = pd.bdate_range("2019-01-02", periods=T)
+    f = rng.standard_normal(T)
+    beta = rng.uniform(0.5, 1.5, N)
+    R = np.outer(f, beta) * 0.01 + rng.standard_normal((T, N)) * 0.01
+    R[:, 1] += 0.6 * R[:, 0]
+    R[:, 5] += 0.6 * R[:, 4]
+    return pd.DataFrame(R, index=idx, columns=NAMES)
+
+
+def test_d0pc_sees_the_graph_only_through_its_edge_count():
+    """The partial-correlation control must depend on the graph only via its
+    nonzero-cell count: equal counts give identical weights, and a different
+    count changes them."""
+    rets = _factor_returns()
+    w_a = dispatch_allocator("D0pc", _graph(_dag_with_edges(9, seed=1)), rets)
+    w_b = dispatch_allocator("D0pc", _graph(_dag_with_edges(9, seed=2)), rets)
+    pd.testing.assert_series_equal(w_a, w_b)
+    w_c = dispatch_allocator("D0pc", _graph(_dag_with_edges(2, seed=3)), rets)
+    assert not np.allclose(w_a.to_numpy(), w_c.to_numpy(), atol=1e-12)

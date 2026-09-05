@@ -62,37 +62,6 @@ def causal_embedding_distance(matrix: np.ndarray) -> np.ndarray:
     return dist
 
 
-def blend_distance(
-    causal_dist: np.ndarray, corr_dist: np.ndarray, alpha: float
-) -> np.ndarray:
-    """Convex blend ``alpha * causal + (1 - alpha) * correlation`` distance (v3)."""
-    return alpha * causal_dist + (1.0 - alpha) * corr_dist
-
-
-# Covariance matrices
-def structural_covariance(
-    matrix: np.ndarray, residual_cov: np.ndarray | None = None
-) -> np.ndarray:
-    """SVAR-implied covariance ``(I - M^T)^{-1} Sigma_e (I - M^T)^{-T}``, PSD-projected.
-
-    ``residual_cov`` defaults to the identity (fine when returns were
-    standardised upstream).
-    """
-    d = matrix.shape[0]
-    if residual_cov is None:
-        residual_cov = np.eye(d)
-    inv = np.linalg.inv(np.eye(d) - matrix.T)
-    cov = inv @ residual_cov @ inv.T
-    return nearest_psd(cov)
-
-
-def blend_covariance(
-    causal_cov: np.ndarray, sample_cov: np.ndarray, alpha: float
-) -> np.ndarray:
-    """Convex blend ``alpha * causal + (1 - alpha) * sample`` covariance (v3)."""
-    return alpha * causal_cov + (1.0 - alpha) * sample_cov
-
-
 # Hierarchical Risk Parity
 def _quasi_diagonal_order(linkage: np.ndarray) -> list[int]:
     """Return the leaf order that quasi-diagonalises the linkage tree."""

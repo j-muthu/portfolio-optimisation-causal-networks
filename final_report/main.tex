@@ -19,6 +19,15 @@
 \newcommand{\topohrp}{\textsc{topo-hrp}}
 \newcommand{\toposemcovhrp}{\textsc{topo-semcov-hrp}}
 \newcommand{\oriented}{\textsc{oriented}}
+% Names for the allocators outside the primary family (Table~\ref{tab:allocator-map})
+\newcommand{\lwhrp}{\textsc{lw-hrp}}
+\newcommand{\dfhrp}{\textsc{defactored-hrp}}
+\newcommand{\pcorrhrp}{\textsc{pcorr-hrp}}
+\newcommand{\structrp}{\textsc{struct-rp}}
+\newcommand{\coanchrp}{\textsc{coancestry-hrp}}
+\newcommand{\corrherc}{\textsc{correlation-herc}}
+\newcommand{\skelherc}{\textsc{skeleton-herc}}
+\newcommand{\semcovherc}{\textsc{semcov-herc}}
 
 % One-sentence captions; anything further goes in a note under the float
 \newcommand{\floatnote}[1]{\par\vspace{3pt}\begin{minipage}{0.92\textwidth}\footnotesize Note. #1\end{minipage}\par}
@@ -696,22 +705,15 @@ afterthought \cite{lopezdeprado2023causal}. Appendix~\ref{app:tables}
 documents the mechanism of the defect, and the observation that
 VARLiNGAM's ICA-based fits were robust to the same jitter.
 
-\chapter{From Graph to Weights}
+\chapter{Incorporating edge directions into hierarchical allocators}
 \label{chap:sensitivity}
 
-This chapter addresses the second obstacle of
-Section~\ref{sec:challenges}: getting a hierarchical allocator to use
-edge direction at all. I describe a family of allocators that all share
-the same per-window graph. Of these, two only see the skeleton of the
-graph, while the other three can see its edge orientations. Comparing
-them is the fixed-graph ablation, in which the only distinction is
-orientation. This family is what meets the second premise of
-Section~\ref{sec:question}: without it, the value of orientation cannot
-be measured at all. Section~\ref{sec:symm} formalises the problem.
-Section~\ref{sec:sem} derives the total-effect matrix and the implied
-covariance that the orientation-aware allocators rely on.
-Sections~\ref{sec:controls}--\ref{sec:d-family} define the allocators,
-and Section~\ref{sec:ablation-design} sets out the ablation design.
+This chapter addresses the second challenge discussed in Section~\ref{sec:challenges}: incorporating edge directions into hierarchical allocators.
+I lay out several different allocators: two can only use the skeleton of the
+graph, while the other three can also use its edge orientations. 
+The fixed-graph ablation that I run involves comparing these two groups of allocators, so that I can identify the performance gain attributable to edge orientation.
+These new allocators also satisfy the second premise mentioned in
+Section~\ref{sec:question}. I discuss the problem in Section~\ref{sec:symm}, derive the relevant matrices and covariance in Section~\ref{sec:sem}, define the allocators in Sections~\ref{sec:controls}--\ref{sec:d-family}, and finally discuss the ablation design in Section~\ref{sec:ablation-design}.
 
 \section{The symmetric-clustering problem}
 \label{sec:symm}
@@ -782,13 +784,29 @@ produce a singular input.
 \section{The controls: correlation and skeleton}
 \label{sec:controls}
 
-The correlation baseline, \corrhrp{}, is textbook HRP
+The correlation baseline, \corrhrp{}, follows HRP as published
 \cite{lopezdeprado2016hrp}: the distance
 $\sqrt{\tfrac{1}{2}(1-\rho_{ij})}$ on the estimation window's sample
 correlation, with the sample covariance for bisection. It is
 graph-blind, which I verify by unit test (changing the graph cannot
 change its weights), and every performance gain reported here is
 measured relative to it.
+
+One implementation detail departs from the published recipe, and it
+applies to every allocator in this chapter alike. Before linkage, I
+project each clustering distance matrix onto the nearest positive
+semi-definite matrix by clipping its negative eigenvalues. This step
+was inherited from the first-phase code, and I record it because it is
+not innocuous: a distance matrix has a zero diagonal and is therefore
+never positive semi-definite, so the projection perturbs every
+off-diagonal distance. In a synthetic check on 100 one-factor assets it
+moved the correlation distances by up to $0.08$ on a range of $0.40$
+to $0.70$, and it moved the sparse embedding distances by considerably
+more. The projection is a function of the symmetric distance alone, so
+the orientation-blindness arguments below are unaffected, and it is
+applied identically in every cell, so the pairwise contrasts remain
+like-for-like. Absolute levels, including those of \corrhrp{}, are
+those of HRP with this projection rather than of textbook HRP.
 
 The skeleton control, \skelhrp{}, substitutes the graph for the
 correlation matrix, but in a symmetric way, so that it sees only the
@@ -930,7 +948,9 @@ included 7 allocators. During the evaluation, I added mechanism controls
 (two direction-free covariance controls and a graph-free
 partial-correlation skeleton control), a second hierarchical family
 (HERC), and two simple benchmarks (equal weight and inverse variance).
-The narrowing to 5 allocators, and the provenance of every extension,
+Table~\ref{tab:allocator-map} in Appendix~\ref{app:tables} places every
+one of these on the same two axes as Table~\ref{tab:variants} and fixes
+the name I use for each. The narrowing to 5 allocators, and the provenance of every extension,
 are stated in Section~\ref{sec:believe}, and every evaluated cell is
 included in the \rsNtrials\ configurations that the Deflated Sharpe
 ratio corrects for. The window axis is a design variable in its own
@@ -974,7 +994,7 @@ Appendix~\ref{app:tables} records the figures for these gates.
     \toposemcovhrp{}           & topological order    & $\Sigma_{\mathrm{SEM}}$ & both steps \\
     \bottomrule
   \end{tabular}
-  \floatnote{All share the universe, calendar, transaction costs and rebalance schedule.}
+  \floatnote{All share the universe, calendar, transaction costs and rebalance schedule. Every other allocator evaluated (the mechanism controls, the simple benchmarks, the HERC cells and the two excluded members) is placed on the same two axes in Table~\ref{tab:allocator-map}, Appendix~\ref{app:tables}.}
 \end{table}
 
 \chapter{Decomposing the Gain}
@@ -1023,6 +1043,11 @@ Inference follows a fixed battery. For pairwise contrasts, I use the
 Politis--Romano stationary block bootstrap \cite{politis1994stationary}
 with 10{,}000 resamples and a mean block length of 21 days. It resamples
 the joint return panel, so cross-strategy correlation is maintained.
+The two-sided $p$-value I report for a contrast is the percentile form:
+twice the fraction of bootstrap Sharpe differences that fall on the far
+side of zero from the point estimate, capped at one. It is the
+$p$-value implied by inverting the percentile confidence interval, not
+a studentised statistic.
 Daily returns show heavy non-normality (excess kurtosis
 ${\approx}\,\rsKurtosis$; Figure~\ref{fig:retdist},
 Appendix~\ref{app:tables}), and I assessed \rsNtrials\ configurations in
@@ -1097,7 +1122,7 @@ where any gain, regardless of its magnitude, comes from.
 In return terms, the gain is $+0.4$ to $+0.7$ percentage points of net
 CAGR per year ($5.62\%$ against $4.97\%$ for \semcovhrp{} versus the
 baseline at 252 days; Table~\ref{tab:return-terms}). Two simple
-benchmarks give a sense of the absolute levels. Equal weight has a
+benchmarks (Table~\ref{tab:allocator-map}) give a sense of the absolute levels. Equal weight has a
 Sharpe ratio of $\rsEwSharpe$, and inverse variance has $\rsIvpSharpe$
 at 252 days (Table~\ref{tab:return-terms}). Every HRP allocator on
 DYNOTEARS and VARLiNGAM graphs outperforms equal
@@ -1259,12 +1284,13 @@ factor. Either of these properties can be realised without a graph at
 all. I test whether either of them is responsible for the performance
 gain, and I noted what each possible outcome would mean before executing
 either test (Section~\ref{sec:believe}). Both controls keep \skelhrp{}'s
-clustering and replace its sample covariance at the allocation step. The
-first control uses a Ledoit--Wolf shrunk covariance
-\cite{ledoitwolf2004}. The second uses a de-factored covariance: each
-asset is regressed on the window's equal-weight market return, and
-allocation relies on the covariance of the residuals. Neither control
-sees an edge direction.
+clustering and replace its sample covariance at the allocation step
+(both are placed in Table~\ref{tab:allocator-map}). The first control,
+\lwhrp{}, uses a Ledoit--Wolf shrunk covariance
+\cite{ledoitwolf2004}. The second, \dfhrp{}, uses a de-factored
+covariance: each asset is regressed on the window's equal-weight market
+return, and allocation relies on the covariance of the residuals.
+Neither control sees an edge direction.
 
 I find that shrinkage does not reproduce the gain. The Ledoit--Wolf
 control sits below \skelhrp{} in every window ($\rsDlwSharpeWone$,
@@ -1294,12 +1320,19 @@ to its gain. Its gain over \corrhrp{} ($+0.022$ at 252 days) could in
 principle be achieved by any sparse conditional-dependence structure of
 the same density, with no discovery at all. A third control tests this
 directly, and as before I wrote down what each outcome would mean before
-executing it (\texttt{PREDICTIONS\_SKELETON\_CONTROL.md}). This control
-is \skelhrp{} with the discovered skeleton replaced by a thresholded
-partial-correlation matrix. I invert a Ledoit--Wolf covariance to obtain
-a precision matrix, keep the largest-magnitude cells, and match the
-density to the paired graph's nonzero-cell count. The graph enters only
-through that scalar. I find that the graph-free skeleton fails to
+executing it (\texttt{PREDICTIONS\_SKELETON\_CONTROL.md}). This control,
+\pcorrhrp{} (Table~\ref{tab:allocator-map}), is \skelhrp{} with the
+discovered skeleton replaced by a thresholded partial-correlation
+matrix. I invert a Ledoit--Wolf covariance to obtain a precision matrix,
+keep the largest-magnitude cells, and match the number of retained
+cells to the paired graph's nonzero-cell count. The graph enters only
+through that scalar. One consequence should be stated. The
+partial-correlation matrix is symmetric, so each retained pair occupies
+two cells, whereas a DAG has one cell per pair. The control therefore
+links half as many asset pairs as the discovered skeleton: the cell
+counts of the two clustering embeddings match, the pair counts do not,
+and a sparser control is a possible contributor to the residual
+reported below. I find that the graph-free skeleton fails to
 reproduce the gain at the window where the gain peaks, and reproduces it
 elsewhere. At 252 days it earns $\rsDpcSharpe$ while the discovered
 skeleton earns $0.403$, a residual of $+0.025$ ($p=0.008$), and its own
@@ -1315,7 +1348,8 @@ dividend requires, but that reading also required no negative-signed
 window, and the 378-day residual is $-0.003$. I therefore apply that
 reading to the 252-day window only: the gain made by the skeleton at 252
 days is attained by the discovered skeleton itself, while at 378 days a
-partial-correlation skeleton of the same density does as well.
+partial-correlation skeleton with the same cell count, and half the
+pair count, does as well.
 The mechanism story is therefore asymmetric in an informative way. The
 gain made by the orientations at the allocation step requires no graph,
 because de-factoring reproduces it. The gain made by the skeleton at 252
@@ -1329,87 +1363,48 @@ days does require the graph.
   \floatnote{All variants absorb the full ${\approx}50\%$ GFC drawdown; the study concerns relative allocation quality, not drawdown avoidance.}
 \end{figure}
 
-\subsection{Robustness to design parameters}
+\subsection{Robustness checks}
 
-The first design parameter is the sparsity threshold $\tau$.
-Thresholding the graph at $\tau\in\{0,0.01,0.05,0.10\}$ leaves the
-treatment flat or slightly improving (\topohrp{}, the allocator that
-uses the DAG's topological order at the ordering step: $0.399\to0.402$
-at the heaviest threshold), while the skeleton control drifts down
-($0.403\to0.394$; Table~\ref{tab:tau}). The structural risk-parity
-allocator, which I also swept, moves the same way ($0.398\to0.407$).
-This indicates that the two orientation-aware allocators I swept are not
-artefacts of the regularisation threshold; \semcovhrp{} and
-\toposemcovhrp{} were not swept. These sweep differences are point
-estimates; I did not formally test them.
+I perform several robustness checks to ensure that my results are consistent with different choices of parameters. The first is the sparsity threshold $\tau$: any edge weight that is below this threshold is pruned from the graph. I try a range of values, $\tau\in\{0,0.01,0.05,0.10\}$, on several allocators, and find net annualised Sharpe is essentially unchanged. \topohrp{}, the allocator that uses the DAG's topological order at HRP's ordering step, sees its Sharpe go from $0.399$ to $0.402$ at the strictest threshold, and the structural risk-parity allocator \structrp{} (Table~\ref{tab:allocator-map}) similarly goes from $0.398$ to $0.407$, while the skeleton control goes from $0.403$ to $0.394$ (see Table~\ref{tab:tau}).
+Due to time constraints, I did not test other allocators, nor did I estimate the statistical significance of the above differences at different thresholds. However, this check indicates that the two orientation-aware allocators I examined are robust to different sparsity thresholds.
 
-The second is transaction costs and turnover. The gain from the implied
-covariance at the allocation step is not sensitive to the level of
-transaction costs, at least in point estimates.
-\semcovhrp{}$-$\skelhrp{} at 504 days moves from $+0.022$ to $+0.025$ as
-costs rise from 0 to 20\,bps (differences on unrounded series;
-Table~\ref{tab:cost}). This is because \semcovhrp{}'s turnover ($0.102$
-one-way per rebalance) is less than the control's ($0.112$). The
-statement does not extend to the ordering step at short windows.
-\toposemcovhrp{} has the highest turnover in the family ($0.140$), and
-its 252-day gain decreases from $+0.004$ at zero cost to $0.000$ at
-20\,bps, while its 504-day gain remains intact through the sweep. In
-short, the implied covariance does not win by trading less and is not
-eroded by trading more, whereas the topological ordering at 252 days is.
+I also check my results against different transaction costs. 
+I find that the performance gain from the implied
+covariance at the allocation step, \semcovhrp{}$-$\skelhrp{}, is robust to different transaction costs. At the 504-day window, the gain moves from $+0.022$ to $+0.025$ as
+costs rise from 0 to 20\,bps (see Table~\ref{tab:cost}).
+This is because \semcovhrp{}'s one-way turnover ($0.102$ per rebalance) is less than the control's ($0.112$). 
+By contrast, I find that the performance gain at the ordering step is not robust to different transaction costs, at least at short windows.
+\toposemcovhrp{} has the highest turnover in the family ($0.140$). As a result, its performance gain over \skelhrp{} decreases from $+0.004$ at zero cost to $0.000$ at 20\,bps.
+However, its performance gain at the 504-day window is robust to different transaction cost values. 
 
-The third is the discovery method. Under VARLiNGAM graphs the
-orientation effect is absent at all 4 windows (4 of 12 contrasts
-positive, mean $-0.005$; Figure~\ref{fig:forest}, right, and the grey
-series of Figure~\ref{fig:gradient}). Therefore, the decomposition is
-contingent on the discovery method. DYNOTEARS' jointly optimised,
-acyclicity-constrained $W$ supports orientation-aware allocation, while
-VARLiNGAM's ICA-ordered $B_0$ does not. This is in line with VARLiNGAM's
-identification weakening with longer windows, as the residuals become
-more Gaussian. At the 189-day window it is also in line with its
-unpruned $B_0$ saturating in the thin-sample regime (density $32\%$
-against DYNOTEARS' stable $6$--$7\%$; Section~\ref{sec:asset-graph}), so
-its short-window graphs carry little usable orientation signal either.
+I also use different causal discovery methods, as mentioned. 
+Using graphs generated by VARLiNGAM, there is no performance improvement from using edge orientations at any of the 4 windows (only 4 of 12 comparisons are
+positive, with a mean of $-0.005$; see Figures~\ref{fig:forest} and \ref{fig:gradient}). 
+This shows that the performance decomposition is not agnostic to the causal discovery method.
+There are two likely reasons for VARLiNGAM's weakness. One is the fact that its identification assumption fails as windows get longer, because residuals become
+more Gaussian. The second explains the lack of performance improvement at the 189-day window: the fact that its unpruned contemporaneous matrix gets saturated with spurious edges, with a density of $32\%$ against DYNOTEARS' roughly $6$--$7\%$ (see Section~\ref{sec:asset-graph}), so the edge directions are not as informative.
 
-A DYNOTEARS graph supplies two pieces of information at once, the
-direction of each edge and a fitted magnitude for it, so its cells alone
-cannot show which of the two the orientation effect uses. The
-ridge-Granger control distinguishes these two: it preserves a usable
-ordering while degrading the magnitudes. On its graphs, causal-ordered
-bisection survives (\topohrp{} $=0.393$ against DYNOTEARS' $0.399$),
-whereas the allocator that relies on the implied covariance collapses
-(\semcovhrp{} $=0.352$; a gap of $-0.060$, $p=0.11$). A ridge-VAR
-coefficient matrix preserves a usable ordering but not structural effect
-sizes. This shows that the orientations' contribution does not hinge on
-merely knowing which way the arrows point (an ordering survives even a
-one-lag ridge regression). It hinges on edge magnitudes that are
-reliable enough to propagate shocks, which only the jointly optimised
-DYNOTEARS fit provides. This clarifies the answer to the research
-question rather than adding another benchmark: ``orientation'' pays
-through its weighted, propagatable form.
+I also use a ridge-Granger graph as another control. 
+As DYNOTEARS graphs provide both the
+direction of each edge and their fitted magnitudes, the performance gain from using edge orientations cannot be attributed cleanly to one of the two.
+By contrast, the ridge-Granger control does distinguish between the two, because it preserves ordering while degrading edge magnitudes. 
+By using its graphs, I find that the Sharpe ratio from causal-ordered
+bisection is essentially unchanged (\topohrp{} $=0.393$ against DYNOTEARS' $0.399$),
+while \semcovhrp{}, the allocator that used implied covariance, saw its performance gain fall ($=0.352$; a gap of $-0.060$, $p=0.11$). 
+This shows that the edge orientations' contribution depends on reliably estimated edge magnitudes which can propagate shocks, rather than just knowing the directions of the edges. Ridge-Granger provides only the latter, while DYNOTEARS provides both.
+This helps to answer part of the research question by identifying that the performance gain of edge orientations relies on them being reliably weighted.
 
-The last check uses a second member of the hierarchical family, HERC.
-Chapter~\ref{chap:background} argued that the limitation is family-wide:
-any hierarchical allocator that clusters on a symmetric matrix loses
-orientation, regardless of the rule that defines how the tree is read.
-Whether the measured decomposition generalises to different rules for
-reading the tree is a distinct, empirical question. I test this on a
-second member, and, prior to running any cell, I noted what each of the
-possible outcomes would imply (\texttt{PREDICTIONS\_HERC.md}). The
-member is a full-recursion Hierarchical Equal Risk Contribution
-allocator \cite{raffinot2018herc}. It has the same clustering step and
-cluster-risk measure as the HRP family; however, instead of bisecting
-the leaf ordering, it descends the actual topology of the dendrogram. I
-find that the outcome is mixed. The sign of the orientation contribution
-carries at every window, the sign of the skeleton contribution does not,
-and the whole HERC family lies well below its HRP counterparts (cells
-and contrasts in Appendix~\ref{app:tables}). As such, the size of the
-decomposition depends on the allocator. What generalises to this second
-member is the sign of the orientations' contribution. Therefore, I
-retain only the structural part of the family-wide claim: every member
-of the family loses orientation at the clustering step, but the size of
-the resulting performance gain depends on the member. All 12 HERC cells
-are included in the \rsNtrials\ configurations and belong to neither SPA
-family.
+The final robustness check I run is using a different hierarchical allocator: Hierarchical Equal Risk Contribution (HERC) \cite{raffinot2018herc}.
+Chapter~\ref{chap:background} states that any hierarchical allocator that clusters on a symmetric matrix loses orientation information, regardless of how the tree is read.
+I therefore test this proposition by seeing whether the performance decomposition I identify
+using HRP generalises to HERC. 
+HERC uses the same clustering step and cluster variance measure as HRP, however, 
+instead of bisecting on the leaf ordering, it splits assets by following the topology of the dendrogram. This tends to result in very concentrated weights.
+The three HERC cells mirror the decomposition's three HRP anchors: \corrherc{}, \skelherc{} and \semcovherc{} (Table~\ref{tab:allocator-map}).
+I find that the outcome is mixed. The edge orientations still yield a positive performance improvement at every window, while this is not the case for the graph's skeleton.
+Both in terms of their overall performance level and their comparison to the baseline, the HERC-based allocators underperform the HRP-based ones (see Appendix~\ref{app:tables}).
+Thus, across these two hierarchical allocators, there is a robust positive performance gain attributable to incorporating edge orientations, but the size of the performance decomposition itself depends on the allocator.
+All 12 HERC configurations are included in the total count (\rsNtrials), but are not in either of the SPA test families.
 
 \subsection{Regime dependence}
 \label{sec:regimes}
@@ -1438,66 +1433,35 @@ stable regimes (Section~\ref{sec:howard-theme}).
 \section{Multiplicity-aware inference}
 \label{sec:believe-rigour}
 
-% Numbers in this section come from _generated/robust_stats.tex, regenerated
-% by `python -m scripts.robust_stats --phase-ii` over all evaluated bundles.
+My statistical testing has to address the multiple-comparisons problem: the possibility that best-performing configurations just happen to arise by pure chance out of the numerous trials I run. 
 
-The first correction addresses non-normality and selection bias through
-the Probabilistic and Deflated Sharpe ratios. The Probabilistic Sharpe
-ratio of each headline allocator, the probability that its true Sharpe
-exceeds zero given the sample's higher moments, is high (\corrhrp{}
-$\rsCorrPSR$, \skelhrp{} $\rsVprimePSR$, \semcovhrp{} $\rsDonePSR$ at
-252 days). This suggests that the levels are not artefacts of fat tails.
-To account for selection, I next deflate against the best Sharpe
-expected from \rsNtrials\ no-skill trials. The highest Deflated Sharpe
-ratio in the study is observed for \toposemcovhrp{} at the 378-day
-window ($\rsDtwosDSRWthree$). This is followed by the direction-free
-de-factored control ($\rsDdfDSRWthree$) and \semcovhrp{}
-($\rsDoneDSRWthree$), against $0.870$ for the baseline and $0.885$ for
-the skeleton-only allocator at the same window (at 252 days,
-$\rsCorrDSR$ and $\rsVprimeDSR$). The top of the deflation table is
-occupied by the orientation-aware cells, the de-factored control that
-mimics them, and two \undirhrp{} cells, which is consistent with the
-mechanism finding of Section~\ref{sec:orientation-role}. Since every
-configuration is deflated against the same trial count over the same
-calendar, the DSR here is close to a monotone transform of the Sharpe
-ratio, so the ordering of the decomposition survives deflation by
-construction. The informative content of the DSR is its level. The SPA
-tests below assess how much statistical separation survives.
+The first correction I apply is to use the Probabilistic Sharpe ratio to address non-normality. The PSR gives the probability that the true Sharpe ratio of each allocator is greater than zero given the sample's higher moments (skewness and kurtosis) and its length. The results are high: at the 252-day window, the PSR of \corrhrp{} is $\rsCorrPSR$, \skelhrp{}'s is $\rsVprimePSR$, and \semcovhrp{}'s is $\rsDonePSR$. This indicates that the true Sharpe ratios are very likely to be over zero, despite the excess kurtosis and long sample length.
+I then use the Deflated Sharpe ratio to account for potential selection bias. It compares the Sharpe ratios against the best configuration that would be expected from \rsNtrials\ trials that all have a true Sharpe of zero. It reports the probability that the true Sharpe is above zero, accounting for this search; the conventional bar is $0.95$. None of the configurations reach it. The highest DSR is
+\toposemcovhrp{} at the 378-day window ($\rsDtwosDSRWthree$), meaning that, after accounting for the search over \rsNtrials\ trials, there is a roughly 10\% chance that its true Sharpe ratio is zero or below. This is followed
+by the direction-free de-factored control ($\rsDdfDSRWthree$) and
+\semcovhrp{} ($\rsDoneDSRWthree$), while \corrhrp{} and \skelhrp{} sit
+at $0.870$ and $0.885$ at the same window. 
+Note that difference between the DSR of the best configuration
+and the baseline is less than $0.03$. This indicates that the DSR is more informative about the individual performance of allocators than about comparisons between allocators.
 
-The second correction is for comparisons over a family of allocators.
-Hansen's SPA test adjusts for the search over such a family. Its null
-hypothesis is that no allocator in the family performs better than the
-baseline, and the test takes into account the fact that the most
-appealing member was chosen from the family. I apply the test to two
-families: (i) the causal allocators against the \corrhrp{} baseline, and
-(ii) the orientation-aware allocators against the DYNOTEARS skeleton
-control \skelhrp{} (Section~\ref{sec:decomposition}). In both families
-the candidates are drawn from both discovery methods, so family (ii)
-also puts the VARLiNGAM orientation-aware cells against the DYNOTEARS
-skeleton. I conduct each test twice at each window. The first run is
-over the full grid of 7 allocators from the experiment plan: all 7 in
-family (i), and the 5 orientation-aware members in family (ii). The
-second is over a narrowed grid of 5 allocators, consisting of the 4
-allocators that cover the 2 entry points of information from the DAG
-into HRP (Table~\ref{tab:crossing}) plus the second symmetrisation
-control, \undirhrp{}. In family (ii) the narrowed grid leaves the 3
-orientation-aware allocators of Table~\ref{tab:crossing}. I fixed the
-narrowing only
-after I had the results of the 4 windows, so the full family's numbers
-are the primary ones and the narrowed family's follow and are labelled
-as such. Table~\ref{tab:spa} contains the $p$-values. Its last column
-combines all 4 windows into a single test against the 252-day baseline,
-therefore correcting for the search over windows as well as the search
-over allocators.
+To allow for comparisons over a family of allocators, I use Hansen's SPA test.
+The null hypothesis is that no allocator in the family outperforms the baseline, and the test accounts for the fact that the best-performing member was chosen from the family. 
+I apply the test to two
+families: first, all 7 causal allocators against the \corrhrp{} baseline, to test whether using the causal graph at all beats the baseline correlational allocator; second, just the 5 orientation-aware allocators versus the DYNOTEARS skeleton-only allocator, \skelhrp{}, to test whether there is an additional gain from the graph's edge orientations above that of the skeleton (Section~\ref{sec:decomposition}).
+Both families contain configurations that use both VARLiNGAM and DYNOTEARS as causal discovery algorithms, so the second family also compares the VARLiNGAM orientation-aware allocators to the DYNOTEARS skeleton-only allocator.
+At each window, I first run the test over the full set of allocators in both families. I then run over a narrowed selection of allocators. For the first family, this selection consists of the 4 allocators that cover the 2 entry points of information from the DAG
+into HRP (Table~\ref{tab:crossing}) plus the second symmetrisation control, \undirhrp{} (where the distance matrix used for clustering only depends on which pairs are linked).
+For the second family, the narrowed set consists of the 3 allocators from Table~\ref{tab:crossing} that are orientation-aware.
+I ran the narrowed tests after having obtained the results from the full sets of allocators. I therefore quote the full-set test results as my primary results. The $p$-values are in Table~\ref{tab:spa}, with the last column pooling all 4 windows into a single test against the 252-day baseline. This pooled test corrects for the search over windows as well as the search over allocators.
 
 \begin{table}[t]
   \centering
-  \caption{Hansen's SPA consistent $p$-values by family, window and grid.}
+  \caption{Hansen's SPA $p$-values by family, window and full/narrowed allocator set.}
   \label{tab:spa}
   \small
   \begin{tabular}{l l c c c c c}
     \toprule
-    Family & Grid & 189 & 252 & 378 & 504 & Pooled \\
+    Family & Allocator set & 189 & 252 & 378 & 504 & Pooled \\
     \midrule
     (i) vs \corrhrp{}      & full     & $\rsSpaSkelWonePre$ & $\rsSpaSkelWtwoPre$ & $\rsSpaSkelWthreePre$ & $\rsSpaSkelWfivePre$ & $\rsSpaSkelPooledPre$ \\
     (i) vs \corrhrp{}      & narrowed & $\rsSpaSkelWone$ & $\rsSpaSkelWtwo$ & $\rsSpaSkelWthree^{*}$ & $\rsSpaSkelWfive^{*}$ & $\rsSpaSkelPooled$ \\
@@ -1505,66 +1469,26 @@ over allocators.
     (ii) vs \skelhrp{} & narrowed & $\rsSpaDirWone$ & $\rsSpaDirWtwo$ & $\rsSpaDirWthree$ & $\rsSpaDirWfive^{*}$ & $\rsSpaDirPooled$ \\
     \bottomrule
   \end{tabular}
-  \floatnote{``Pooled'' runs one SPA whose candidate set is the union of the family's cells at all 4 windows against the family's 252-day baseline, so it accounts for the strategy search and the window search jointly. $^{*}$: $p<0.05$.}
+  \floatnote{(i) denotes the larger family of all causal allocators, tested against \corrhrp{}. (ii) denotes the smaller family of only the edge-orientation-aware allocators, tested against \skelhrp{}. ``Pooled'' runs one SPA whose candidate set is the union of the family's cells at all 4 windows against the family's 252-day baseline to account for both the strategy search and the window search. $^{*}$: $p<0.05$.}
 \end{table}
 
-Over the full grid, the null hypothesis is not rejected at any window,
-for either family (i) or family (ii). Over the narrowed grid, it is
-rejected for family (i) at the
-378-day and 504-day windows ($p=\rsSpaSkelWthree$ and $\rsSpaSkelWfive$)
-and for family (ii) at the 504-day window ($p=\rsSpaDirWfive$). These
-are the only rejections discussed in this report, and they exist only
-because of the narrowing I made after seeing the results. The pooled
-column adjusts for the search across windows, which the per-window tests
-leave open, and it is decisive. After the 4 windows are combined into a
-single test, the null is not rejected for either family, under either
-the full or the narrowed grid ($p=\rsSpaSkelPooled$ for the narrowed
+Over the full set of allocators, the null hypothesis is not rejected at any window for either of the two families.
+Over the narrowed sets of allocators (the allocators that cover the two possible entry points of causal graphs into HRP), the null is
+rejected for the first family at the
+378-day and 504-day windows ($p=\rsSpaSkelWthree$ and $\rsSpaSkelWfive$),
+and for the second family at the 504-day window ($p=\rsSpaDirWfive$). 
+These rejections of the null hypothesis are the only ones discussed in the report, and, as mentioned above, these narrowed tests were only run after seeing the results of tests of the full allocators. I therefore treat them as being merely indicative.
+The results in the pooled column show that, once the search across windows is accounted for, the null hypothesis is not rejected for either family, under either the full or the narrowed allocator set ($p=\rsSpaSkelPooled$ for the narrowed
 causal family, $\rsSpaDirPooled$ for the narrowed orientation family).
-Consequently, I interpret the window-level rejections as suggestive
-rather than established. They occur at the peaks of the point estimates,
-but they survive neither the full family nor the pooled test.
 
-The third correction is the Model Confidence Set. The $90\%$ MCS over
-the \rsMcsUniverse\ distinct 252-day strategies retains \rsMcsSize\ of
-them: every member of the reported family, both orientation-blind
-controls and the graph-blind \corrhrp{}. Its only exclusion is HSP as
-published (Appendix~\ref{app:hsp}). This should be interpreted as a
-statement about power and not as a vindication of everything included.
-Given this many highly correlated long-only variants whose Sharpes span
-$0.35$--$0.41$, the equivalence test does not have the power to rank the
-causal family, including separating treatments from controls.
-
-These corrections allow a verdict on the research question, with its
-uncertainty stated. The point estimates for the decomposition are clear
-and internally consistent. There is a stable total gain whose
-composition depends on the estimation window: the skeleton's
-contribution is hump-shaped and peaks at 252 days, and the orientations'
-contribution is positive at every window and largest at the two
-extremes. The orientation-aware allocators rank highest in the
-study-wide DSR table. The statistical support is modest, and I present
-it at its estimated size. 19 of the 20 DYNOTEARS comparisons against
-\corrhrp{}, and 17 of the 20 VARLiNGAM comparisons, are positive. Of the
-12 orientation contrasts, one is pairwise significant ($p=0.048$). For
-the full grid, the SPA null is not rejected anywhere. For the narrowed
-grid fixed after the results were known, it is
-rejected marginally at the longest windows only, where the point
-estimates also peak. And with the 4 windows pooled, it is not rejected
-for either family (Table~\ref{tab:spa}). The mechanism controls of
-Section~\ref{sec:orientation-role} provide different answers for the two
-components. The orientations' gain at the allocation step is reproduced
-by a graph-free de-factored covariance, so it is robustness rather than
-directional information as such. The skeleton's 252-day gain is not
-reproduced by a graph-free skeleton of matched density, so the gain at
-the conventional window does need the discovered graph. The largest
-defensible claim is modest. Substituting a DYNOTEARS graph for the
-correlation matrix pays through the skeleton near the 1-year window, and
-keeping the orientations imposes no cost while improving robustness to
-the choice of estimation window. The evidence does not support
-attributing the allocation-step gain to edge direction, any orientation
-effect under VARLiNGAM graphs, or the stress hypothesis. In a nutshell,
-the point estimates are precise and consistent in sign, their
-significance holds only under the post-hoc narrowed family, and a
-direction-free control replicates the primary mechanism.
+I also use the Model Confidence Set, which identifies the smallest set of strategies that, at a given confidence level, contain the best-performing strategy, given the sample. 
+The $90\%$ MCS over
+the \rsMcsUniverse\ 252-day strategies consists of \rsMcsSize\ strategies:
+the only strategy that is excluded is Hierarchical Sensitivity Parity (see Appendix~\ref{app:hsp}).
+The remaining strategies are all of the 252-day causal allocators from all three of the causal discovery algorithms (DYNOTEARS, VARLiNGAM, and ridge-Granger): the orientation-aware and orientation-blind allocators, the causal-selection HSP
+variants, and the \corrhrp{} baseline.
+Given that there are this many highly correlated variants, whose Sharpe ratios span
+$0.35$--$0.41$, the MCS method lacks the power to rank the causal family. Nor can it separate treatments from controls by performance difference.
 
 \section{An out-of-sample slice}
 \label{sec:oos}
@@ -1661,9 +1585,9 @@ However, the risk from these post-hoc changes is low.
 I ran causal discovery and allocation over the added windows identically to the initial windows.
 Also, the total number of configurations, \rsNtrials, accounts for both the initial and subsequent (primary) research directions, across all phases and windows, which means that the multiplicity-aware tests account for the change in direction.
 The final influenced design choice is the family of allocators tested for.
-The initial plan was to use a family of 7 allocators, and this is indeed the main family I discuss in the report. However, after seeing the results, I narrowed it to the 5 allocators that are discussed in Chapter~\ref{chap:sensitivity}. The reason for doing so was to focus only on the allocators where the causal graph enters into HRP's two entry points; the two excluded allocators take in the graph elsewhere. Both are orientation-aware allocators, with
-one replacing the hierarchy with risk parity over structural shocks, and the
-other constructing the clustering distance from shared upstream
+The initial plan was to use a family of 7 allocators, and this is indeed the main family I discuss in the report. However, after seeing the results, I narrowed it to the 5 allocators that are discussed in Chapter~\ref{chap:sensitivity}. The reason for doing so was to focus only on the allocators where the causal graph enters into HRP's two entry points; the two excluded allocators take in the graph elsewhere. Both are orientation-aware allocators (Table~\ref{tab:allocator-map}), with
+one, \structrp{}, replacing the hierarchy with risk parity over structural shocks, and the
+other, \coanchrp{}, constructing the clustering distance from shared upstream
 ancestry. However, the timing (restricting the family after having seen the overall results) means the null hypothesis rejections from testing the restricted family can only be suggestive, not definitive.
 Both families' SPA $p$-values are recorded in Table~\ref{tab:spa}. 
 The null is never rejected for the full (7-allocator) family, while three of the ten narrowed-family tests have rejections.
@@ -1697,6 +1621,10 @@ In any case, as all the allocators receive the same graph, the performance decom
 
 One other caveat is the fact that my results are method-dependent, as the performance gain from edge orientations only exists under DYNOTEARS graphs. I therefore can only claim that 
 DYNOTEARS' contemporaneous structure supports orientation-aware allocation, rather than a broader claim about causal edge orientations being useful for portfolio allocation in general.
+
+Overall, the results are modest. Replacing the correlation matrix in a hierarchical allocator with a DYNOTEARS graph yields a positive performance improvement across estimation windows. At the 1-year estimation window, this performance gain is driven by the graph's skeleton, while the edge orientations compensate across other windows to improve robustness.
+The point estimates of performance improvement are consistently positive across the estimation windows and the different discovery methods. However, they are only statistically significant when tested as a family of allocators that was narrowed post-hoc. The results are also not significant when the SPA testing accounts for the search over estimation windows, in the pooled results.
+At the allocation step, a de-factored covariance (which does not use edge direction information) replicates the edge orientations' gain. This implies that the performance gain seen in the edge-orientation-aware allocators cannot be attributed to the edge direction itself. Also, the performance gain is only observed for the edge-orientation-aware allocators that use DYNOTEARS as a causal discovery method, not VARLiNGAM. Nor is there a performance gain for those allocators during times of market stress.
 
 \chapter{Conclusions and Future Work}
 \label{chap:conclusion}
@@ -1980,6 +1908,52 @@ but the results can still be reproduced from the above repository.
 
 This appendix contains the full tables discussed in
 Chapter~\ref{chap:evaluation}, as well as the reproducibility notes.
+
+\section{The allocator map}
+\label{app:allocator-map}
+
+Table~\ref{tab:allocator-map} places every allocator evaluated in this
+study on the two axes of Chapter~\ref{chap:sensitivity}: where the leaf
+ordering comes from, and which covariance recursive bisection splits
+on. The primary family of Table~\ref{tab:variants} occupies six of its
+cells. The remaining cells are the mechanism controls of
+Section~\ref{sec:orientation-role}, the two simple benchmarks, the HERC
+cells of Section~\ref{sec:decomposition}, and the two members of the
+pre-specified family that were excluded from the narrowed family
+(Section~\ref{sec:believe}). The table also fixes the name used for
+each of them in the text.
+
+\begin{table}[htbp]
+  \centering
+  \caption{The allocator map: every allocator evaluated, placed by where its ordering and its bisection covariance come from.}
+  \label{tab:allocator-map}
+  \small
+  \setlength{\tabcolsep}{3.5pt}
+  \setlength{\aboverulesep}{0pt}
+  \setlength{\belowrulesep}{0pt}
+  \setlength{\extrarowheight}{2pt}
+  \begin{tabular}{l | l l l l | l}
+    \toprule
+    \diagbox[height=2.4\line]{Ordering from}{Bisects on}
+      & sample $\Sigma$ & Ledoit--Wolf & de-factored & $\Sigma_{\mathrm{SEM}}$ & Graph content used \\
+    \midrule
+    \multicolumn{6}{l}{\emph{Graph-blind}} \\
+    correlation dendrogram      & \corrhrp{} / \corrherc{} & & & & none (baseline) \\
+    none                        & EW $(1/N)$; IVP (diagonal only) & & & & none (benchmarks) \\
+    \midrule
+    \multicolumn{6}{l}{\emph{Skeleton only}} \\
+    skeleton-embedding dendrogram   & \skelhrp{} / \skelherc{} & \lwhrp{}$^{c}$ & \dfhrp{}$^{c}$ & \semcovhrp{} / \semcovherc{} & skeleton; $\Sigma_{\mathrm{SEM}}$ adds orientation \\
+    undirected-adjacency dendrogram & \undirhrp{} & & & & skeleton (control on the control) \\
+    partial-correlation dendrogram  & \pcorrhrp{}$^{c}$ & & & & edge count only (graph-free) \\
+    \midrule
+    \multicolumn{6}{l}{\emph{Orientation-aware}} \\
+    topological order           & \topohrp{} & & & \toposemcovhrp{} & orientation (ordering step) \\
+    co-ancestry dendrogram      & \coanchrp{}$^{e}$ & & & & orientation (clustering step) \\
+    none (risk parity)          & & & & \structrp{}$^{e}$ & orientation (covariance only) \\
+    \bottomrule
+  \end{tabular}
+  \floatnote{Rows give the source of the leaf ordering that recursive bisection splits; columns give the covariance it splits on. A slash separates the HRP and HERC members of one cell. $^{c}$: mechanism control added after the grid was seen; sees no edge direction. $^{e}$: in the pre-specified 7-allocator family but outside the narrowed 5-allocator family. The Phase~I HSP variants (Appendix~\ref{app:hsp}) belong to the first block, with a sensitivity-distance dendrogram and the sample covariance; they differ only upstream, in driver selection. All cells share the universe, calendar, transaction costs and rebalance schedule.}
+\end{table}
 
 \section{The full allocator matrix}
 
@@ -2278,7 +2252,9 @@ extraction threshold $\tau$ of Section~\ref{sec:asset-graph} defaults to
 $0$ on top of this); VARLiNGAM with lingam pruning disabled (adaptive
 lasso fails at $d>n$); ridge-Granger ridge $\lambda=10^{-2}$ scaled by
 window length, density-matched per window to the paired DYNOTEARS graph.
-Allocators: single-linkage where clustering is used;
+Allocators: single-linkage where clustering is used, with every
+clustering distance projected to the nearest PSD matrix before linkage
+(Section~\ref{sec:controls});
 $\Sigma_{\mathrm{SEM}}$ with diagonal shock variances from fit-window
 residuals, nearest-PSD projection and ridge load
 $10^{-6}\operatorname{tr}(\Sigma)/N$; topological tie-break by total
