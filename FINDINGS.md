@@ -4,7 +4,7 @@
 results from the full 2007–2024 backtests (`results/`), the design decisions and
 their justifications (the two repo plan docs + the session plan), the research
 notes in this repo, and the methodological findings/bugs discovered during
-implementation. Last updated 2026-06-15.*
+implementation. Last updated 2026-09-05 (see §1e: the distance-projection correction supersedes the Phase II numbers in §1d and the CORR/V0′ numbers elsewhere).*
 
 > **One-line thesis.** Replace HSP's *correlation-based* driver selection with
 > *causal-discovery-based* selection (and optionally close a performance→selection
@@ -275,6 +275,8 @@ CNN kernel → a `(W, A)` pair slotting into the DYNOTEARS interface); probe
 
 ## 1d. Phase II — direction-aware allocation (the fixed-graph ablation)
 
+> **Superseded (2026-09-05).** Every HRP/HERC number in this section was produced with the distance-projection defect described in §1e. The narrative below is kept as a record of what was believed when the family was narrowed and the controls interpreted; the corrected numbers and reading are in §1e.
+
 **The question (pre-registered in `PHASE_II_PLAN.md` §0.2):** *holding the
 discovered asset–asset graph fixed, does a direction-aware allocator outperform
 its own symmetrised counterpart?* V0′ symmetrises the asset–asset block
@@ -478,6 +480,107 @@ added one overnight populate for the two new windows. DAG diagnostics:
 DYNOTEARS asset-graphs average ~625 edges (density 0.064) with DAG depth ~50
 of 99 — deep directed chains, so the ablation had real direction to work
 with.
+
+---
+
+## 1e. The distance-projection correction (2026-09-05) — SUPERSEDES §1d
+
+**The defect.** `_hrp_from_distance` / `_herc_from_distance` (and the Phase I
+V0′ path) called `nearest_psd` on the *clustering distance matrix* before
+linkage, inherited from the Phase I code "as a safeguard". A Euclidean distance
+matrix (correlation distance √(½(1−ρ)) and the embedding distance both are) has
+exactly one positive eigenvalue, so clipping the rest returns a rank-one matrix
+`d_i·d_j`; under single linkage the dendrogram degenerates to a chain ordered by
+the Perron vector. HRP was clustering on one centrality score per asset, not on
+pairwise structure. On the real 2007–2024 backtests projected vs textbook
+weights differ at every rebalance (median L1 at w252: CORR 0.29, D0 0.21,
+D1 0.14). HSP (`psd_project_distance=False` by default) never projected.
+
+**The fix.** Projection removed from every allocator; kept behind
+`psd_project_distance=True` so the committed Phase I bundle can be replayed.
+99 cells re-run (all HRP/HERC cells × {DYNOTEARS, VARLiNGAM} × 4 windows,
+Granger D0/D1, tau and cost sweeps, OOS slice for CORR/D0/D0s/D1/D0df, Phase I
+V0′ w252/w504), then collate, regime, both batteries, all figures. Unchanged:
+D2, D2s, D3, EW, IVP, HSP V0/V1/V2. Replication gate D0 ≡ V0′ still exact
+(max |Δw| = 0). Projected-run results archived at `archive/results_psd_legacy/`.
+
+**Corrected matrix (net Sharpe; CORR anchor per window):**
+
+| | w189 | w252 | w378 | w504 |
+|---|---|---|---|---|
+| CORR-HRP | **0.411** | **0.427** | 0.407 | 0.383 |
+| D0 (skeleton) | 0.392 | 0.399 | 0.404 | 0.375 |
+| D0s (undirected) | 0.389 | 0.401 | 0.412 | 0.394 |
+| D1 (Σ_struct) | 0.407 | 0.410 | 0.413 | 0.396 |
+| D2s (topo + Σ_struct) | 0.408 | 0.406 | **0.419** | 0.399 |
+| D0df / D0lw / D0pc | 0.410 / 0.390 / 0.372 | 0.409 / 0.394 / 0.410 | 0.425 / 0.382 / 0.399 | 0.402 / 0.356 / 0.382 |
+| HERCC / HERC0 / HERC1 | 0.454 / 0.197 / 0.285 | 0.410 / 0.228 / 0.280 | 0.345 / 0.316 / 0.326 | 0.364 / 0.288 / 0.337 |
+
+VARLiNGAM: D0 .376/.394/.399/.364, D0s .387/.392/.400/.377, D1 .340/.385/.410/.371,
+D2 .387/.388/.398/.372, D2s .394/.386/.399/.375. Granger w252: D0 0.386, D1 0.352, D2 0.393.
+
+**Corrected decomposition (DYNOTEARS; ΔSharpe, Politis–Romano p):**
+
+| component | w189 | w252 | w378 | w504 |
+|---|---|---|---|---|
+| skeleton (D0−CORR) | −0.019 (0.21) | −0.028 (0.056) | −0.003 (0.80) | −0.008 (0.56) |
+| orientation (D1−D0) | +0.015 (0.22) | +0.011 (0.35) | +0.009 (0.45) | +0.021 (0.051) |
+| orientation, both steps (D2s−D0) | +0.016 (0.31) | +0.007 (0.61) | +0.015 (0.33) | +0.024 (0.086) |
+| total (D1−CORR) | −0.004 (0.82) | −0.017 (0.36) | +0.006 (0.73) | +0.013 (0.44) |
+| D0s−D0 | −0.003 (0.82) | +0.002 (0.84) | +0.008 (0.47) | +0.019 (0.072) |
+
+**The corrected reading (what the report now says):**
+
+1. **Premise 1 fails.** The causal graph does not beat the correlation matrix.
+   CORR is the best HRP cell at w189/w252; 6/20 DYNOTEARS and 1/20 VARLiNGAM
+   cells beat CORR, all at w378/w504. SPA family (i) vs CORR: full
+   0.44/0.79/0.35/0.24, narrowed 0.67/0.89/0.27/0.21, pooled 0.82.
+2. **Skeleton is a cost at every window** (−0.003…−0.028, worst at w252);
+   **orientation recovers a similar amount at every window** (+0.009…+0.021,
+   largest at w504, p=0.051). Total ≈ 0. 10/12 DYNOTEARS orientation contrasts
+   positive (D2−D0 ≈ 0.000 at w189/w252); VARLiNGAM 6/12, mean 0.000.
+3. **Against D0s the orientation gain vanishes at long windows** (D1−D0s:
+   +0.017/+0.009/+0.001/+0.001). The w504 orientation gain is D0-control-specific.
+   The old w189 D0s−D0 = +0.025 (p=0.008) caveat is gone (now −0.003).
+4. **Mechanism unchanged:** D0df reproduces D1 at every window (residual −0.011…+0.001);
+   LW does not (D1 ahead +0.016…+0.040). **D0pc now matches D0** (−0.020/+0.012/−0.005/+0.007,
+   p ≥ 0.07) and trails CORR (−0.039 p=0.008, −0.016, −0.008, −0.001): the old
+   "discovered skeleton beats partial-corr by +0.025 (p=0.008)" is gone. Neither
+   component needs a graph.
+5. **SPA: nothing rejects anywhere** — family (ii) vs D0: full 0.22/0.30/0.33/0.17,
+   narrowed 0.36/0.33/0.18/0.076, pooled 0.45/0.40. The three narrowed-family
+   rejections in §1d are gone.
+6. **DSR leader is HERCC w189 (0.940), then CORR w252 (0.925)**, then D0df w378
+   (0.924), D2s w378 (0.920). MCS w252: 16 of 17, excludes only V0 (unchanged).
+   MDE: total SE 0.019 → MDE 0.047; orientation SE 0.015 → MDE 0.037. Kurtosis 15.9.
+7. **HERC:** orientation positive at every window (+0.088/+0.052/+0.010/+0.049,
+   p ≥ 0.10 — no longer significant), skeleton negative at every window
+   (−0.258/−0.182/−0.028/−0.076). Signs of both components generalise.
+8. **Regimes (w252, excess over CORR):** D1/D2s beat CORR only in the VIX bottom
+   quintile (+0.14/+0.13); negative in every other regime (recession −0.02/−0.04,
+   top quintile −0.04/−0.05). Stress hypothesis still rejected. Regime figure
+   now plots excess over CORR (was over HSP V0, contradicting its caption).
+9. **OOS 2025-26:** skeleton +0.107/+0.071/−0.009/+0.100; orientation (D1−D0)
+   +0.035/+0.050/+0.105/+0.036; D2s−D0 +0.002/+0.013/+0.079/+0.110; total
+   +0.142/+0.122/+0.096/+0.136; residual D1−D0df −0.090/−0.001/+0.005/−0.002.
+   Pre-committed outcome 1 (orientation and total non-negative at a majority of
+   windows) holds; the skeleton's in-sample sign (negative) did NOT carry over;
+   the w189 residual (−0.090) is outside the in-sample band and is reported per
+   rule 4 of PREDICTIONS_OOS.md.
+10. **Sweeps:** tau (w252) D0 0.399/0.399/0.386/0.395, D2 and D3 unchanged.
+    Cost: D1−D0 at w504 +0.020→+0.022 (0→20 bps), turnover D1 0.089 vs D0 0.107;
+    D2s−D0 at w252 +0.008→+0.005, at w504 +0.024→+0.022. Return terms w252: CORR
+    5.77% CAGR / −49.7% MDD / 0.129 turnover; D1 5.60% / −50.0% / 0.110.
+11. **Phase I comparators:** V0′ now 0.399 (w252) / 0.375 (w504); CORR beats HSP
+    V0 (0.371) by even more. Seed-audit claim (every graph-route allocator at w252
+    above the seed max 0.396) still holds (min D0/D2 0.399).
+
+**What survived the correction:** the orientation-over-skeleton sign at every
+window, the de-factoring mechanism, the VARLiNGAM null, the calm-regime pattern,
+the Granger magnitude result, the MCS/seed-audit statements. **What did not:**
+the total gain, the hump/U shapes, the skeleton's w252 gain over the
+partial-correlation control, the narrowed-family SPA rejections, the D2s-w378
+"highest DSR" claim, the "every HRP cell beats EW" claim (VARL-D1 w189 = 0.340).
 
 ---
 

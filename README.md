@@ -178,3 +178,16 @@ figures under `results/figures/`.
   A Yahoo-only rebuild will differ in the third decimal place of Sharpe.
 - The `results/*/closed_loop.pkl` bundles are gitignored because of size.
   Only the CSVs, figures and generated macros are tracked.
+
+### The distance-projection correction (2026-09-05)
+
+Until 2026-09-05 every HRP and HERC allocator nearest-PSD projected its
+clustering distance matrix before linkage (inherited from the Phase I code).
+A Euclidean distance matrix has one positive eigenvalue, so the projection
+collapsed the distance to rank one and single linkage degenerated to a chain.
+The projection is now off by default and kept behind
+`psd_project_distance=True` in `pipeline/portfolio/directed.py` and
+`causal_hsp.py` so the original Phase I bundle can still be replayed.
+All affected cells, batteries and figures were re-run; the projected-run
+results are archived under `archive/results_psd_legacy/`. The report's
+Appendix records what changed.
