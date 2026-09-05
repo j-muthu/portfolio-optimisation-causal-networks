@@ -59,8 +59,9 @@ def hsp_weights_from_S(
     """HSP weights from an ``(N, K)`` sensitivity matrix + a return window.
 
     Rows of ``S`` must align with ``asset_names``. ``psd_project_distance``
-    projects the distance to nearest-PSD before clustering (rarely needed;
-    kept as a safeguard).
+    projects the distance to nearest-PSD before clustering. Leave it off:
+    a Euclidean distance matrix has one positive eigenvalue, so the
+    projection collapses it to rank one (see ``directed._hrp_from_distance``).
     """
     if S.shape[0] != len(asset_names):
         raise ValueError(

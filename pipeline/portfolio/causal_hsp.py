@@ -38,15 +38,22 @@ def v0prime_asset_only_causal_hrp(
     asset_names: list[str],
     returns_window: pd.DataFrame,
     linkage_method: str = "single",
+    psd_project_distance: bool = False,
 ) -> pd.Series:
-    """Asset-only Causal-HRP using the (asset_idx, asset_idx) block of W."""
+    """Asset-only Causal-HRP using the (asset_idx, asset_idx) block of W.
+
+    ``psd_project_distance=True`` replays the original Phase I run, which
+    nearest-PSD projected the distance before linkage (a bug: the projection
+    collapses a Euclidean distance matrix to rank one). Off by default.
+    """
     if causal_W.shape != (len(asset_names), len(asset_names)):
         raise ValueError(
             f"causal_W must be NxN on asset_names; got {causal_W.shape} "
             f"vs N={len(asset_names)}"
         )
     dist_arr = causal_embedding_distance(causal_W)
-    dist_arr = nearest_psd(dist_arr)
+    if psd_project_distance:
+        dist_arr = nearest_psd(dist_arr)
     D = pd.DataFrame(dist_arr, index=asset_names, columns=asset_names)
     cov = sample_covariance(returns_window[asset_names].dropna())
     return hrp_weights(D, cov, linkage_method=linkage_method)

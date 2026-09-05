@@ -149,9 +149,20 @@ def _hrp_from_distance(
     graph: AssetGraphWindow,
     covariance: pd.DataFrame,
     linkage_method: str,
+    psd_project_distance: bool = False,
 ) -> pd.Series:
-    """Nearest-PSD the distance, then HRP (mirrors V0')."""
-    dist_arr = nearest_psd(dist_arr)
+    """HRP on the given clustering distance.
+
+    ``psd_project_distance=True`` reproduces the legacy Phase I behaviour of
+    nearest-PSD projecting the distance before linkage. That projection is a
+    bug for clustering: a Euclidean distance matrix has exactly one positive
+    eigenvalue, so clipping the rest returns a rank-one matrix and the
+    single-linkage dendrogram degenerates to a chain ordered by its top
+    eigenvector. Off by default; kept only to replay the committed Phase I
+    result.
+    """
+    if psd_project_distance:
+        dist_arr = nearest_psd(dist_arr)
     D = pd.DataFrame(dist_arr, index=graph.asset_names, columns=graph.asset_names)
     return hrp_weights(D, covariance, linkage_method=linkage_method)
 
@@ -230,9 +241,12 @@ def _herc_from_distance(
     graph: AssetGraphWindow,
     covariance: pd.DataFrame,
     linkage_method: str,
+    psd_project_distance: bool = False,
 ) -> pd.Series:
-    """Nearest-PSD the distance, then HERC (mirrors ``_hrp_from_distance``)."""
-    dist_arr = nearest_psd(dist_arr)
+    """HERC on the given clustering distance (same flag semantics as
+    :func:`_hrp_from_distance`)."""
+    if psd_project_distance:
+        dist_arr = nearest_psd(dist_arr)
     D = pd.DataFrame(dist_arr, index=graph.asset_names, columns=graph.asset_names)
     return herc_weights(D, covariance, linkage_method=linkage_method)
 

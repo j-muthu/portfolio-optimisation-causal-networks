@@ -191,7 +191,7 @@ def f4_seed(matrix: pd.DataFrame) -> None:
     plt.close(fig)
 
 
-# F5: regime excess over hsp-baseline (w252)
+# F5: regime excess over the correlation-hrp baseline (w252)
 def f5_regime() -> None:
     path = RESULTS / "regime_analysis" / "daily_metrics.csv"
     if not path.exists():
@@ -201,7 +201,7 @@ def f5_regime() -> None:
     df = df[df.window == 252]
     regimes = ["nber_recession", "nber_expansion", "high_vol", "low_vol"]
     df = df[df.regime.isin(regimes)]
-    base = df[df.variant == "V0"].set_index("regime")["sharpe"]
+    base = df[df.variant == "CORR-HRP"].set_index("regime")["sharpe"]
     show = [("V0prime", "skeleton-hrp", C["D0"]), ("DYNO-D1", "semcov-hrp", C["D1"]),
             ("DYNO-D2s", "topo-semcov-hrp", C["D2s"]),
             ("V1-DYNOTEARS", "causal-hsp", C["V1"])]
@@ -216,7 +216,7 @@ def f5_regime() -> None:
     ax.axhline(0, color="grey", lw=1)
     ax.set_xticks(xs, ["NBER\nrecession", "NBER\nexpansion", "VIX\ntop quintile",
                        "VIX\nbottom quintile"], fontsize=9)
-    ax.set_ylabel("Sharpe excess over hsp-baseline")
+    ax.set_ylabel("Sharpe excess over correlation-hrp")
     ax.legend(fontsize=8.5)
     fig.savefig(FIG / "phase_ii_regime.png", dpi=200)
     plt.close(fig)
@@ -242,7 +242,7 @@ def f6_decomposition(matrix: pd.DataFrame, contrasts: pd.DataFrame) -> None:
     ws = _windows(matrix)
     all_vals = {w: [sharpe("phase_i", "CORR-HRP", w)] + [
         sharpe("dynotears", a, w) for a, _ in bars[1:]] for w in ws}
-    lo = min(v for vs in all_vals.values() for v in vs) - 0.006
+    lo = min(v for vs in all_vals.values() for v in vs) - 0.014
     hi = max(v for vs in all_vals.values() for v in vs) + 0.007
 
     ncol = 2 if len(ws) > 2 else len(ws)
@@ -267,7 +267,7 @@ def f6_decomposition(matrix: pd.DataFrame, contrasts: pd.DataFrame) -> None:
                 if d is not None:
                     dv, p = d
                     ax.annotate(f"{steps[x][1]}\n{dv:+.3f}\n(p={p:.2f})",
-                                (x, lo + 0.55 * (min(vals) - lo) + 0.004),
+                                (x, lo + 0.002),
                                 ha="center", va="bottom", fontsize=7.4,
                                 color="white", fontweight="bold")
         ax.set_xticks(xs, [DISPLAY[b] for b, _ in bars], fontsize=8, rotation=15, ha="right")

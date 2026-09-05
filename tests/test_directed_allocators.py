@@ -155,7 +155,7 @@ def test_every_allocator_returns_valid_longonly_weights(name):
 
 def test_corr_hrp_matches_hand_construction():
     """CORR equals hrp_weights on the textbook correlation distance."""
-    from pipeline.portfolio._old_v123 import correlation_distance, nearest_psd
+    from pipeline.portfolio._old_v123 import correlation_distance
     from pipeline.portfolio.hrp import hrp_weights
     from pipeline.portfolio.hsp import sample_covariance
 
@@ -165,7 +165,7 @@ def test_corr_hrp_matches_hand_construction():
     w = dispatch_allocator("CORR", g, rets)
 
     sub = rets[g.asset_names].dropna()
-    dist = nearest_psd(correlation_distance(sub.corr().to_numpy()))
+    dist = correlation_distance(sub.corr().to_numpy())
     D = pd.DataFrame(dist, index=g.asset_names, columns=g.asset_names)
     expected = hrp_weights(D, sample_covariance(sub))
     pd.testing.assert_series_equal(w, expected, check_names=False)
