@@ -1,8 +1,8 @@
-"""Deliberately leaky utility lookup, used as a leak-detection canary.
+"""Deliberately leaky utility lookup, used to check that leak detection works.
 
-A backtest using this should show visibly inflated Sharpe vs the
-lookahead-safe lookup; if not, the feedback signal is too weak or the leak
-detection is broken.
+A backtest that uses this lookup should show a clearly inflated Sharpe ratio
+compared with the lookahead-safe lookup. If it does not, the feedback signal
+is too weak or the leak detection is broken.
 """
 
 from __future__ import annotations
@@ -22,8 +22,9 @@ def leaky_lookup(
     rebalance_date: pd.Timestamp,
     peek_ahead_days: int = 21,
 ) -> tuple[pd.Series, pd.Timestamp | None]:
-    """U row from min(t + peek_ahead_days, latest); leaky on purpose. The
-    default 21 days peeks exactly one rebalance ahead."""
+    """Return the utility row at min(t + peek_ahead_days, latest date). This
+    is leaky on purpose. The default of 21 days peeks exactly 1 rebalance
+    ahead."""
     t = pd.Timestamp(rebalance_date).normalize()
     if store.frame.empty:
         return pd.Series(dtype=float, name="utility"), None
@@ -41,7 +42,8 @@ def leaky_lookup(
 def make_leaky_lookup(
     store: UtilityStore, peek_ahead_days: int = 21,
 ) -> Callable[[pd.Timestamp], tuple[pd.Series, pd.Timestamp | None]]:
-    """Leaky-lookup callable matching selector.utility_lookup's signature."""
+    """Return a leaky lookup callable with the signature of
+    selector.utility_lookup."""
     return lambda t: leaky_lookup(store, t, peek_ahead_days=peek_ahead_days)
 
 

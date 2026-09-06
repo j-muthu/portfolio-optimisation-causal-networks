@@ -1,8 +1,10 @@
-"""Sensitivity-weighted credit attribution and EMA driver-utility update.
+"""Sensitivity-weighted credit attribution and the EMA update of driver
+utility.
 
-influence_d = sum_i |w_i * s_{i,d}|; credit_d partitions R[t] over selected
-drivers in proportion to influence; the EMA update touches selected drivers
-only. Lookahead discipline lives in feedback.storage, not here.
+The influence of driver d is sum_i |w_i * s_{i,d}|. The credit for driver d
+splits the reward R[t] over the selected drivers in proportion to influence.
+The EMA update changes the selected drivers only. The lookahead rules are in
+feedback.storage.
 """
 
 from __future__ import annotations
@@ -20,7 +22,7 @@ logger = logging.getLogger(__name__)
 # Credit attribution
 @dataclass
 class CreditAttribution:
-    """Per-driver credit for one holding period; credits sum to the reward."""
+    """Per-driver credit for 1 holding period. The credits sum to the reward."""
 
     rebalance_date: pd.Timestamp
     holding_end: pd.Timestamp
@@ -36,10 +38,10 @@ def sensitivity_weighted_credit(
     rebalance_date: pd.Timestamp,
     holding_end: pd.Timestamp,
 ) -> CreditAttribution:
-    """Distribute reward over selected drivers by sensitivity-weighted
-    influence.
+    """Split the reward over the selected drivers in proportion to their
+    sensitivity-weighted influence.
 
-    sensitivities is (assets x selected drivers); assets missing from weights
+    sensitivities is (assets x selected drivers). Assets missing from weights
     get weight 0. reward is the realised holding-period reward R[t].
     """
     assets = list(sensitivities.index)
@@ -67,9 +69,9 @@ def ema_update(
     gamma: float,
     selected: Sequence[str] | None = None,
 ) -> pd.Series:
-    """EMA update of driver utility: selected drivers get
-    gamma * credit + (1 - gamma) * prior; unselected carry the prior through.
-    selected defaults to credit's index.
+    """Update driver utility by EMA. Selected drivers get
+    gamma * credit + (1 - gamma) * prior. Unselected drivers keep the prior.
+    selected defaults to the index of credit.
     """
     if not 0.0 < gamma <= 1.0:
         raise ValueError(f"gamma must be in (0, 1]; got {gamma}")

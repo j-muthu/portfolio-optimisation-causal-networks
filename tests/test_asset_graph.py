@@ -1,7 +1,7 @@
-"""Unit tests for asset_graph.py
+"""Unit tests for asset_graph.py.
 
-Puts DYNOTEARS/VARLiNGAM joint windows through
-``asset_graph_from_discovery`` and pins down invariants.
+I put DYNOTEARS and VARLiNGAM joint windows through
+``asset_graph_from_discovery`` and check the invariants.
 """
 
 from __future__ import annotations
@@ -32,7 +32,7 @@ def _joint_window(T=120, seed=1):
 
 def _asset_block():
     A = np.zeros((4, 4))
-    A[0, 1], A[1, 2], A[0, 3] = 0.5, -0.3, 0.02  # AAA->BBB, BBB->CCC (neg), AAA->DDD (small)
+    A[0, 1], A[1, 2], A[0, 3] = 0.5, -0.3, 0.02  # AAA -> BBB, BBB -> CCC (negative), AAA -> DDD (small)
     return A
 
 
@@ -41,7 +41,7 @@ def _dyno_window(jw):
     W = np.zeros((d, d))
     aidx = np.arange(2, 6)
     W[np.ix_(aidx, aidx)] = _asset_block()
-    W[0, 2] = 0.4  # driver->asset edge, outside the asset block
+    W[0, 2] = 0.4  # a driver -> asset edge, outside the asset block
     mean = jw.mean(axis=0)
     std = jw.std(axis=0, ddof=0)
     return JointDynotearsWindow(
@@ -57,7 +57,7 @@ def _dyno_window(jw):
     )
 
 
-# Round-trip + tau + ordering
+# Round trip, tau and ordering
 def test_roundtrip_m_equals_asset_block():
     jw = _joint_window()
     disc = _dyno_window(jw)
@@ -83,7 +83,7 @@ def test_universe_slicing_drops_rows_and_columns_together():
     g = asset_graph_from_discovery(
         _dyno_window(jw), jw, method="dynotears", universe=["DDD", "AAA", "BBB"],
     )
-    # Caller's order preserved; CCC dropped everywhere.
+    # The caller's order is preserved and CCC is dropped everywhere.
     assert g.asset_names == ["DDD", "AAA", "BBB"]
     A = _asset_block()
     expected = A[np.ix_([3, 0, 1], [3, 0, 1])]
@@ -128,7 +128,7 @@ def test_no_fit_window_gives_none_residuals():
     assert g.resid_var_z is None
 
 
-# VARLiNGAM convention (B0 already i -> j, no second transpose)
+# VARLiNGAM convention (B0 is already i -> j, so there is no second transpose)
 def test_varlingam_asset_block_convention():
     jw = _joint_window()
     d = len(COLUMNS)
@@ -146,11 +146,11 @@ def test_varlingam_asset_block_convention():
         selected_lags=1,
         zscore_mean=mean.to_numpy(), zscore_std=std.to_numpy(),
     )
-    # Accessor mirrors dynotears: same block, no transpose.
+    # The accessor matches dynotears, with the same block and no transpose.
     np.testing.assert_array_equal(disc.asset_to_asset_block(0), _asset_block())
     g = asset_graph_from_discovery(disc, jw, method="varlingam")
     np.testing.assert_array_equal(g.M, _asset_block())
-    # Asymmetry must survive (a transpose bug would flip it).
+    # The asymmetry must be preserved, because a transpose bug would flip it.
     assert g.M[0, 1] == 0.5 and g.M[1, 0] == 0.0
 
 

@@ -1,7 +1,8 @@
 """Rolling-window DYNOTEARS on S&P 500 log-returns.
 
-One causal graph per window: ``W`` is the d x d contemporaneous adjacency
-(``W[i, j]`` = same-day effect of i on j), ``A`` is one lagged matrix per lag.
+I fit 1 causal graph per window. ``W`` is the d x d contemporaneous adjacency
+matrix (``W[i, j]`` is the same-day effect of i on j) and ``A`` holds 1
+lagged matrix per lag.
 """
 
 from __future__ import annotations
@@ -27,9 +28,9 @@ logger = logging.getLogger(__name__)
 # Result containers
 @dataclass
 class DynotearsWindow:
-    """Causal graph learned from a single rolling window.
+    """Causal graph learned from 1 rolling window.
 
-    Convention: ``W[i, j]`` / ``A[k][i, j]`` is the effect of i on j.
+    ``W[i, j]`` and ``A[k][i, j]`` are the effect of i on j.
     """
 
     index: int
@@ -68,15 +69,17 @@ class RollingDynotearsResult:
 
     @property
     def dates(self) -> pd.DatetimeIndex:
-        """End date of each window -- the natural timestamp for its graph."""
+        """Return the end date of each window, which is the timestamp of its
+        graph."""
         return pd.DatetimeIndex([w.end_date for w in self.windows])
 
     def w_stack(self) -> np.ndarray:
-        """All contemporaneous matrices stacked: shape ``(n_windows, d, d)``."""
+        """Return all contemporaneous matrices stacked, with shape
+        ``(n_windows, d, d)``."""
         return np.stack([w.W for w in self.windows])
 
     def to_frame(self) -> pd.DataFrame:
-        """One row per window summarising edge counts and convergence."""
+        """Return 1 row per window with the edge counts and convergence."""
         return pd.DataFrame(
             {
                 "start_date": [w.start_date for w in self.windows],
@@ -93,8 +96,8 @@ class RollingDynotearsResult:
 
 # Windowing
 def rolling_windows(n_rows: int, window: int, step: int) -> Iterator[tuple[int, int]]:
-    """Yield ``(start, end)`` row-index pairs, end exclusive; partial last
-    window skipped."""
+    """Yield ``(start, end)`` row-index pairs with the end exclusive. I skip a
+    partial last window."""
     start = 0
     while start + window <= n_rows:
         yield start, start + window
@@ -103,7 +106,8 @@ def rolling_windows(n_rows: int, window: int, step: int) -> Iterator[tuple[int, 
 
 # StructureModel -> matrix extraction
 def _split_node(name: str) -> tuple[str, int]:
-    """``"AAPL_lag1"`` -> ``("AAPL", 1)``.  Splits on the *last* ``_lag``."""
+    """Split ``"AAPL_lag1"`` into ``("AAPL", 1)``. I split on the last
+    ``_lag`` in the name."""
     var, lag = name.rsplit("_lag", 1)
     return var, int(lag)
 
@@ -111,10 +115,10 @@ def _split_node(name: str) -> tuple[str, int]:
 def structure_model_to_matrices(
     sm, columns: Sequence[str], p: int
 ) -> tuple[np.ndarray, list[np.ndarray]]:
-    """Convert a DYNOTEARS ``StructureModel`` to ``W`` and ``A`` matrices.
+    """Convert a DYNOTEARS ``StructureModel`` to the ``W`` and ``A`` matrices.
 
-    DYNOTEARS edges always point into a ``lag0`` node.  ``lag0 -> lag0`` edges
-    populate ``W``; ``lagk -> lag0`` edges populate ``A[k-1]``.
+    DYNOTEARS edges always point into a ``lag0`` node. ``lag0 -> lag0`` edges
+    go into ``W`` and ``lagk -> lag0`` edges go into ``A[k-1]``.
     """
     d = len(columns)
     col_idx = {c: i for i, c in enumerate(columns)}
@@ -136,7 +140,7 @@ def enforce_dag(W: np.ndarray) -> tuple[np.ndarray, int]:
     """Drop the weakest edge on each cycle until the matrix is acyclic.
 
     The continuous acyclicity constraint only holds up to ``h_tol``, so a
-    thresholded ``W`` can retain tiny residual cycles. Returns the acyclic
+    thresholded ``W`` can keep tiny residual cycles. Return the acyclic
     matrix and the number of edges removed.
     """
     W = W.copy()
@@ -165,11 +169,12 @@ def run_dynotears_window(
     enforce_acyclic: bool = True,
     tabu_edges: list[tuple[int, str, str]] | None = None,
 ) -> tuple[np.ndarray, list[np.ndarray], bool, int]:
-    """Fit DYNOTEARS on one window; returns ``(W, A, converged, edges_removed)``.
+    """Fit DYNOTEARS on 1 window and return ``(W, A, converged, edges_removed)``.
 
-    ``tabu_edges`` are ``(lag, from, to)`` tuples to forbid; they become
-    ``(0, 0)`` L-BFGS-B bounds, an exact hard constraint. ``enforce_acyclic``
-    post-processes ``W`` only (lagged blocks may legitimately have cycles).
+    ``tabu_edges`` are ``(lag, from, to)`` tuples to forbid. They become
+    ``(0, 0)`` L-BFGS-B bounds, which is an exact hard constraint.
+    ``enforce_acyclic`` post-processes ``W`` only, because the lagged blocks
+    may legitimately have cycles.
     """
     df = window_df.reset_index(drop=True)
     columns = list(df.columns)
@@ -195,8 +200,9 @@ def run_dynotears_window(
 
 # Hyper-parameter selection (cross-validation)
 def _make_x_xlags(values: np.ndarray, p: int) -> tuple[np.ndarray, np.ndarray]:
-    """Build the DYNOTEARS design matrices, mirroring causalnex's
-    ``DynamicDataTransformer``: X from row p onward, Xlags the stacked lags."""
+    """Build the DYNOTEARS design matrices in the same way as causalnex's
+    ``DynamicDataTransformer``. X is the data from row p onward and Xlags is
+    the stacked lags."""
     X = values[p:]
     lags = [values[p - i - 1 : len(values) - i - 1] for i in range(p)]
     Xlags = np.concatenate(lags, axis=1)
@@ -206,8 +212,9 @@ def _make_x_xlags(values: np.ndarray, p: int) -> tuple[np.ndarray, np.ndarray]:
 def reconstruction_error(
     values: np.ndarray, p: int, W: np.ndarray, A: list[np.ndarray]
 ) -> float:
-    """Frobenius norm of the DYNOTEARS residual ``X(I - W) - Xlags A`` (the
-    unregularised fit term of the objective)."""
+    """Return the Frobenius norm of the DYNOTEARS residual
+    ``X(I - W) - Xlags A``, which is the unregularised fit term of the
+    objective."""
     X, Xlags = _make_x_xlags(values, p)
     d = W.shape[0]
     A_stacked = np.vstack(A) if A else np.zeros((0, d))
@@ -225,8 +232,9 @@ def select_lambdas(
 ) -> tuple[float, float, pd.DataFrame]:
     """Grid-search ``(lambda_w, lambda_a)`` on a held-out chronological tail.
 
-    Lowest validation reconstruction error wins; both lambdas share the grid.
-    Returns ``(best_lambda_w, best_lambda_a, scores_df)``.
+    I pick the pair with the lowest validation reconstruction error. Both
+    lambdas share the grid. Return ``(best_lambda_w, best_lambda_a,
+    scores_df)``.
     """
     df = window_df.reset_index(drop=True)
     n = len(df)
@@ -264,7 +272,8 @@ def _fit_one(
     lambda_grid: Sequence[float] | None,
     cv_val_frac: float,
 ) -> DynotearsWindow:
-    """Fit DYNOTEARS for a single window (top-level so joblib can pickle it)."""
+    """Fit DYNOTEARS for 1 window. This is a top-level function so that joblib
+    can pickle it."""
     idx, start, end = args
     window_df = returns.iloc[start:end]
 
@@ -320,10 +329,10 @@ def run_rolling_dynotears(
 ) -> RollingDynotearsResult:
     """Slide DYNOTEARS across a :class:`Dataset`.
 
-    ``lambda_grid``, if given, cross-validates the penalties per window
-    instead of using the fixed values. ``checkpoint_dir`` enables resume;
-    it is keyed by window index only, so use a fresh directory when
-    parameters change.
+    If ``lambda_grid`` is given, I cross-validate the penalties per window
+    instead of using the fixed values. ``checkpoint_dir`` allows a run to
+    resume. It is keyed by window index only, so use a fresh directory when
+    the parameters change.
     """
     returns = dataset.returns
     dates = dataset.dates
@@ -362,14 +371,14 @@ def run_rolling_dynotears(
     )
 
 
-# Stage 1 joint-matrix path: drivers + assets with asset->driver tabu_edges
+# Stage 1 joint-matrix path: drivers and assets with asset -> driver tabu_edges
 def make_tabu_edges_asset_to_driver(
     driver_columns: Sequence[str],
     asset_columns: Sequence[str],
     p: int,
 ) -> list[tuple[int, str, str]]:
-    """Enumerate the (lag, from, to) tuples forbidding asset -> driver edges,
-    encoding the prior that drivers cause assets and not vice versa."""
+    """List the (lag, from, to) tuples that forbid asset -> driver edges.
+    This encodes the prior that drivers cause assets and not the reverse."""
     out: list[tuple[int, str, str]] = []
     for lag in range(p + 1):
         for asset in asset_columns:
@@ -380,10 +389,11 @@ def make_tabu_edges_asset_to_driver(
 
 @dataclass
 class JointDynotearsWindow:
-    """DYNOTEARS output for one window of the joint ``[D | A]`` panel.
+    """DYNOTEARS output for 1 window of the joint ``[D | A]`` panel.
 
-    Same matrix convention as :class:`DynotearsWindow`; columns include
-    drivers and assets, with ``driver_idx`` / ``asset_idx`` giving the layout.
+    The matrix convention is the same as in :class:`DynotearsWindow`. The
+    columns include drivers and assets, and ``driver_idx`` and ``asset_idx``
+    give the layout.
     """
 
     index: int
@@ -417,17 +427,17 @@ class JointDynotearsWindow:
         return len(self.asset_columns)
 
     def driver_to_asset_block(self, lag: int) -> np.ndarray:
-        """``M[d, a]``: the block that should be non-trivial."""
+        """Return ``M[d, a]``, the block that should be non-trivial."""
         mat = self.W if lag == 0 else self.A[lag - 1]
         return mat[np.ix_(self.driver_idx, self.asset_idx)]
 
     def asset_to_driver_block(self, lag: int) -> np.ndarray:
-        """``M[a, d]``: the block masked to zero by tabu_edges."""
+        """Return ``M[a, d]``, the block that tabu_edges masks to zero."""
         mat = self.W if lag == 0 else self.A[lag - 1]
         return mat[np.ix_(self.asset_idx, self.driver_idx)]
 
     def asset_to_asset_block(self, lag: int) -> np.ndarray:
-        """``M[a, a]``: the asset-only causal block."""
+        """Return ``M[a, a]``, the asset-only causal block."""
         mat = self.W if lag == 0 else self.A[lag - 1]
         return mat[np.ix_(self.asset_idx, self.asset_idx)]
 
@@ -437,7 +447,7 @@ class JointDynotearsWindow:
 
 @dataclass
 class RollingJointDynotearsResult:
-    """Per-window sequence of :class:`JointDynotearsWindow` plus meta."""
+    """Per-window sequence of :class:`JointDynotearsWindow` plus run metadata."""
 
     windows: list[JointDynotearsWindow]
     columns: list[str]
@@ -486,11 +496,11 @@ def run_dynotears_joint_window(
     enforce_acyclic: bool = True,
     enforce_tabu: bool = True,
 ) -> JointDynotearsWindow:
-    """Fit DYNOTEARS on one window of the joint ``[D | A]`` panel.
+    """Fit DYNOTEARS on 1 window of the joint ``[D | A]`` panel.
 
-    Z-scores per window, applies the asset -> driver tabu mask, fits, and
-    records the residual fit loss. Row/index fields are placeholders that the
-    rolling driver overwrites.
+    I z-score the window, apply the asset -> driver tabu mask, fit, and
+    record the residual fit loss. The row and index fields are placeholders
+    that the rolling driver overwrites.
     """
     columns = list(joint_window.columns)
     driver_columns = list(driver_columns)
@@ -501,19 +511,19 @@ def run_dynotears_joint_window(
             "asset_columns"
         )
 
-    # 1. Per-window z-score.
+    # First, z-score the window.
     mean = joint_window.mean(axis=0)
     std = joint_window.std(axis=0, ddof=0).where(lambda s: s > 1e-12, 1e-12)
     normalised = (joint_window - mean) / std
 
-    # 2. Tabu mask.
+    # Second, build the tabu mask.
     tabu = (
         make_tabu_edges_asset_to_driver(driver_columns, asset_columns, p)
         if enforce_tabu
         else None
     )
 
-    # 3. Fit.
+    # Third, fit.
     W, A, converged, removed = run_dynotears_window(
         normalised,
         p=p,
@@ -525,7 +535,7 @@ def run_dynotears_joint_window(
         tabu_edges=tabu,
     )
 
-    # 4. Fit loss (Frobenius residual on the normalised window).
+    # Finally, record the fit loss (the Frobenius residual on the normalised window).
     fit_loss = reconstruction_error(normalised.to_numpy(), p, W, A)
 
     driver_idx = np.array([columns.index(c) for c in driver_columns], dtype=int)
@@ -557,7 +567,7 @@ def run_dynotears_joint_window(
 
 
 def run_rolling_dynotears_joint(
-    joint,  # JointMatrix from pipeline.data.alignment (avoid import cycle)
+    joint,  # JointMatrix from pipeline.data.alignment (not imported, to avoid a cycle)
     window: int = 504,
     step: int = 21,
     p: int = 1,
@@ -571,8 +581,8 @@ def run_rolling_dynotears_joint(
 ) -> RollingJointDynotearsResult:
     """Slide DYNOTEARS over the joint ``[D | A]`` matrix.
 
-    ``enforce_tabu=False`` refits without the asset -> driver constraint,
-    for the prior-knowledge verification step.
+    ``enforce_tabu=False`` refits without the asset -> driver constraint. I
+    use this to verify the effect of the prior.
     """
     frame = joint.frame
     if frame.shape[0] < window:

@@ -1,9 +1,10 @@
-"""Graph-extraction dry-run plus cache-hit gate for Phase II.
+"""Graph-extraction dry run and cache-hit check for Phase II.
 
-Rebuilds the Phase-I joint panel, asserts every rebalance window hits the
-discovery cache (a miss means the panel diverged from the Phase-I fits),
-then writes DAG diagnostics to results/phase_ii_dag_diagnostics.csv.
-No WRDS calls; all data comes from cache/.
+I rebuild the Phase I joint panel and assert that every rebalance window
+hits the discovery cache. A miss means that the panel has diverged from the
+Phase I fits. I then write the DAG diagnostics to
+results/phase_ii_dag_diagnostics.csv. This makes no WRDS calls, because all
+data comes from cache/.
 
 Usage
 -----
@@ -40,7 +41,8 @@ RESULTS = THESIS_ROOT / "results"
 
 
 def build_phase_i_inputs():
-    """Reproduce run_shakedown's data prep for the Phase-I config."""
+    """Reproduce the data preparation of run_shakedown for the Phase I
+    configuration."""
     universe = sorted(set(UNIVERSE_FILE.read_text().strip().split(",")))
     driver_specs = [s for s in DRIVER_CATALOGUE if s.name not in DROP_DRIVERS]
     start_ts, end_ts = pd.Timestamp(DATA_START), pd.Timestamp(DATA_END)
@@ -67,7 +69,8 @@ def build_phase_i_inputs():
 
 
 def check_combo(joint, rebalance_dates, method: str, window: int) -> pd.DataFrame:
-    """Cache-hit gate + DAG diagnostics for one (method, window) combo."""
+    """Run the cache-hit check and the DAG diagnostics for 1 (method, window)
+    combination."""
     discovery_kwargs = {"prune": False} if method == "varlingam" else {}
     cal = joint.frame.index
     dcols, acols = list(joint.driver_columns), list(joint.asset_columns)

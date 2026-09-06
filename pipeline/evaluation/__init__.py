@@ -1,5 +1,5 @@
-"""Backtest evaluation: performance metrics, regime classification, and
-stationary block bootstrap for Sharpe-difference CIs."""
+"""Backtest evaluation: performance metrics, regime classification and a
+stationary block bootstrap for confidence intervals on Sharpe differences."""
 
 from __future__ import annotations
 

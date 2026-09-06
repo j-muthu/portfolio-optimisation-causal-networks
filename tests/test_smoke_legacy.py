@@ -1,7 +1,8 @@
-"""End-to-end smoke test on a ~20-asset subset.
+"""End-to-end smoke test on a 20-asset subset.
 
-DYNOTEARS and VARLiNGAM single windows, rolling windows, graph analysis,
-head-to-head comparison, and HRP construction from a causal matrix.
+It runs DYNOTEARS and VARLiNGAM single windows, rolling windows, graph
+analysis, the head-to-head comparison and HRP construction from a causal
+matrix.
 
 Run from the thesis root::
 
@@ -26,17 +27,17 @@ from pipeline.portfolio import compare_hrp
 from pipeline.discovery.dynotears import run_dynotears_window, run_rolling_dynotears
 from pipeline.discovery.varlingam import run_rolling_varlingam, run_varlingam_window
 
-# 20 large-cap, long-history names across several GICS sectors.
+# 20 large-cap names with a long history across several GICS sectors.
 SMOKE_TICKERS = [
-    "AAPL", "MSFT", "AMZN", "GOOGL", "META", "NVDA",  # Tech / comms
-    "JPM", "BAC", "GS",                                # Financials
-    "XOM", "CVX",                                      # Energy
-    "JNJ", "PFE",                                      # Health care
-    "PG", "KO", "WMT", "HD",                           # Staples / discretionary
-    "DIS", "VZ", "T",                                  # Comms / telecom
+    "AAPL", "MSFT", "AMZN", "GOOGL", "META", "NVDA",  # tech and communications
+    "JPM", "BAC", "GS",                                # financials
+    "XOM", "CVX",                                      # energy
+    "JNJ", "PFE",                                      # health care
+    "PG", "KO", "WMT", "HD",                           # staples and discretionary
+    "DIS", "VZ", "T",                                  # communications and telecom
 ]
 START, END = "2018-01-01", "2023-01-01"
-WINDOW, STEP = 504, 189  # ~2-year window, ~9-month step -> a handful of windows
+WINDOW, STEP = 504, 189  # a 2-year window and a 9-month step give a handful of windows
 
 
 def _banner(text: str) -> None:
@@ -48,7 +49,7 @@ def main() -> None:
         level=logging.INFO, format="%(levelname)s %(name)s: %(message)s"
     )
 
-    # 1. Shared data pipeline
+    # First, the shared data pipeline.
     _banner("1. DATA PIPELINE")
     ds = build_dataset(start=START, end=END, tickers=SMOKE_TICKERS)
     print(f"  dataset: {ds!r}")
@@ -59,7 +60,7 @@ def main() -> None:
     assert ds.n > WINDOW, f"need > {WINDOW} rows, got {ds.n}"
     assert ds.d >= 15, f"expected ~20 assets, got {ds.d}"
 
-    # 2. DYNOTEARS single window -> valid DAG?
+    # Second, a DYNOTEARS single window. I check that it gives a valid DAG.
     _banner("2. DYNOTEARS SMOKE (single window)")
     window_df = ds.returns.iloc[:WINDOW]
     W, A, converged, removed = run_dynotears_window(
@@ -77,14 +78,14 @@ def main() -> None:
     print(f"  contemporaneous graph is a DAG: {is_dag}")
     assert is_dag, "DYNOTEARS contemporaneous graph must be acyclic"
 
-    # 3. VARLiNGAM single window -> triangular B0 + assumption check
+    # Third, a VARLiNGAM single window. I check for a triangular B0 and the assumptions.
     _banner("3. VARLiNGAM SMOKE (single window)")
     vwin = run_varlingam_window(
         window_df, lags=1, criterion="bic", compute_error_independence=True
     )
     order = vwin.causal_order
-    permuted = vwin.B0[np.ix_(order, order)]  # i->j: should be strictly upper-triangular
-    lower = np.tril(permuted)  # includes diagonal
+    permuted = vwin.B0[np.ix_(order, order)]  # i -> j, so it should be strictly upper-triangular
+    lower = np.tril(permuted)  # includes the diagonal
     print(f"  B0 shape={vwin.B0.shape}  contemp-edges={vwin.n_contemp_edges}  "
           f"selected lags={vwin.selected_lags}")
     print(f"  causal order (upstream first): {vwin.causal_order_tickers}")
@@ -95,7 +96,7 @@ def main() -> None:
     print(f"  error-independence: {frac_ok:.0%} of pairs have p > 0.05")
     assert np.abs(lower).max() < 1e-6, "B0 not triangular under the causal order"
 
-    # 4. Rolling windows, both methods
+    # Fourth, rolling windows with both methods.
     _banner("4. ROLLING WINDOWS")
     dyn = run_rolling_dynotears(ds, window=WINDOW, step=STEP, p=1,
                                 lambda_w=0.05, lambda_a=0.05)
@@ -106,7 +107,7 @@ def main() -> None:
     print(var.to_frame().to_string(index=False))
     assert len(dyn) == len(var) >= 3, "expected >= 3 comparable windows"
 
-    # 5. Graph analysis & regime detection
+    # Fifth, graph analysis and regime detection.
     _banner("5. GRAPH ANALYSIS & REGIME DETECTION")
     dyn_metrics = analyse_rolling(dyn)
     print("  DYNOTEARS rolling metrics:")
@@ -118,13 +119,13 @@ def main() -> None:
     print("\n  VARLiNGAM causal-order drift:")
     print(drift.to_string())
 
-    # 6. Head-to-head DYNOTEARS vs VARLiNGAM
+    # Sixth, the head-to-head comparison of DYNOTEARS and VARLiNGAM.
     _banner("6. HEAD-TO-HEAD (W vs B0)")
     cmp = compare_rolling(dyn, var)
     print(cmp[["frobenius_distance", "edge_jaccard", "sign_agreement",
                "weight_correlation"]].to_string())
 
-    # 7. Portfolio integration (HRP)
+    # Finally, the portfolio integration (HRP).
     _banner("7. PORTFOLIO INTEGRATION (HRP)")
     last_window_returns = ds.returns.iloc[dyn.windows[-1].start_row:
                                           dyn.windows[-1].end_row]

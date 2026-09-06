@@ -1,7 +1,7 @@
-"""Plot the two Phase I figures for the interim report.
+"""Plot the 2 Phase I figures for the interim report.
 
-Bar-chart numbers are hard-coded from Tables 3.1/3.2 so the figures match
-the text; recomputed Sharpes are printed as a cross-check.
+The bar-chart numbers are hard-coded from Tables 3.1 and 3.2 so that the
+figures match the text. I print the recomputed Sharpes as a cross-check.
 
 Run:  python -m scripts.plot_interim_results
 """
@@ -13,12 +13,12 @@ import pickle
 
 import matplotlib
 
-matplotlib.use("Agg")  # headless
+matplotlib.use("Agg")  # no display needed
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 
-# Importing pipeline makes the pickled classes resolvable by pickle.load.
+# Importing pipeline lets pickle.load resolve the pickled classes.
 from pipeline.evaluation.metrics import annualised_sharpe
 
 REPO_ROOT = pathlib.Path(__file__).resolve().parent.parent
@@ -34,12 +34,12 @@ LABELS = {
     "V2": "V2  Causal-HSP (closed loop)",
 }
 
-# Phase I summary numbers (net of 5 bps), identical to Tables 3.1/3.2.
-SHARPE = {  # net annualised Sharpe by window
+# Phase I summary numbers (net of 5 bps), identical to Tables 3.1 and 3.2.
+SHARPE = {  # net annualised Sharpe ratio by window
     252: {"V0": 0.371, "V1": 0.382, "V2": 0.382},
     504: {"V0": 0.370, "V1": 0.382, "V2": 0.373},
 }
-# Regime-conditional mean monthly excess-Sharpe vs 1/N, window 252.
+# Mean monthly excess Sharpe over 1/N by regime, window 252.
 REGIMES = ["GFC\n2007-09", "2018Q4\nselloff", "COVID\n2020", "2022\nrate-hike", "Bull\n2013-18"]
 REGIME_EXCESS_SHARPE = {
     "V0": [0.160, 0.355, 0.287, 0.235, -0.128],
@@ -60,9 +60,10 @@ def load_nav_net(variant: str, window: int) -> pd.Series:
 
 
 def plot_nav_curve(window: int = 252) -> None:
-    """Figure 1: cumulative NAV (net) for V0/V1/V2 over the full sample."""
+    """Plot Figure 1, the cumulative net NAV of V0, V1 and V2 over the full
+    sample."""
     fig, ax = plt.subplots(figsize=(7.2, 7.2))
-    ax.set_box_aspect(1)  # square plot box
+    ax.set_box_aspect(1)  # make the plot box square
     for v in VARIANTS:
         nav = load_nav_net(v, window)
         ax.plot(nav.index, nav.values, color=COLOURS[v], lw=1.6, label=LABELS[v])
@@ -82,10 +83,11 @@ def plot_nav_curve(window: int = 252) -> None:
 
 
 def plot_sharpe_and_regime() -> None:
-    """Figure 2: Sharpe by variant x window, and regime-conditional excess-Sharpe."""
+    """Plot Figure 2, the Sharpe by variant and window and the excess Sharpe
+    by regime."""
     fig, (axL, axR) = plt.subplots(1, 2, figsize=(11.0, 4.3))
 
-    # Left: Sharpe by variant, grouped by window.
+    # The left panel is the Sharpe by variant, grouped by window.
     windows = [252, 504]
     x = np.arange(len(VARIANTS))
     bw = 0.38
@@ -104,7 +106,7 @@ def plot_sharpe_and_regime() -> None:
     axL.legend(frameon=False, fontsize=9, loc="upper right")
     axL.grid(True, axis="y", alpha=0.3)
 
-    # Right: regime-conditional excess-Sharpe (window 252).
+    # The right panel is the excess Sharpe by regime (window 252).
     xr = np.arange(len(REGIMES))
     bw2 = 0.26
     for k, v in enumerate(VARIANTS):

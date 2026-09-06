@@ -1,7 +1,8 @@
-"""Strategy variants V0 / V0' / V1 / V2 (see ``Closed-Loop Causal-HSP Portfolio.md``).
+"""Strategy variants V0, V0', V1 and V2 (see ``Closed-Loop Causal-HSP Portfolio.md``).
 
-They differ only in which distance matrix enters HRP's clustering stage; each
-is a thin wrapper over :mod:`pipeline.portfolio.hrp` / :mod:`pipeline.portfolio.hsp`.
+They differ only in which distance matrix goes into HRP's clustering step.
+Each one is a thin wrapper over :mod:`pipeline.portfolio.hrp` and
+:mod:`pipeline.portfolio.hsp`.
 """
 
 from __future__ import annotations
@@ -25,7 +26,8 @@ def v0_vanilla_hsp(
     returns_window: pd.DataFrame,
     linkage_method: str = "single",
 ) -> pd.Series:
-    """Vanilla HSP: caller supplies the cum-corr-derived sensitivity matrix."""
+    """Vanilla HSP. The caller supplies the sensitivity matrix from
+    cumulative-correlation selection."""
     return hsp_weights_from_S(
         S=S, asset_names=asset_names, returns_window=returns_window,
         linkage_method=linkage_method,
@@ -40,11 +42,12 @@ def v0prime_asset_only_causal_hrp(
     linkage_method: str = "single",
     psd_project_distance: bool = False,
 ) -> pd.Series:
-    """Asset-only Causal-HRP using the (asset_idx, asset_idx) block of W.
+    """Asset-only Causal-HRP on the (asset, asset) block of W.
 
     ``psd_project_distance=True`` replays the original Phase I run, which
-    nearest-PSD projected the distance before linkage (a bug: the projection
-    collapses a Euclidean distance matrix to rank one). Off by default.
+    projected the distance to the nearest PSD matrix before linkage. This was
+    a bug because the projection collapses a Euclidean distance matrix to
+    rank 1. I leave it off by default.
     """
     if causal_W.shape != (len(asset_names), len(asset_names)):
         raise ValueError(
@@ -66,7 +69,8 @@ def v1_causal_hsp_open_loop(
     returns_window: pd.DataFrame,
     linkage_method: str = "single",
 ) -> pd.Series:
-    """Identical math to V0; the contribution is upstream (causal selection)."""
+    """Same maths as V0. The difference is upstream, in the causal driver
+    selection."""
     return v0_vanilla_hsp(
         S=S, asset_names=asset_names, returns_window=returns_window,
         linkage_method=linkage_method,
@@ -80,8 +84,8 @@ def v2_causal_hsp_closed_loop(
     returns_window: pd.DataFrame,
     linkage_method: str = "single",
 ) -> pd.Series:
-    """V2 weights from S; the closed-loop contribution enters the driver
-    selection upstream, so clustering/allocation is identical to V1.
+    """V2 weights from S. The closed-loop feedback changes the driver
+    selection upstream, so clustering and allocation are identical to V1.
     """
     return v0_vanilla_hsp(
         S=S, asset_names=asset_names, returns_window=returns_window,

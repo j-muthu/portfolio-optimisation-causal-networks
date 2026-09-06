@@ -1,7 +1,7 @@
-"""Stage 1 orchestration: discovery, driver selection and sensitivities per
-rebalance date, persisted under ``results/<tag>/stage1/``.
+"""Stage 1 orchestration: discovery, driver selection and sensitivities for
+each rebalance date, saved under ``results/<tag>/stage1/``.
 
-Entry point: :func:`run_stage1`.
+The entry point is :func:`run_stage1`.
 """
 
 from __future__ import annotations
@@ -41,10 +41,10 @@ RESULTS_ROOT = THESIS_ROOT / "results"
 # Per-rebalance result
 @dataclass
 class Stage1Rebalance:
-    """Stage 1 output for one rebalance date.
+    """Stage 1 output for 1 rebalance date.
 
     ``discovery`` is ``None`` on the V0 path. ``selection`` is either kind of
-    selection result; both expose ``.selected`` and ``.K``.
+    selection result, and both expose ``.selected`` and ``.K``.
     """
 
     rebalance_date: pd.Timestamp
@@ -55,7 +55,7 @@ class Stage1Rebalance:
 
 @dataclass
 class Stage1Output:
-    """Sequence of Stage 1 rebalances + run metadata."""
+    """Sequence of Stage 1 rebalances plus run metadata."""
 
     rebalances: list[Stage1Rebalance]
     tag: str
@@ -65,7 +65,7 @@ class Stage1Output:
         return pd.DatetimeIndex([r.rebalance_date for r in self.rebalances])
 
     def selected_drivers_frame(self) -> pd.DataFrame:
-        """Tidy long-form table of (date, position, driver)."""
+        """Return a long-form table of (date, position, driver)."""
         rows = []
         for r in self.rebalances:
             for pos, d in enumerate(r.selection.selected):
@@ -81,7 +81,8 @@ def derive_rebalance_dates(
     burn_in_days: int,
     rebalance_step: int = 21,
 ) -> pd.DatetimeIndex:
-    """Rebalance every ``rebalance_step`` trading days starting after burn-in."""
+    """Rebalance every ``rebalance_step`` trading days, starting after
+    burn-in."""
     if len(calendar) <= burn_in_days:
         raise ValueError(
             f"calendar has {len(calendar)} trading days but burn_in_days={burn_in_days}"
@@ -106,14 +107,14 @@ def fit_stage1_rebalance(
     correlation_kwargs: dict | None = None,
     discovery_cache: bool = False,
 ) -> Stage1Rebalance:
-    """Run discovery, selection and sensitivities on a single window.
+    """Run discovery, selection and sensitivities on 1 window.
 
-    Used by both :func:`run_stage1` and the V2 closed loop.
+    Both :func:`run_stage1` and the V2 closed loop use this.
     ``selection_method="correlation"`` (V0) skips discovery entirely and
     ignores ``discovery_method``.
     """
-    # Per-window z-score for selection and sensitivities (discovery z-scores
-    # internally).
+    # Z-score the window for selection and sensitivities. Discovery z-scores
+    # internally.
     zs, _, _ = zscore_window(joint_window)
     dw = zs[driver_columns]
     aw = zs[asset_columns]
@@ -128,11 +129,11 @@ def fit_stage1_rebalance(
     sel: SelectionResult | CorrelationSelectionResult
 
     if selection_method == "asset_only":
-        # V0' path: same joint discovery as V1, but only the asset-asset block
-        # is used downstream. Empty selection yields an empty
-        # SensitivityWindow; the closed loop reads asset_to_asset_block.
-        # Default stays "dynotears" so Phase-I V0' reproductions are
-        # bit-identical.
+        # The V0' path runs the same joint discovery as V1, but only the
+        # asset-to-asset block is used downstream. An empty selection gives an
+        # empty SensitivityWindow, and the closed loop reads
+        # asset_to_asset_block. The default stays "dynotears" so that Phase I
+        # V0' reproductions are bit-identical.
         if discovery_method in (None, "dynotears"):
             disc = load_or_compute_discovery(
                 lambda: run_dynotears_joint_window(
@@ -156,10 +157,9 @@ def fit_stage1_rebalance(
         elif discovery_method == "granger":
             from pipeline.discovery.granger import run_granger_joint_window
 
-            # Density matching: the paired DYNOTEARS window supplies the
-            # asset-block edge density so the granger graph is compared at
-            # like-for-like sparsity. The resolved density enters the cache
-            # key.
+            # The paired DYNOTEARS window supplies the asset-block edge
+            # density, so that the granger graph is compared at the same
+            # sparsity. The resolved density goes into the cache key.
             g_kwargs = dict(discovery_kwargs)
             if g_kwargs.pop("density_match_dynotears", False):
                 dyno = load_or_compute_discovery(
@@ -197,7 +197,8 @@ def fit_stage1_rebalance(
             selected=[], scores=pd.Series(dtype=float), K=0, lags=(),
         )
     elif selection_method == "correlation":
-        # V0 path: rank drivers by cum-corr with the asset block, take top K.
+        # The V0 path ranks drivers by cumulative correlation with the asset
+        # block and takes the top K.
         if discovery_method is not None:
             logger.debug(
                 "selection_method='correlation': ignoring discovery_method=%r "
@@ -209,7 +210,7 @@ def fit_stage1_rebalance(
             rebalance_date=rebalance_date, **corr_kw,
         )
     else:
-        # V1/V2 path: discovery then Stage A + Stage B + utility blend.
+        # The V1 and V2 path runs discovery, then Stage A, Stage B and the utility blend.
         if discovery_method == "varlingam":
             disc = load_or_compute_discovery(
                 lambda: run_varlingam_joint_window(
@@ -236,7 +237,7 @@ def fit_stage1_rebalance(
                 f"selection_method='causal_greedy', got {discovery_method!r}"
             )
 
-        # Thread the method through so Stage A applies the right stability
+        # Pass the method through so that Stage A applies the right stability
         # mask.
         sel_kw = dict(selector_kwargs)
         sel_kw.setdefault("method", discovery_method)
@@ -251,9 +252,9 @@ def fit_stage1_rebalance(
             **sel_kw,
         )
 
-    # Sensitivities on the selected drivers (shared across V0/V1/V2).
+    # Sensitivities on the selected drivers. V0, V1 and V2 share this step.
     if not sel.selected:
-        # Empty placeholder so the loop can carry on.
+        # Use an empty placeholder so that the loop can carry on.
         N = len(asset_columns)
         sens = SensitivityWindow(
             rebalance_date=rebalance_date,
@@ -298,19 +299,20 @@ def run_stage1(
     output_dir: Path | None = None,
     progress_log_every: int = 6,
 ) -> Stage1Output:
-    """Drive Stage 1 over a sequence of rebalance dates; returns Stage1Output.
+    """Run Stage 1 over a sequence of rebalance dates and return a
+    Stage1Output.
 
     Each rebalance gets ``window_size`` lookback days ending at its date.
     ``utility_lookup`` is a lookahead-safe callable from
-    ``UtilityStore.as_lookup``; ``None`` gives V1 open-loop behaviour.
+    ``UtilityStore.as_lookup``. ``None`` gives the V1 open-loop behaviour.
     """
     discovery_kwargs = dict(discovery_kwargs or {})
     selector_kwargs = dict(selector_kwargs or {})
     sensitivities_kwargs = dict(sensitivities_kwargs or {})
     correlation_kwargs = dict(correlation_kwargs or {})
 
-    # Embed the method in the output dir so runs with the same tag don't
-    # clobber each other.
+    # Put the method in the output directory so that runs with the same tag
+    # do not overwrite each other.
     method_suffix = (
         "v0_corr" if selection_method == "correlation"
         else f"causal_{discovery_method}"

@@ -43,7 +43,7 @@ def strip_env(text, env):
 
 
 def tex_to_plain(body, labels):
-    body = re.sub(r"(?<!\\)%.*", "", body)  # comments
+    body = re.sub(r"(?<!\\)%.*", "", body)  # strip LaTeX comments
     body = re.sub(r"\\cite[tp]?\*?(\[[^\]]*\])*\{[^}]*\}", "", body)
     body = re.sub(r"\\label\{[^}]*\}", "", body)
     body = re.sub(r"\\(?:eq|auto|c)?ref\{([^}]*)\}", lambda m: labels.get(m.group(1), "X"), body)
@@ -66,7 +66,7 @@ def tex_to_plain(body, labels):
 def extract(from_line=1):
     lines = TEX.read_text().splitlines()
     labels = load_labels()
-    # find heading lines
+    # Find the heading lines.
     heads = []
     for i, l in enumerate(lines, 1):
         m = re.match(r"\\(chapter|section|subsection)\{([^}]*)\}", l)
@@ -75,7 +75,7 @@ def extract(from_line=1):
         if l.startswith("\\end{document}"):
             heads.append((i, "end", ""))
             break
-    # section number lookup via following \label
+    # Look up the section number from the \label that follows.
     units = []
     ch, sec, sub = 0, 0, 0
     appendix = False

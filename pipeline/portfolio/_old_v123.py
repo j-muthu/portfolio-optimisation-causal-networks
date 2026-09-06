@@ -1,6 +1,7 @@
-"""Legacy HRP integration (Lopez de Prado): turns causal graphs into portfolio
-weights via causal distances and/or the SVAR-implied structural covariance.
-Kept for its reusable helpers (nearest_psd, symmetrise, causal_embedding_distance).
+"""Legacy HRP integration (Lopez de Prado). It turns causal graphs into
+portfolio weights through causal distances and the SVAR-implied structural
+covariance. I keep it for its reusable helpers (nearest_psd, symmetrise and
+causal_embedding_distance).
 """
 
 from __future__ import annotations
@@ -15,7 +16,7 @@ logger = logging.getLogger(__name__)
 
 # Matrix utilities
 def symmetrise(matrix: np.ndarray) -> np.ndarray:
-    """Symmetrise a directed causal matrix: ``(|M| + |M^T|) / 2``."""
+    """Symmetrise a directed causal matrix as ``(|M| + |M^T|) / 2``."""
     abs_m = np.abs(matrix)
     return 0.5 * (abs_m + abs_m.T)
 
@@ -30,14 +31,15 @@ def nearest_psd(matrix: np.ndarray) -> np.ndarray:
 
 # Distance matrices
 def correlation_distance(corr: np.ndarray) -> np.ndarray:
-    """Standard HRP correlation distance ``sqrt(0.5 * (1 - corr))``."""
+    """Return the standard HRP correlation distance ``sqrt(0.5 * (1 - corr))``."""
     dist = np.sqrt(np.clip(0.5 * (1.0 - corr), 0.0, None))
     np.fill_diagonal(dist, 0.0)
     return dist
 
 
 def symmetrise_distance(matrix: np.ndarray) -> np.ndarray:
-    """Symmetrise to a similarity, scale to [0, 1], return ``1 - similarity``."""
+    """Symmetrise to a similarity, scale it to [0, 1] and return
+    ``1 - similarity``."""
     sim = symmetrise(matrix)
     off_diag = sim.copy()
     np.fill_diagonal(off_diag, 0.0)
@@ -51,7 +53,7 @@ def symmetrise_distance(matrix: np.ndarray) -> np.ndarray:
 
 def causal_embedding_distance(matrix: np.ndarray) -> np.ndarray:
     """Embed each asset as ``e_i = [M[i, :], M[:, i]]`` and take Euclidean
-    distances. Keeps more of the causal signature than symmetrising.
+    distances. This keeps more of the causal structure than symmetrising.
     """
     out_edges = matrix
     in_edges = matrix.T
@@ -81,7 +83,7 @@ def _quasi_diagonal_order(linkage: np.ndarray) -> list[int]:
 
 
 def _cluster_variance(cov: np.ndarray, items: list[int]) -> float:
-    """Inverse-variance-weighted variance of a sub-cluster."""
+    """Return the inverse-variance-weighted variance of a sub-cluster."""
     sub = cov[np.ix_(items, items)]
     inv_diag = 1.0 / np.diag(sub)
     weights = inv_diag / inv_diag.sum()
@@ -117,9 +119,8 @@ def hrp_weights(
     tickers: list[str] | None = None,
     linkage_method: str = "single",
 ) -> pd.Series:
-    """HRP weights: ``dist`` drives clustering, ``cov`` drives allocation.
-
-    Returns a Series of weights summing to 1.
+    """Return HRP weights. ``dist`` is used for clustering and ``cov`` for
+    allocation. The weights sum to 1.
     """
     from scipy.cluster.hierarchy import linkage
     from scipy.spatial.distance import squareform
@@ -140,10 +141,10 @@ def compare_hrp(
     distance: str = "embedding",
     linkage_method: str = "single",
 ) -> pd.DataFrame:
-    """HRP weights for the correlation baseline and the causal variant.
+    """Return HRP weights for the correlation baseline and the causal variant.
 
-    ``distance`` is "embedding" or "symmetrise". Returns a DataFrame with
-    columns ``correlation_hrp`` and ``causal_hrp``.
+    ``distance`` is "embedding" or "symmetrise". The result is a DataFrame
+    with the columns ``correlation_hrp`` and ``causal_hrp``.
     """
     tickers = list(returns.columns)
     cov = returns.cov().to_numpy()

@@ -1,6 +1,6 @@
-"""Portfolio construction (HRP, HSP, Causal-HSP variants).
+"""Portfolio construction (HRP, HSP and the Causal-HSP variants).
 
-Also re-exports the reusable legacy helpers from ``_old_v123``.
+I also re-export the reusable legacy helpers from ``_old_v123``.
 """
 
 from __future__ import annotations

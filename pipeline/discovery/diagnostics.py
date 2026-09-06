@@ -1,8 +1,9 @@
-"""Graph analysis and regime detection, method-agnostic.
+"""Graph analysis and regime detection for either discovery method.
 
-Consumes the per-window adjacency matrices from either rolling method (same
-``i -> j`` convention) and computes density, inter-window distance, sector
-flow, causal-order drift, and head-to-head comparisons.
+The functions take the per-window adjacency matrices from either rolling
+method (both use the ``i -> j`` convention) and compute density,
+inter-window distance, sector flow, causal-order drift and head-to-head
+comparisons.
 """
 
 from __future__ import annotations
@@ -18,7 +19,7 @@ logger = logging.getLogger(__name__)
 
 # Single-matrix metrics
 def graph_density(matrix: np.ndarray, threshold: float = 0.0) -> float:
-    """Fraction of possible directed edges that are present.
+    """Return the fraction of possible directed edges that are present.
 
     Self-loops are excluded, so the denominator is ``d * (d - 1)``.
     """
@@ -31,18 +32,21 @@ def graph_density(matrix: np.ndarray, threshold: float = 0.0) -> float:
 
 
 def average_edge_weight(matrix: np.ndarray, threshold: float = 0.0) -> float:
-    """Mean absolute weight over the *present* edges (0.0 if the graph is empty)."""
+    """Return the mean absolute weight over the present edges (0.0 if the
+    graph is empty)."""
     weights = np.abs(matrix[np.abs(matrix) > threshold])
     return float(weights.mean()) if weights.size else 0.0
 
 
 def graph_distance(a: np.ndarray, b: np.ndarray) -> float:
-    """Frobenius norm of ``a - b`` -- the structural distance between two graphs."""
+    """Return the Frobenius norm of ``a - b``, the structural distance between
+    2 graphs."""
     return float(np.linalg.norm(a - b, "fro"))
 
 
 def edge_jaccard(a: np.ndarray, b: np.ndarray, threshold: float = 0.0) -> float:
-    """Jaccard overlap of the edge *sets* of two graphs (ignores weights/signs)."""
+    """Return the Jaccard overlap of the edge sets of 2 graphs. Weights and
+    signs are ignored."""
     ea = np.abs(a) > threshold
     eb = np.abs(b) > threshold
     union = np.count_nonzero(ea | eb)
@@ -51,7 +55,7 @@ def edge_jaccard(a: np.ndarray, b: np.ndarray, threshold: float = 0.0) -> float:
 
 # Result adapters
 def _extract_sequence(result) -> tuple[np.ndarray, pd.DatetimeIndex, list[str]]:
-    """Pull ``(matrices, dates, columns)`` from either rolling result type."""
+    """Take ``(matrices, dates, columns)`` from either rolling result type."""
     if hasattr(result, "w_stack"):
         return result.w_stack(), result.dates, result.columns
     if hasattr(result, "b0_stack"):
@@ -61,11 +65,12 @@ def _extract_sequence(result) -> tuple[np.ndarray, pd.DatetimeIndex, list[str]]:
 
 # Time-series of metrics + regime detection
 def analyse_rolling(result, threshold: float = 0.0) -> pd.DataFrame:
-    """Per-window graph metrics for a rolling result.
+    """Compute per-window graph metrics for a rolling result.
 
-    Returns a DataFrame indexed by window end-date with columns:
-    ``n_edges``, ``density``, ``avg_weight`` and ``distance_prev`` (Frobenius
-    distance to the previous window's graph; ``NaN`` for the first window).
+    The result is a DataFrame indexed by window end date with the columns
+    ``n_edges``, ``density``, ``avg_weight`` and ``distance_prev`` (the
+    Frobenius distance to the previous window's graph, ``NaN`` for the first
+    window).
     """
     matrices, dates, _ = _extract_sequence(result)
     rows = []
@@ -87,11 +92,11 @@ def analyse_rolling(result, threshold: float = 0.0) -> pd.DataFrame:
 def detect_regime_changes(
     metrics: pd.DataFrame, n_sigma: float = 2.0
 ) -> pd.DataFrame:
-    """Flag windows whose graph jumped abnormally far from the previous one.
+    """Flag windows whose graph moved unusually far from the previous one.
 
     A window is a candidate regime change when ``distance_prev`` exceeds
-    ``mean + n_sigma * std`` of all consecutive distances. Returns the
-    flagged subset of ``metrics`` with an added ``z_score`` column.
+    ``mean + n_sigma * std`` of all consecutive distances. Return the flagged
+    subset of ``metrics`` with an added ``z_score`` column.
     """
     dist = metrics["distance_prev"].dropna()
     if dist.empty:
@@ -116,8 +121,8 @@ def sector_flow(
 ) -> pd.DataFrame:
     """Aggregate edge weights into a sector-by-sector causal-flow matrix.
 
-    Entry ``[s_from, s_to]`` is the total absolute weight from one sector to
-    another; ``normalise=True`` divides by the number of ordered asset pairs.
+    Entry ``[s_from, s_to]`` is the total absolute weight from 1 sector to
+    another. ``normalise=True`` divides by the number of ordered asset pairs.
     """
     labels = [sectors.get(c, "Unknown") for c in columns]
     unique = sorted(set(labels))
@@ -141,10 +146,10 @@ def sector_flow(
 
 # VARLiNGAM-specific: causal-order drift
 def causal_order_drift(result) -> pd.DataFrame:
-    """Track how VARLiNGAM's discovered causal order shifts across windows.
+    """Track how VARLiNGAM's discovered causal order changes across windows.
 
-    Kendall's tau between consecutive rank vectors; a sharp drop signals a
-    re-shuffling of which assets are causally upstream. Returns a DataFrame
+    I compute Kendall's tau between consecutive rank vectors. A sharp drop
+    indicates that the set of upstream assets has changed. Return a DataFrame
     with ``kendall_tau`` and ``n_position_changes`` per window.
     """
     from scipy.stats import kendalltau
@@ -182,10 +187,12 @@ def causal_order_drift(result) -> pd.DataFrame:
 def compare_graphs(
     a: np.ndarray, b: np.ndarray, threshold: float = 0.0
 ) -> dict[str, float]:
-    """Compare two adjacency matrices (same convention, same asset ordering).
+    """Compare 2 adjacency matrices with the same convention and asset
+    ordering.
 
-    Returns Frobenius distance, edge-set Jaccard, sign agreement on common
-    edges, and weight correlation over edges present in either graph.
+    Return the Frobenius distance, the edge-set Jaccard, the sign agreement
+    on common edges and the weight correlation over edges present in either
+    graph.
     """
     ea = np.abs(a) > threshold
     eb = np.abs(b) > threshold
@@ -211,9 +218,10 @@ def compare_graphs(
 
 
 def compare_rolling(dyn_result, var_result, threshold: float = 0.0) -> pd.DataFrame:
-    """Window-by-window comparison of a DYNOTEARS run against a VARLiNGAM run.
+    """Compare a DYNOTEARS run against a VARLiNGAM run window by window.
 
-    Both runs must share windows and asset ordering. One row per window.
+    Both runs must share the windows and the asset ordering. The result has
+    1 row per window.
     """
     w_stack, dates, _ = _extract_sequence(dyn_result)
     b_stack, _, _ = _extract_sequence(var_result)
@@ -238,7 +246,8 @@ def plot_metrics(
 ) -> Path:
     """Plot density, average weight and inter-window distance over time.
 
-    Flagged ``regime_changes`` windows get vertical lines. Returns the path.
+    Windows flagged in ``regime_changes`` get vertical lines. Return the
+    path of the figure.
     """
     import matplotlib
 
@@ -272,9 +281,10 @@ def plot_metrics(
 def summarise_error_independence(window) -> dict:
     """Summarise a window's HSIC p-value matrix as scalars.
 
-    ``rejection_rate`` is the fraction of off-diagonal p-values < 0.05;
-    much above 0.05 means LiNGAM is misspecified for this window. Empty dict
-    if the window has no ``error_indep_pvalues``.
+    ``rejection_rate`` is the fraction of off-diagonal p-values below 0.05.
+    A value well above 0.05 means that LiNGAM is misspecified for this
+    window. Return an empty dict if the window has no
+    ``error_indep_pvalues``.
     """
     pvalues = getattr(window, "error_indep_pvalues", None)
     if pvalues is None:
@@ -293,7 +303,8 @@ def summarise_error_independence(window) -> dict:
 def summarise_error_independence_panel(result) -> pd.DataFrame:
     """Aggregate :func:`summarise_error_independence` across a rolling result.
 
-    One row per window with HSIC p-values populated; skipped windows omitted.
+    The result has 1 row per window that has HSIC p-values. Skipped windows
+    are left out.
     """
     rows = []
     for w in result.windows:

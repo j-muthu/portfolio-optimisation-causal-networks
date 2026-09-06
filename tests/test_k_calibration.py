@@ -1,7 +1,9 @@
-"""Unit tests for K calibration (runtime + multiple-comparisons fix).
+"""Unit tests for K calibration (the runtime and the multiple-comparisons
+fix).
 
-t1: BH-FDR recovers planted signal; t2: the max_iter cap doesn't shift the
-null score distribution; t3: n_jobs parallelisation is deterministic.
+t1 checks that BH-FDR recovers a planted signal. t2 checks that the
+max_iter cap does not shift the null score distribution. t3 checks that
+n_jobs parallelisation is deterministic.
 """
 
 from __future__ import annotations
@@ -16,19 +18,19 @@ from pipeline.factor_selection.k_calibration import (
 )
 
 
-# t1: BH-FDR recovers planted signal where max-of-d fails
+# t1: BH-FDR recovers a planted signal where max-of-d fails
 def test_h1_bh_zscore_recovers_signal_at_thesis_scale():
-    """BH-FDR with z-score p-values flags 5 planted signals at B=100, d=35;
-    MC-mode BH fails closed at the same scale."""
+    """BH-FDR with z-score p-values flags 5 planted signals at B=100 and
+    d=35. Monte Carlo BH flags nothing at the same scale."""
     rng = np.random.default_rng(seed=0)
     d = 35
     n_signal = 5
-    B = 100  # thesis-realistic; underpowering only matters at this scale
+    B = 100  # realistic for the thesis, and the lack of power only matters at this scale
 
-    # Null: every driver's score ~ N(0, 1).
+    # Under the null, every driver's score is N(0, 1).
     null_per_driver = rng.standard_normal(size=(B, d))
 
-    # First n_signal drivers at score 4, rest noise.
+    # The first n_signal drivers have score 4 and the rest are noise.
     real_scores = np.concatenate([
         np.full(n_signal, 4.0),
         rng.standard_normal(d - n_signal),
@@ -46,8 +48,9 @@ def test_h1_bh_zscore_recovers_signal_at_thesis_scale():
     )
     assert K_z == n_signal + n_fp
 
-    # MC p-floor 1/101 ~ 0.0099 > BH rank-1 threshold 0.05/35 ~ 0.0014,
-    # so MC-BH cannot flag anything regardless of signal strength.
+    # The Monte Carlo p-value floor 1/101 (about 0.0099) is above the BH
+    # rank-1 threshold 0.05/35 (about 0.0014), so Monte Carlo BH cannot flag
+    # anything whatever the signal strength.
     K_mc, _, mask_mc = benjamini_hochberg_K_perm(
         real_scores, null_per_driver, alpha=0.05, method="mc",
     )
@@ -57,14 +60,14 @@ def test_h1_bh_zscore_recovers_signal_at_thesis_scale():
         f"discreteness floor has changed — check the +1 adjustments."
     )
 
-    # No "z-score > legacy" assertion here: that comparison is empirical
-    # (Phase H.6, real data).
+    # I do not assert that z-score beats legacy here, because that
+    # comparison is empirical (Phase H.6, real data).
 
 
-# t2: max_iter cap doesn't shift the score distribution
+# t2: the max_iter cap does not shift the score distribution
 def test_h2_permuted_max_iter_cap_preserves_distribution():
-    """Capping max_iter at 5 vs 50 on shuffled-driver fits leaves the score
-    distribution within a small KS-stat."""
+    """Capping max_iter at 5 rather than 50 on shuffled-driver fits leaves
+    the score distribution within a small KS statistic."""
     from pipeline.data.alignment import build_joint_matrix
     from pipeline.discovery.dynotears import run_dynotears_joint_window
     from pipeline.factor_selection.prune import stage_a_score
@@ -84,7 +87,8 @@ def test_h2_permuted_max_iter_cap_preserves_distribution():
     joint = build_joint_matrix(drivers, assets, calendar=cal, drop_na="any")
 
     def fit_score(seed: int, max_iter: int) -> np.ndarray:
-        """Fit DYNOTEARS on a shuffled-driver window, return Stage A scores."""
+        """Fit DYNOTEARS on a shuffled-driver window and return the Stage A
+        scores."""
         local_rng = np.random.default_rng(seed)
         shuffled = joint.frame.copy()
         for c in joint.driver_columns:
@@ -95,7 +99,7 @@ def test_h2_permuted_max_iter_cap_preserves_distribution():
         )
         return stage_a_score(disc).scores.to_numpy()
 
-    B = 8  # tiny for test speed
+    B = 8  # tiny, for test speed
     seeds = list(range(100, 100 + B))
     scores_low_cap = np.array([fit_score(s, max_iter=5) for s in seeds])
     scores_hi_cap = np.array([fit_score(s, max_iter=50) for s in seeds])
@@ -114,8 +118,9 @@ def test_h2_permuted_max_iter_cap_preserves_distribution():
 
 # t3: n_jobs parallelisation is deterministic
 def test_h3_n_jobs_determinism():
-    """Same seed: n_jobs=1 and n_jobs=2 give identical null matrices
-    (the seed pool is drawn up-front, so execution order doesn't matter)."""
+    """With the same seed, n_jobs=1 and n_jobs=2 give identical null
+    matrices. The seeds are drawn up front, so the execution order does not
+    matter."""
     d = 12
     B = 20
 

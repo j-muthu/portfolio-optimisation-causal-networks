@@ -1,8 +1,9 @@
-"""End-to-end real-data shakedown: universe, prices, drivers, joint matrix,
-optional K calibration, then the closed-loop backtest.
+"""End-to-end shakedown on real data: universe, prices, drivers, joint
+matrix, optional K calibration and then the closed-loop backtest.
 
-Default config is compact (one year of rebalances, top-30 assets) to keep
-the run under ~30 min. Entry point: :func:`run_shakedown`.
+The default configuration is small (1 year of rebalances and the top 30
+assets) to keep the run under roughly 30 minutes. The entry point is
+:func:`run_shakedown`.
 """
 
 from __future__ import annotations
@@ -39,7 +40,8 @@ RESULTS_ROOT = THESIS_ROOT / "results"
 # Result container
 @dataclass
 class ShakedownResult:
-    """Closed-loop output plus data-layer artefacts for notebook introspection."""
+    """Closed-loop output plus the data-layer objects, for inspection in a
+    notebook."""
 
     closed_loop: ClosedLoopResult
     joint_matrix: alignment.JointMatrix
@@ -57,15 +59,16 @@ def _build_universe(
     n_per_snapshot: int,
     use_cache: bool = True,
 ) -> list[str]:
-    """Union of top-N-by-CRSP-mcap across a handful of snapshot dates.
+    """Return the union of the top N by CRSP market cap across a few snapshot
+    dates.
 
     A fixed universe keeps the joint matrix columns stable across windows,
-    which DYNOTEARS needs. Uses the bulk-SQL mcap lookup when available,
-    else falls back to the per-ticker path.
+    which DYNOTEARS needs. I use the bulk SQL market-cap lookup when it is
+    available and fall back to the per-ticker path otherwise.
     """
     history = fetch_fja05680(use_cache=use_cache)
 
-    # Prefer the bulk-SQL path; fall back if WRDS is not configured.
+    # Use the bulk SQL path if WRDS is configured and fall back otherwise.
     try:
         from pipeline.data.wrds_backend import fetch_crsp_mcap_at_snapshot
         bulk_available = True
@@ -100,7 +103,7 @@ def _build_universe(
                 )
                 tickers = []
 
-        # Legacy fallback: per-ticker prices + shares + top_n_by_mcap_at.
+        # The legacy fallback uses per-ticker prices, shares and top_n_by_mcap_at.
         if not tickers:
             panel = fetch_prices(
                 members, ts - pd.Timedelta(days=10), ts, use_cache=use_cache,
@@ -160,10 +163,11 @@ def run_shakedown(
     use_cache: bool = True,
     discovery_cache: bool = False,
 ) -> ShakedownResult:
-    """End-to-end real-data smoke run.
+    """Run an end-to-end smoke test on real data.
 
-    Defaults: 2018-2020 data, 2020 backtest, top-30 by CRSP mcap, full
-    driver pool, K calibrated on the burn-in window then frozen.
+    The defaults are 2018-2020 data, a 2020 backtest, the top 30 by CRSP
+    market cap, the full driver pool and K calibrated on the burn-in window
+    and then fixed.
     """
     output_dir = Path(output_dir) if output_dir else RESULTS_ROOT / tag
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -186,7 +190,7 @@ def run_shakedown(
         tag=tag,
     )
 
-    # V0 (correlation selection) has no discovery, so no K calibration either.
+    # V0 (correlation selection) has no discovery, so it has no K calibration either.
     if selection_method == "correlation" and use_k_calibration:
         logger.info(
             "selection_method='correlation' (V0): skipping K calibration "
@@ -195,15 +199,15 @@ def run_shakedown(
         use_k_calibration = False
         config["use_k_calibration"] = False
 
-    # 1. Universe
+    # First, the universe.
     t0 = time.time()
     start_ts, end_ts = pd.Timestamp(start), pd.Timestamp(end)
     if universe_override is not None:
         universe = sorted(set(universe_override))
         logger.info("Using user-provided universe: %d tickers", len(universe))
     else:
-        # Top-N by CRSP mcap at three snapshots, union. Slow on first run;
-        # pass universe_override for fast smoke runs.
+        # Take the union of the top N by CRSP market cap at 3 snapshots. This
+        # is slow on the first run, so pass universe_override for fast smoke runs.
         midpoint = start_ts + (end_ts - start_ts) / 2
         snapshots = [start_ts, midpoint, end_ts]
         logger.info("Building universe from snapshots: %s", [d.date() for d in snapshots])
@@ -211,7 +215,7 @@ def run_shakedown(
     timings["universe_build_s"] = time.time() - t0
     logger.info("Universe size: %d unique tickers", len(universe))
 
-    # 2. Asset prices
+    # Second, the asset prices.
     t0 = time.time()
     asset_panel = fetch_prices(universe, start_ts, end_ts, use_cache=use_cache)
     if not asset_panel.resolved:
@@ -227,7 +231,7 @@ def run_shakedown(
         len(asset_panel.missing), asset_returns.shape,
     )
 
-    # 3. Drivers
+    # Third, the drivers.
     t0 = time.time()
     nyse_cal = alignment.trading_calendar(start_ts, end_ts)
     pool = build_driver_pool(
@@ -244,7 +248,7 @@ def run_shakedown(
     if pool.dropped:
         logger.info("Dropped drivers: %s", list(pool.dropped.keys()))
 
-    # 4. Joint matrix [D | A]
+    # Fourth, the joint matrix [D | A].
     t0 = time.time()
     joint = alignment.build_joint_matrix(
         drivers=pool.frame, assets=asset_returns, calendar=nyse_cal,
@@ -274,7 +278,7 @@ def run_shakedown(
             "extending the [start, end] window or reducing window_size.", joint.n,
         )
 
-    # 5. Rebalance dates
+    # Fifth, the rebalance dates.
     backtest_start_ts = pd.Timestamp(backtest_start)
     cal = joint.frame.index
     first_bt_pos = int(cal.searchsorted(backtest_start_ts, side="left"))
@@ -293,7 +297,7 @@ def run_shakedown(
         rebalance_dates[-1].date(), rebalance_step_days, holding_days,
     )
 
-    # 6. K calibration on the burn-in window (optional)
+    # Sixth, the optional K calibration on the burn-in window.
     cal_result: KCalibration | None = None
     K = K_default
     if use_k_calibration:
@@ -307,8 +311,8 @@ def run_shakedown(
             len(burnin_window), k_calibration_B, k_calibration_n_jobs,
         )
 
-        # Permuted fits cap max_iter: shuffled drivers have no structure, so
-        # full iterations are wasted. The real fit keeps discovery_kwargs.
+        # The permuted fits cap max_iter, because shuffled drivers have no
+        # structure and full iterations are wasted. The real fit keeps discovery_kwargs.
         disc_kwargs = dict(discovery_kwargs or {})
         permuted_disc_kwargs = {**disc_kwargs, "max_iter": k_calibration_permuted_max_iter}
         driver_cols_local = list(joint.driver_columns)
@@ -330,7 +334,7 @@ def run_shakedown(
                 return np.zeros(len(driver_cols_local))
             return stage_a_score(disc).scores.to_numpy()
 
-        # One real fit at full max_iter for the calibration.
+        # Run 1 real fit at the full max_iter for the calibration.
         real_disc = run_dynotears_joint_window(
             burnin_window, joint.driver_columns, joint.asset_columns, **disc_kwargs,
         )
@@ -353,13 +357,13 @@ def run_shakedown(
             cal_result.K_perm, cal_result.K_perm_legacy, K,
         )
 
-    # 7. Closed-loop V2 backtest
+    # Finally, the closed-loop V2 backtest.
     t0 = time.time()
-    # Restrict to the joint matrix's assets (some dropped in the NaN purge).
+    # Restrict to the joint matrix's assets, because some were dropped when NaNs were removed.
     asset_returns_used = asset_returns[joint.asset_columns]
 
     # An asset enters only if it has real data across the whole lookback
-    # window; keeps pre-inception zero-fills out of the sample covariance.
+    # window. This keeps zero-filled days before inception out of the sample covariance.
     def universe_at(t: pd.Timestamp) -> list[str]:
         if joint.asset_eligibility is None:
             return list(joint.asset_columns)
@@ -409,7 +413,7 @@ def run_shakedown(
     config["K_used"] = K
     config["timings_s"] = timings
 
-    # Persist a small results bundle for the notebook.
+    # Save a small results bundle for the notebook.
     bundle = {
         "config": config,
         "timings": timings,

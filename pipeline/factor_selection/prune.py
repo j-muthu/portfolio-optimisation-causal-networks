@@ -1,10 +1,10 @@
-"""Stage A: score each candidate driver by its aggregate outgoing causal
-influence on the asset block, then prune to the top-2K survivors.
+"""Stage A: score each candidate driver by its total outgoing causal
+influence on the asset block, then prune to the top 2K.
 
-The score sums |edge| x stability over lagged driver -> asset edges
-(quantile-threshold mask for DYNOTEARS, bootstrap probability for VARLiNGAM).
-Only lagged edges count: contemporaneous edges lack temporal precedence and
-have the weakest exogeneity argument.
+The score sums |edge| x stability over the lagged driver -> asset edges. The
+stability is a quantile-threshold mask for DYNOTEARS and a bootstrap
+probability for VARLiNGAM. Only lagged edges count, because contemporaneous
+edges have no temporal precedence and the weakest exogeneity argument.
 """
 
 from __future__ import annotations
@@ -24,10 +24,11 @@ def dynotears_stability_mask(
     A_stacked: np.ndarray,
     target_fraction: float = 0.10,
 ) -> tuple[np.ndarray, float]:
-    """0/1 stability mask on lagged edges plus the chosen threshold.
+    """Return a 0/1 stability mask on the lagged edges plus the chosen
+    threshold.
 
     The threshold is the (1 - target_fraction) quantile of the non-zero
-    magnitudes, chosen from the data so Stage A stays scale-invariant
+    magnitudes. I take it from the data so that Stage A is scale-invariant
     across windows.
     """
     flat = np.abs(A_stacked).ravel()
@@ -43,9 +44,10 @@ def varlingam_stability_mask(
     B_lags: list[np.ndarray],
     bootstrap_prob_per_lag: list[np.ndarray] | None,
 ) -> np.ndarray:
-    """Bootstrap-derived stability weights for VARLiNGAM, shape ``(p, d, d)``.
+    """Return bootstrap stability weights for VARLiNGAM, with shape
+    ``(p, d, d)``.
 
-    Falls back to a 0/1 presence mask when no bootstrap was run.
+    I fall back to a 0/1 presence mask when no bootstrap was run.
     """
     p = len(B_lags)
     if bootstrap_prob_per_lag is not None and len(bootstrap_prob_per_lag) == p:
@@ -56,7 +58,7 @@ def varlingam_stability_mask(
 # Stage A score
 @dataclass
 class StageAResult:
-    """Outcome of Stage A: per-driver scores plus the kept pool."""
+    """Outcome of Stage A, i.e. the per-driver scores plus the kept pool."""
 
     scores: pd.Series
     threshold: float | None
@@ -77,8 +79,8 @@ def stage_a_score(
     """Compute the Stage A score for every candidate driver in a window.
 
     ``window`` must expose ``driver_idx``, ``asset_idx``, ``driver_columns``
-    and the lagged matrices (``A`` or ``B_lags``); contemporaneous edges are
-    deliberately excluded. Returns a :class:`StageAResult`.
+    and the lagged matrices (``A`` or ``B_lags``). I deliberately exclude
+    contemporaneous edges. Return a :class:`StageAResult`.
     """
     driver_idx = np.asarray(window.driver_idx, dtype=int)
     asset_idx = np.asarray(window.asset_idx, dtype=int)
@@ -86,15 +88,15 @@ def stage_a_score(
 
     if method == "dynotears":
         A_stacked = np.stack(list(window.A), axis=0)  # (p, d, d)
-        # Driver -> asset entries only: shape (p, n_drivers, n_assets).
+        # Keep the driver -> asset entries only, with shape (p, n_drivers, n_assets).
         d2a = A_stacked[:, driver_idx[:, None], asset_idx[None, :]]
         mask, threshold = dynotears_stability_mask(d2a, target_fraction=target_fraction)
         contributions = np.abs(d2a) * mask.astype(float)
     elif method == "varlingam":
         B_lags = list(window.B_lags)
         boot = None
-        # JointVarLingamWindow only exposes contemporaneous bootstrap probs,
-        # so lagged stability falls back to presence indicators.
+        # JointVarLingamWindow only exposes contemporaneous bootstrap
+        # probabilities, so the lagged stability falls back to presence indicators.
         stab = varlingam_stability_mask(B_lags, bootstrap_prob_per_lag=boot)
         d2a = np.stack(
             [B[driver_idx[:, None], asset_idx[None, :]] for B in B_lags], axis=0
@@ -105,7 +107,7 @@ def stage_a_score(
     else:
         raise ValueError(f"Unknown method: {method!r}")
 
-    # One score per driver: sum over lags and assets.
+    # Sum over lags and assets to get 1 score per driver.
     per_driver = contributions.sum(axis=(0, 2))
     scores = pd.Series(per_driver, index=driver_columns, name="stage_a_score")
     pool = scores[scores > 0].sort_values(ascending=False).index.tolist()
@@ -120,7 +122,8 @@ def prune_to_pool(
     K: int,
     pool_multiplier: int = 2,
 ) -> list[str]:
-    """Top-``pool_multiplier * K`` survivors, intersected with the non-zero pool."""
+    """Return the top ``pool_multiplier * K`` drivers, intersected with the
+    non-zero pool."""
     target = pool_multiplier * K
     return result.pool[:target]
 

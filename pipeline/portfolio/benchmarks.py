@@ -1,9 +1,11 @@
-"""Benchmark portfolios. Only the equal-weight (1/N) benchmark survives; the
-min-variance, mean-variance and cap-weighted benchmarks were never part of
-the reported grid and were removed as dead code.
+"""Benchmark portfolios.
 
-Returns a name-indexed pd.Series of weights summing to 1, matching the
-HRP/HSP signature.
+I keep only the equal-weight (1/N) benchmark. I removed the min-variance,
+mean-variance and cap-weighted benchmarks because they were never part of
+the reported grid.
+
+The function returns a name-indexed pd.Series of weights that sum to 1,
+matching the HRP and HSP signature.
 """
 
 from __future__ import annotations
@@ -16,7 +18,7 @@ logger = logging.getLogger(__name__)
 
 
 def equal_weight(asset_names: list[str]) -> pd.Series:
-    """``w_i = 1/N`` for every asset."""
+    """Give every asset the weight 1/N."""
     n = len(asset_names)
     if n == 0:
         raise ValueError("empty asset list")

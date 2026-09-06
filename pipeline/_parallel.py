@@ -1,7 +1,8 @@
-"""Shared rolling-window execution: parallelism, progress logging, checkpointing.
+"""Shared rolling-window execution (parallelism, progress logging and
+checkpointing).
 
-Progress is logged from the parent process because joblib workers don't
-inherit logging handlers. Completed windows are pickled so runs can resume.
+I log progress from the parent process because joblib workers do not inherit
+logging handlers. I pickle each completed window so that a run can resume.
 """
 
 from __future__ import annotations
@@ -24,11 +25,11 @@ def execute_windows(
     checkpoint_dir: str | Path | None = None,
     log_every: int = 1,
 ) -> list:
-    """Run ``call_fn`` over every job; returns results sorted by ``.index``.
+    """Run ``call_fn`` over every job and return the results sorted by ``.index``.
 
-    Each result must carry an integer ``.index``. Checkpoints are keyed only
-    by ``label`` + index, so use a fresh ``checkpoint_dir`` when windowing or
-    algorithm parameters change.
+    Each result must carry an integer ``.index``. Checkpoints are keyed by
+    ``label`` and index only, so use a fresh ``checkpoint_dir`` whenever the
+    windowing or the algorithm parameters change.
     """
     log = logging.getLogger(f"pipeline.{label}")
     total = len(jobs)
@@ -39,7 +40,7 @@ def execute_windows(
     def _ckpt_path(index: int) -> Path:
         return ckpt / f"{label}_window_{index:04d}.pkl"  # type: ignore[union-attr]
 
-    # Partition into already-checkpointed and to-do
+    # Split the jobs into those already checkpointed and those still to run.
     done: list = []
     todo: list[Job] = []
     for job in jobs:
@@ -58,7 +59,7 @@ def execute_windows(
     if not todo:
         return sorted(done, key=lambda r: r.index)
 
-    # Run the remaining jobs, recording each as it completes
+    # Run the remaining jobs and record each one as it completes.
     results: list = list(done)
     started = time.time()
     n_complete = len(done)

@@ -1,8 +1,9 @@
-"""Top-level selector, called once per rebalance date: Stage A pruning,
-Stage B greedy refinement, and the closed-loop utility blend.
+"""Top-level selector, called once per rebalance date. It runs Stage A
+pruning, Stage B greedy refinement and the closed-loop utility blend.
 
-Blend: score = alpha * z(causal) + (1 - alpha) * z(utility), z-scored across
-the pool so the scales are commensurate. During burn-in alpha is forced to 1.
+The blend is score = alpha * z(causal) + (1 - alpha) * z(utility), z-scored
+across the pool so that the 2 scales are comparable. During burn-in alpha is
+forced to 1.
 """
 
 from __future__ import annotations
@@ -20,7 +21,7 @@ from pipeline.factor_selection.prune import StageAResult, prune_to_pool, stage_a
 logger = logging.getLogger(__name__)
 
 
-# Helper: z-score across a pool
+# Z-score across a pool
 def _zscore(series: pd.Series) -> pd.Series:
     mu = series.mean()
     sigma = series.std(ddof=0)
@@ -32,11 +33,11 @@ def _zscore(series: pd.Series) -> pd.Series:
 # Top-level selector
 @dataclass
 class SelectionResult:
-    """What Stage 1 persists per rebalance date.
+    """What Stage 1 saves for each rebalance date.
 
     ``selected`` is in Stage B addition order and may be shorter than ``K``
     if Stage B stopped early. ``alpha_effective`` is the alpha actually
-    applied (1.0 during burn-in); ``utility_lookup_timestamp`` is part of
+    applied (1.0 during burn-in). ``utility_lookup_timestamp`` is part of
     the lookahead audit trail.
     """
 
@@ -70,19 +71,20 @@ def select_drivers(
     epsilon: float | None = None,
     ridge_alpha: float = 1.0,
 ) -> SelectionResult:
-    """End-to-end selection for one rebalance date.
+    """Run the full selection for 1 rebalance date.
 
-    ``driver_window`` / ``asset_window`` must already be z-scored. ``alpha``
-    mixes causal evidence (1) with historical utility (0) and is forced to 1
-    for the first ``burn_in_rebalances`` rebalances. ``utility_lookup`` maps
-    ``t`` to ``(U_series, lookup_timestamp)`` derived only from periods
-    strictly before ``t``; ``None`` means pure causal selection.
+    ``driver_window`` and ``asset_window`` must already be z-scored.
+    ``alpha`` mixes causal evidence (1) with historical utility (0) and is
+    forced to 1 for the first ``burn_in_rebalances`` rebalances.
+    ``utility_lookup`` maps ``t`` to ``(U_series, lookup_timestamp)`` derived
+    only from periods strictly before ``t``. ``None`` means pure causal
+    selection.
     """
     t = pd.Timestamp(rebalance_date)
     stage_a = stage_a_score(discovery_window, method=method, target_fraction=target_fraction)
     causal_scores = stage_a.scores
 
-    # Utility lookup (skip during burn-in).
+    # Look up the utility. This is skipped during burn-in.
     burn_in = rebalance_index < burn_in_rebalances
     alpha_eff = 1.0 if burn_in else float(alpha)
     utility_series: pd.Series = pd.Series(0.0, index=causal_scores.index)
@@ -101,8 +103,8 @@ def select_drivers(
         blended = alpha_eff * z_causal + (1.0 - alpha_eff) * z_util
         blended.name = "blended_score"
 
-    # Pool: top-2K by blended score, restricted to drivers with strictly
-    # positive causal evidence; high utility alone never selects a driver.
+    # The pool is the top 2K by blended score, restricted to drivers with
+    # strictly positive causal evidence. High utility alone never selects a driver.
     nonzero = causal_scores[causal_scores > 0].index
     blended_pool_sorted = blended.loc[nonzero].sort_values(ascending=False)
     target_pool = pool_multiplier * K

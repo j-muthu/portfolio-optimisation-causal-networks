@@ -1,8 +1,9 @@
-"""Causal-ordered bisection: DAG utilities + the D2/D2s allocators (Phase II).
+"""Causal-ordered bisection: DAG utilities and the D2 and D2s allocators
+(Phase II).
 
-Replaces HRP's clustering step with a deterministic topological order of the
-DAG, then runs the existing ``recursive_bisection`` on that order. Non-DAG
-inputs (GRANGER) go through greedy feedback-arc removal first.
+I replace HRP's clustering step with a deterministic topological order of the
+DAG and then run the existing ``recursive_bisection`` on that order. Inputs
+that are not DAGs (GRANGER) go through greedy feedback-arc removal first.
 """
 
 from __future__ import annotations
@@ -28,14 +29,14 @@ class CyclicGraphError(ValueError):
 
 # Feedback-arc removal (non-DAG fallback, GRANGER only)
 def remove_feedback_arcs(M: np.ndarray) -> tuple[np.ndarray, int]:
-    """Greedily zero the smallest-|M| edges until the graph is acyclic.
+    """Greedily zero the edges with the smallest |M| until the graph is acyclic.
 
-    Returns the cleaned matrix and the number of edges dropped.
+    Return the cleaned matrix and the number of edges dropped.
     """
     M = M.copy()
     dropped = 0
     while not is_dag_matrix(M):
-        # Nodes not eliminated by a Kahn pass form the cyclic core.
+        # The nodes that a Kahn pass cannot eliminate form the cyclic core.
         adj = (M != 0.0).astype(np.int64)
         np.fill_diagonal(adj, 0)
         in_deg = adj.sum(axis=0)
@@ -65,11 +66,12 @@ def topological_order(
     M: np.ndarray,
     asset_names: list[str] | None = None,
 ) -> list[int]:
-    """Kahn topological order of ``M`` (i → j), upstream first.
+    """Return the Kahn topological order of ``M`` (edges run i to j), upstream
+    first.
 
-    Tie-break: total downstream influence ``Σᵣ |B[r, i]|`` descending, then
-    asset name ascending, so the order is fully deterministic. Raises
-    :class:`CyclicGraphError` on cyclic graphs.
+    Ties are broken by total downstream influence ``sum_r |B[r, i]|``
+    descending, then by asset name ascending, so the order is fully
+    deterministic. Raise :class:`CyclicGraphError` on a cyclic graph.
     """
     N = M.shape[0]
     if not is_dag_matrix(M):
@@ -84,7 +86,7 @@ def topological_order(
     order: list[int] = []
     while remaining:
         candidates = [i for i in remaining if in_deg[i] == 0]
-        # Deterministic pick: max influence, then name ascending.
+        # Pick deterministically: largest influence first, then name ascending.
         pick = min(candidates, key=lambda i: (-influence[i], names[i]))
         order.append(pick)
         remaining.discard(pick)
@@ -100,10 +102,12 @@ def d2_weights(
     returns_window: pd.DataFrame,
     covariance: str = "sample",
 ) -> pd.Series:
-    """Recursive bisection over the topological order (no clustering step).
+    """Run recursive bisection over the topological order, with no clustering
+    step.
 
-    ``covariance="sample"`` is D2 (direction enters only the ordering);
-    ``"structural"`` is D2s (ordering *and* allocation covariance).
+    ``covariance="sample"`` is D2, where edge direction enters only through
+    the ordering. ``"structural"`` is D2s, where it also enters the
+    allocation covariance.
     """
     M = graph.M
     if not graph.is_dag:
@@ -120,7 +124,7 @@ def d2_weights(
         from pipeline.portfolio.directed import _sample_cov
 
         cov = _sample_cov(graph, returns_window)
-        # recursive_bisection indexes positionally; align to the graph's order.
+        # recursive_bisection indexes by position, so align to the graph's order.
         cov = cov.loc[graph.asset_names, graph.asset_names]
     else:
         raise ValueError(f"covariance must be 'sample' or 'structural', got {covariance!r}")
@@ -132,7 +136,8 @@ def d2_weights(
 
 # Diagnostics (E3/E6 inputs)
 def dag_diagnostics(graph: AssetGraphWindow) -> dict:
-    """Edge density, DAG depth (longest path), roots/leaves — per window."""
+    """Return the edge density, DAG depth (longest path) and the numbers of
+    roots and leaves for 1 window."""
     M = graph.M
     N = graph.n_assets
     adj = M != 0.0
@@ -162,7 +167,8 @@ def dag_diagnostics(graph: AssetGraphWindow) -> dict:
 
 
 def order_stability(orders: list[list[int]]) -> pd.Series:
-    """Kendall's τ between consecutive-window topological orders (E6)."""
+    """Return Kendall's tau between the topological orders of consecutive
+    windows (E6)."""
     from scipy.stats import kendalltau
 
     taus = []

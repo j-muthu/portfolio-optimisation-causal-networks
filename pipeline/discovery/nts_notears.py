@@ -1,9 +1,10 @@
-"""NTS-NOTEARS joint-window wrapper (non-linear discovery probe).
+"""NTS-NOTEARS joint-window wrapper (a probe of non-linear discovery).
 
-Wraps the vendored NTS-NOTEARS behind the DYNOTEARS interface; each edge is
-summarised by the L2-norm of its CNN kernel. The asset -> driver prior is
-enforced via NTS's native bound-dicts. A reduced-scope probe, not a full
-backtest path: fits are too slow to run at every rebalance.
+I wrap the vendored NTS-NOTEARS behind the DYNOTEARS interface and summarise
+each edge by the L2 norm of its CNN kernel. The asset -> driver prior is
+enforced through NTS's own bound dictionaries. This is a reduced-scope probe
+rather than a full backtest path, because the fits are too slow to run at
+every rebalance.
 """
 
 from __future__ import annotations
@@ -24,8 +25,9 @@ _NTS_DIR = THESIS_ROOT / "nts-notears" / "notears"
 
 
 def _import_nts():
-    """Lazy import of the vendored NTS-NOTEARS; its bare relative imports need
-    the notears/ dir on sys.path, and this defers the torch import."""
+    """Import the vendored NTS-NOTEARS lazily. Its bare relative imports need
+    the notears/ directory on sys.path, and this also defers the torch
+    import."""
     if str(_NTS_DIR) not in sys.path:
         sys.path.insert(0, str(_NTS_DIR))
     # source code available at: https://github.com/xiangyu-sun-789/NTS-NOTEARS
@@ -34,7 +36,8 @@ def _import_nts():
 
 
 def _asset_to_driver_prior(driver_columns, asset_columns, p):
-    """Bound-dicts forbidding every asset->driver edge at lags 0..p."""
+    """Return bound dictionaries that forbid every asset -> driver edge at
+    lags 0 to p."""
     rules = []
     for lag in range(p + 1):
         for a in asset_columns:
@@ -57,8 +60,9 @@ def run_nts_notears_joint_window(
     h_tol: float = 1e-6,
     enforce_prior: bool = True,
 ) -> JointDynotearsWindow:
-    """Fit NTS-NOTEARS on one joint ``[D | A]`` window; returns a
-    ``JointDynotearsWindow`` of kernel-norm magnitudes (``W[i, j]`` = i->j)."""
+    """Fit NTS-NOTEARS on 1 joint ``[D | A]`` window and return a
+    ``JointDynotearsWindow`` of kernel-norm magnitudes (``W[i, j]`` is
+    i -> j)."""
     nts = _import_nts()
     # source code available at: https://github.com/pytorch/pytorch
     import torch
@@ -70,7 +74,7 @@ def run_nts_notears_joint_window(
     driver_idx = np.array([columns.index(c) for c in driver_columns])
     asset_idx = np.array([columns.index(c) for c in asset_columns])
 
-    # Per-window z-score (NTS expects standardised input).
+    # Z-score per window because NTS expects standardised input.
     X = joint_window.to_numpy(dtype=np.float64)
     mean = X.mean(axis=0)
     std = X.std(axis=0)
@@ -89,8 +93,8 @@ def run_nts_notears_joint_window(
         model, Xn.astype(np.float32), device, lambda1=lambda1, lambda2=lambda2,
         w_threshold=w_threshold, max_iter=max_iter, h_tol=h_tol, verbose=0,
     )
-    # W_full is (d*(p+1), d*(p+1)); only the last d columns (contemporaneous
-    # targets) are populated. Rows are stacked [lag_oldest..lag_1, instantaneous].
+    # W_full is (d*(p+1), d*(p+1)). Only the last d columns (the contemporaneous
+    # targets) are filled. The rows are stacked [oldest lag, ..., lag 1, instantaneous].
     tgt = W_full[:, -d:]
     A = [np.ascontiguousarray(tgt[i * d:(i + 1) * d, :]) for i in range(p)]  # lag blocks
     W = np.ascontiguousarray(tgt[p * d:(p + 1) * d, :])                      # instantaneous

@@ -1,7 +1,7 @@
-"""Phase I full 2007-2024 backtest launcher (V0/V1/V2).
+"""Launcher for the full 2007-2024 Phase I backtest (V0, V1 and V2).
 
-All data is pre-cached, so this makes no WRDS calls. K calibration runs once
-(on the V1 launch); V0 and V2 reuse the result via --k.
+All data is already cached, so this makes no WRDS calls. K calibration runs
+once, on the V1 launch. V0 and V2 reuse the result through --k.
 
 Usage
 -----
@@ -22,19 +22,19 @@ import pathlib
 from pipeline.data.drivers import DRIVER_CATALOGUE
 from pipeline.shakedown import run_shakedown
 
-# Excluded for the full-sample run: they don't exist before 2007-04, and
-# baa10y_diff already covers the credit-spread role.
+# Excluded from the full-sample run because they do not exist before 2007-04
+# and baa10y_diff already covers the credit-spread role.
 DROP_DRIVERS = {"hyg_lqd_logret", "vvix"}
 
-# 99-ticker G.7 universe. Tracked copy lives next to this script; falls back
-# to the cache/ copy if absent.
+# The 99-ticker G.7 universe. The tracked copy is next to this script, and I
+# fall back to the cache/ copy if it is absent.
 _TRACKED_UNIVERSE = pathlib.Path(__file__).resolve().parent / "phase_i_universe.txt"
 _CACHE_UNIVERSE = pathlib.Path(__file__).resolve().parent.parent / "cache" / "phase_i_universe.txt"
 UNIVERSE_FILE = _TRACKED_UNIVERSE if _TRACKED_UNIVERSE.exists() else _CACHE_UNIVERSE
 
-# Fixed sample boundaries.
-DATA_START = "2005-01-03"      # joint matrix naturally starts 2006-01
-BACKTEST_START = "2007-01-03"  # full GFC captured at window 252
+# The fixed sample boundaries.
+DATA_START = "2005-01-03"      # the joint matrix naturally starts in 2006-01
+BACKTEST_START = "2007-01-03"  # the full GFC is captured at window 252
 DATA_END = "2024-12-31"
 
 
@@ -84,34 +84,34 @@ def main(argv: list[str] | None = None) -> None:
         sorted(DROP_DRIVERS), BACKTEST_START, DATA_END,
     )
 
-    # Variant -> (selection_method, discovery_method, K-calibration on?)
+    # Map the variant to (selection_method, discovery_method, whether K calibration is on).
     if args.variant == "V0":
-        # V0 (cum-corr) never uses discovery or K calibration.
+        # V0 (cumulative correlation) never uses discovery or K calibration.
         selection_method, discovery_method = "correlation", "dynotears"
         use_kcal = False
     elif args.variant == "V0prime":
-        # V0' asset-only Causal-HRP: no drivers, no FFNN, no K calibration.
+        # V0' asset-only Causal-HRP has no drivers, no FFNN and no K calibration.
         selection_method, discovery_method = "asset_only", "dynotears"
         use_kcal = False
-    else:  # V1 / V2: causal greedy on the chosen discovery backend
+    else:  # V1 and V2 use causal greedy selection on the chosen discovery backend
         selection_method, discovery_method = "causal_greedy", args.discovery_method
         use_kcal = args.k is None
 
     if args.k is not None:
         log.info("Reusing pre-calibrated K=%d (skipping K calibration)", args.k)
 
-    # VARLiNGAM at d=132 must disable lingam's adaptive-lasso pruning: it
-    # fails when a late-order variable has more predecessors than window
-    # samples. Not needed anyway; the mask is enforced by post-fit projection.
+    # VARLiNGAM at d=132 must disable lingam's adaptive-lasso pruning, because
+    # it fails when a late-order variable has more predecessors than window
+    # samples. It is not needed anyway, as the mask is enforced after the fit.
     discovery_kwargs = {"prune": False} if discovery_method == "varlingam" else None
 
-    # Suffix non-default discovery so VARLiNGAM runs don't clobber the
-    # committed DYNOTEARS bundles; DYNOTEARS keeps the unsuffixed tag.
+    # Add a suffix for non-default discovery so that VARLiNGAM runs do not
+    # overwrite the committed DYNOTEARS bundles. DYNOTEARS keeps the plain tag.
     if args.variant != "V0" and discovery_method != "dynotears":
         tag = f"phase_i_{args.variant.lower()}_{discovery_method}_w{args.window}"
     else:
         tag = f"phase_i_{args.variant.lower()}_w{args.window}"
-    # J4 sweep runs write to distinct result dirs via the suffix.
+    # The J4 sweep runs write to separate result directories through the suffix.
     if args.tag_suffix:
         tag = f"{tag}{args.tag_suffix}"
 
@@ -146,7 +146,7 @@ def main(argv: list[str] | None = None) -> None:
     try:
         bt = res.closed_loop.backtest
         print(f"final NAV (gross/net): {bt.nav_gross.iloc[-1]:.4f} / {bt.nav_net.iloc[-1]:.4f}")
-    except Exception as exc:  # cosmetic print must not abort a multi-hour run
+    except Exception as exc:  # the summary print must not abort a multi-hour run
         log.warning("Could not print final NAV (%s); results are persisted regardless.", exc)
     print("=" * 70)
 

@@ -1,10 +1,12 @@
-"""Verification harness: V0 (vanilla HSP) on Rodriguez-Dominguez's data.
+"""Verification of V0 (vanilla HSP) on Rodriguez-Dominguez's data.
 
-Loads the reference panels under ``thesis/HSP/`` and runs the V0 path so
-the weights can be cross-checked against the published notebook. No-op if
-the Excel files are absent (not under version control).
+I load the reference panels under ``thesis/HSP/`` and run the V0 path so
+that the weights can be cross-checked against the published notebook. It
+does nothing if the Excel files are absent, as they are not under version
+control.
 
-Not a pytest test; run as ``.venv/bin/python -m tests.test_hsp_reference``.
+This is not a pytest test. Run it as
+``.venv/bin/python -m tests.test_hsp_reference``.
 """
 
 from __future__ import annotations
@@ -27,7 +29,7 @@ logger = logging.getLogger(__name__)
 
 # Loader
 class ReferenceData(NamedTuple):
-    """Cleaned panels: daily log-returns on a common trading-day calendar."""
+    """Cleaned panels of daily log-returns on a common trading-day calendar."""
 
     asset_returns: pd.DataFrame
     driver_returns: pd.DataFrame
@@ -36,28 +38,28 @@ class ReferenceData(NamedTuple):
 
 
 def load_hsp_reference_data() -> ReferenceData:
-    """Load both Excel files, compute log-returns, intersect calendars."""
+    """Load both Excel files, compute log-returns and intersect the calendars."""
     if not ASSETS_PATH.exists() or not DRIVERS_PATH.exists():
         raise FileNotFoundError(
             f"Reference data missing — expected {ASSETS_PATH} and {DRIVERS_PATH}."
         )
 
-    # Assets sheet: prices, Date already a Timestamp.
+    # The assets sheet holds prices, and Date is already a Timestamp.
     asset_prices = pd.read_excel(ASSETS_PATH, sheet_name="Daily_Equities_Hypo")
     asset_prices = asset_prices.set_index("Date").sort_index()
     asset_prices.index = pd.DatetimeIndex(asset_prices.index).normalize()
 
-    # Drivers sheet: values are already returns; Date is an integer YYYYMMDD.
+    # The drivers sheet holds returns, and Date is an integer YYYYMMDD.
     drivers_raw = pd.read_excel(DRIVERS_PATH, sheet_name="Sheet1")
     drivers_raw["Date"] = pd.to_datetime(
         drivers_raw["Date"].astype(int).astype(str), format="%Y%m%d"
     )
     driver_returns = drivers_raw.set_index("Date").sort_index()
     driver_returns.index = pd.DatetimeIndex(driver_returns.index).normalize()
-    # Driver "prices" don't exist (values are returns); placeholder only.
+    # Driver prices do not exist because the values are returns, so this is a placeholder.
     driver_prices = driver_returns.cumsum()
 
-    # Intersect calendars (assets 2011-2024, drivers 2015-2022).
+    # Intersect the calendars (assets 2011-2024, drivers 2015-2022).
     common = asset_prices.index.intersection(driver_returns.index)
     if common.empty:
         raise RuntimeError(
@@ -73,7 +75,7 @@ def load_hsp_reference_data() -> ReferenceData:
 
     asset_returns = np.log(asset_prices / asset_prices.shift(1)).dropna(how="all")
 
-    # Drop drivers with materially missing data.
+    # Drop drivers with a lot of missing data.
     coverage = driver_returns.notna().mean()
     keep = coverage[coverage > 0.90].index
     dropped = sorted(set(driver_returns.columns) - set(keep))
@@ -81,7 +83,7 @@ def load_hsp_reference_data() -> ReferenceData:
         logger.info("Dropped %d drivers with > 10%% NaN coverage", len(dropped))
     driver_returns = driver_returns[keep]
 
-    # Final intersection after the diff drops rows.
+    # Intersect again after the differencing drops rows.
     common = asset_returns.index.intersection(driver_returns.index)
     return ReferenceData(
         asset_returns=asset_returns.loc[common],
@@ -101,7 +103,8 @@ def run_v0_on_reference_window(
     linkage_method: str = "single",
     ffnn_epochs: int = 100,
 ) -> pd.Series:
-    """One V0 rebalance: cum-corr selection, FFNN sensitivities, HRP."""
+    """Run 1 V0 rebalance: cumulative-correlation selection, FFNN
+    sensitivities and HRP."""
     from pipeline.factor_selection import select_top_k_corr
     from pipeline.portfolio import v0_vanilla_hsp
     from pipeline.sensitivities import fit_sensitivities_window
@@ -138,7 +141,7 @@ def run_v0_on_reference_window(
     return weights
 
 
-# CLI: print one rebalance's weights for eyeball cross-check
+# CLI: print the weights of 1 rebalance for a manual cross-check
 def main(argv: list[str] | None = None) -> int:
     argv = argv if argv is not None else sys.argv[1:]
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")

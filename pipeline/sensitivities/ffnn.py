@@ -1,9 +1,11 @@
-"""Per-window FFNN sensitivity estimation (HSP-style, multi-head batched).
+"""Per-window FFNN sensitivity estimation in the HSP style, with all asset
+heads trained in 1 batch.
 
-Fits lagged drivers to contemporaneous asset returns with a shared-body,
-per-asset-head MLP (architecture search by validation RMSE), then extracts
-``S[t] ∈ ℝ^{N × K}`` as the window-averaged ``torch.func.jacrev`` Jacobian.
-Per-window results are cached under ``cache/ffnn/``.
+I fit lagged drivers to contemporaneous asset returns with an MLP that has a
+shared body and 1 output head per asset. The architecture is chosen by
+validation RMSE. I then extract ``S[t] ∈ ℝ^{N × K}`` as the window-averaged
+``torch.func.jacrev`` Jacobian. Per-window results are cached under
+``cache/ffnn/``.
 """
 
 from __future__ import annotations
@@ -20,7 +22,7 @@ import pandas as pd
 
 logger = logging.getLogger(__name__)
 
-# Defer torch imports so the module can be inspected without torch.
+# Defer the torch imports so that the module can be inspected without torch.
 def _torch():
     # source code available at: https://github.com/pytorch/pytorch
     import torch
@@ -35,7 +37,8 @@ CACHE_DIR.mkdir(parents=True, exist_ok=True)
 
 # Device selection
 def best_device() -> str:
-    """``"mps"`` on Apple Silicon, ``"cuda"`` if available, else ``"cpu"``."""
+    """Return ``"mps"`` on Apple Silicon, ``"cuda"`` if it is available and
+    ``"cpu"`` otherwise."""
     torch = _torch()
     if torch.cuda.is_available():
         return "cuda"
@@ -46,7 +49,8 @@ def best_device() -> str:
 
 # Model
 def _build_mlp(input_dim: int, n_assets: int, depth: int, width: int):
-    """Multi-head MLP: shared hidden layers, one linear output head per asset."""
+    """Build a multi-head MLP with shared hidden layers and 1 linear output
+    head per asset."""
     torch = _torch()
     # source code available at: https://github.com/pytorch/pytorch
     import torch.nn as nn
@@ -66,9 +70,10 @@ def _build_mlp(input_dim: int, n_assets: int, depth: int, width: int):
 def make_lagged_inputs(
     drivers: pd.DataFrame, assets: pd.DataFrame, lags: int
 ) -> tuple["torch.Tensor", "torch.Tensor", pd.DatetimeIndex]:
-    """Stack driver values at ``t-1 .. t-lags`` against asset returns at ``t``.
+    """Stack the driver values at ``t-1 .. t-lags`` against the asset returns
+    at ``t``.
 
-    Returns ``(X, Y, dates)`` for the rows where all lag values exist.
+    Return ``(X, Y, dates)`` for the rows where all lag values exist.
     """
     torch = _torch()
     selected = list(drivers.columns)
@@ -87,10 +92,10 @@ def make_lagged_inputs(
 # Per-window fit + jacobian
 @dataclass
 class SensitivityWindow:
-    """FFNN output for one rolling window.
+    """FFNN output for 1 rolling window.
 
-    ``S`` is the ``(N, K)`` window-averaged Jacobian; for ``lags > 1`` it is
-    summed across lag blocks before averaging.
+    ``S`` is the ``(N, K)`` window-averaged Jacobian. For ``lags > 1`` it is
+    summed across the lag blocks before averaging.
     """
 
     rebalance_date: pd.Timestamp
@@ -120,10 +125,11 @@ def _train_one_arch(
     device: str, seed: int,
     mask_tr=None, mask_va=None,
 ):
-    """Train one architecture; return ``(model, val_rmse)``.
+    """Train 1 architecture and return ``(model, val_rmse)``.
 
-    Optional masks exclude per-(sample, asset) cells from the loss and val
-    RMSE, so pre-inception zero-fills don't bias an asset's head.
+    The optional masks exclude (sample, asset) cells from the loss and the
+    validation RMSE, so that zero-filled days before an asset's inception do
+    not bias its head.
     """
     torch = _torch()
     torch.manual_seed(seed)
@@ -174,8 +180,8 @@ def _train_one_arch(
 def _compute_sensitivities(
     model, X_train, n_assets: int, lags: int, K_drivers: int, device: str,
 ) -> np.ndarray:
-    """Average per-asset Jacobian via ``torch.func.jacrev``, summed across
-    lag blocks back to the K-dimensional driver axis.
+    """Return the average per-asset Jacobian from ``torch.func.jacrev``,
+    summed across the lag blocks back to the K-dimensional driver axis.
     """
     torch = _torch()
     # source code available at: https://github.com/pytorch/pytorch
@@ -214,13 +220,14 @@ def fit_sensitivities_window(
     cache_key: str | None = None,
     asset_eligibility: pd.DataFrame | None = None,
 ) -> SensitivityWindow:
-    """Fit one window's multi-head FFNN and extract per-asset sensitivities.
+    """Fit 1 window's multi-head FFNN and extract the per-asset sensitivities.
 
-    Panels arrive z-scored from the discovery pipeline. ``asset_eligibility``
-    (bool, same index/columns as ``assets``) restricts each asset's head to
-    rows with real data; without it the FFNN learns "predict zero" on
-    pre-inception days, biasing the Jacobian for late-inception assets.
-    Returns a :class:`SensitivityWindow`.
+    The panels arrive z-scored from the discovery pipeline.
+    ``asset_eligibility`` (bool, with the same index and columns as
+    ``assets``) restricts each asset's head to rows with real data. Without
+    it the FFNN learns to predict zero on days before an asset's inception,
+    which biases the Jacobian for assets with a late start. Return a
+    :class:`SensitivityWindow`.
     """
     torch = _torch()
     device = device or best_device()
@@ -240,7 +247,7 @@ def fit_sensitivities_window(
     X_tr, Y_tr = X[:split], Y[:split]
     X_va, Y_va = X[split:], Y[split:]
 
-    # Per-(sample, asset) eligibility mask aligned to the lagged-input dates.
+    # Eligibility mask per (sample, asset), aligned to the lagged-input dates.
     mask_tr = mask_va = None
     elig_signature = b""
     if asset_eligibility is not None:
@@ -267,8 +274,8 @@ def fit_sensitivities_window(
 
     cache_path = CACHE_DIR / f"{cache_key}.pt"
     if use_cache and cache_path.exists():
-        # Tolerant read: a torn/corrupt cache file must not crash the
-        # backtest; fall through and recompute.
+        # A torn or corrupt cache file must not crash the backtest, so fall
+        # through and recompute.
         try:
             bundle = torch.load(cache_path, weights_only=False)
             logger.debug("FFNN cache hit: %s", cache_path.name)
@@ -287,7 +294,7 @@ def fit_sensitivities_window(
             logger.warning("FFNN cache read failed (%s: %s) — recomputing",
                            cache_path.name, exc)
 
-    # Architecture search.
+    # Search over architectures.
     best_model = None
     best_arch: dict = {}
     best_val = float("inf")
@@ -308,8 +315,8 @@ def fit_sensitivities_window(
     assert best_model is not None
     S = _compute_sensitivities(best_model, X_tr, N, lags, K, device)
     if use_cache:
-        # Atomic write via temp file + os.replace, so a concurrent reader
-        # never sees a torn file.
+        # Write atomically through a temporary file and os.replace, so that a
+        # concurrent reader never sees a torn file.
         tmp_path = cache_path.with_suffix(f".{os.getpid()}.tmp")
         torch.save(
             {"S": S, "arch": best_arch, "val_rmse": best_val,

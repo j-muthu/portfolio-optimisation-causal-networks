@@ -3,7 +3,7 @@
 Edge direction enters through the total-effect matrix ``B = (I - Mᵀ)⁻¹`` of
 the structural model ``(I - Mᵀ) x = ε``. Every allocator takes
 ``(AssetGraphWindow, returns_window)`` and returns a name-indexed long-only
-weight Series summing to 1. All deterministic and seed-free.
+weight Series that sums to 1. All of them are deterministic and use no seed.
 """
 
 from __future__ import annotations
@@ -37,11 +37,12 @@ def total_effect_matrix(
     k_trunc: int = 10,
     spectral_target: float = 0.95,
 ) -> np.ndarray:
-    """Total-effect matrix ``B = (I - Mᵀ)⁻¹``; ``B[i, j]`` is the effect of a
-    unit shock at ``j`` on ``i`` over all directed paths.
+    """Return the total-effect matrix ``B = (I - Mᵀ)⁻¹``. ``B[i, j]`` is the
+    effect of a unit shock at ``j`` on ``i`` over all directed paths.
 
-    Exact solve for DAGs. Non-DAG inputs (GRANGER) get a truncated Neumann
-    series, rescaling M to spectral radius ``spectral_target`` if ρ(M) ≥ 1.
+    I solve exactly for DAGs. Inputs that are not DAGs (GRANGER) get a
+    truncated Neumann series, and I rescale M to the spectral radius
+    ``spectral_target`` if the spectral radius of M is 1 or more.
     """
     N = M.shape[0]
     if is_dag:
@@ -66,12 +67,14 @@ def structural_covariance_v2(
     ridge: float = 1e-6,
     k_trunc: int = 10,
 ) -> pd.DataFrame:
-    """SEM-implied covariance in return units: ``Σ = D_σ (B Σ_ε Bᵀ) D_σ``.
+    """Return the SEM-implied covariance in return units,
+    ``Σ = D_σ (B Σ_ε Bᵀ) D_σ``.
 
-    Σ_ε is diagonal, from the fit window's structural residuals (a dense Σ_ε
-    would smuggle sample correlation back in). D_σ de-standardises from the
-    z-scored discovery units; skipping it would equalise asset vols. The
-    result is nearest-PSD projected and ridge-loaded to avoid singularity.
+    Σ_ε is diagonal and comes from the fit window's structural residuals. A
+    dense Σ_ε would bring sample correlation back in. D_σ undoes the z-scoring
+    of the discovery units, because skipping it would give every asset the
+    same volatility. I project the result to the nearest PSD matrix and add a
+    ridge so that it is not singular.
     """
     N = graph.n_assets
     if graph.resid_var_z is not None:
@@ -110,14 +113,15 @@ def erc_weights(
     max_iter: int = 10_000,
     rc_tol: float = 1e-8,
 ) -> np.ndarray:
-    """Long-only ERC via cyclical coordinate descent on the log-barrier form
-    ``½ wᵀΣw − λ Σᵢ ln wᵢ`` (Spinu 2013). Deterministic: fixed init and sweep order.
+    """Return long-only ERC weights by cyclical coordinate descent on the
+    log-barrier form ``½ wᵀΣw − λ Σᵢ ln wᵢ`` (Spinu 2013). The result is
+    deterministic because the initial point and the sweep order are fixed.
     """
     cov = np.asarray(cov, dtype=float)
     N = cov.shape[0]
     if np.any(np.diag(cov) <= 0):
         raise ValueError("ERC needs a strictly positive covariance diagonal")
-    lam = float(np.trace(cov)) / (N * N)  # scale-matched barrier weight
+    lam = float(np.trace(cov)) / (N * N)  # barrier weight matched to the scale of cov
     w = np.full(N, 1.0 / N)
     for _ in range(max_iter):
         w_prev = w.copy()
@@ -140,7 +144,8 @@ def erc_weights(
 
 # Shared helpers
 def _sample_cov(graph: AssetGraphWindow, returns_window: pd.DataFrame) -> pd.DataFrame:
-    """Sample covariance on the graph's asset set (the exact V0' recipe)."""
+    """Return the sample covariance on the graph's asset set (the same recipe
+    as V0')."""
     return sample_covariance(returns_window[list(graph.asset_names)].dropna())
 
 
@@ -151,15 +156,15 @@ def _hrp_from_distance(
     linkage_method: str,
     psd_project_distance: bool = False,
 ) -> pd.Series:
-    """HRP on the given clustering distance.
+    """Run HRP on the given clustering distance.
 
-    ``psd_project_distance=True`` reproduces the legacy Phase I behaviour of
-    nearest-PSD projecting the distance before linkage. That projection is a
-    bug for clustering: a Euclidean distance matrix has exactly one positive
-    eigenvalue, so clipping the rest returns a rank-one matrix and the
-    single-linkage dendrogram degenerates to a chain ordered by its top
-    eigenvector. Off by default; kept only to replay the committed Phase I
-    result.
+    ``psd_project_distance=True`` reproduces the Phase I behaviour of
+    projecting the distance to the nearest PSD matrix before linkage. That
+    projection is a bug for clustering. A Euclidean distance matrix has
+    exactly 1 positive eigenvalue, so clipping the rest gives a rank-1 matrix
+    and the single-linkage dendrogram becomes a chain ordered by its top
+    eigenvector. I leave it off by default and keep it only to replay the
+    committed Phase I result.
     """
     if psd_project_distance:
         dist_arr = nearest_psd(dist_arr)
@@ -173,9 +178,9 @@ def corr_hrp_weights(
     returns_window: pd.DataFrame,
     linkage_method: str = "single",
 ) -> pd.Series:
-    """CORR: plain correlation-distance HRP (López de Prado 2016), the
-    graph-blind control. Everything downstream of the distance is identical
-    to the D-variants; ``graph`` supplies only the asset universe.
+    """CORR: plain correlation-distance HRP (López de Prado 2016). This is the
+    baseline that uses no graph. Everything after the distance is identical
+    to the D-variants, and ``graph`` supplies only the asset universe.
     """
     rets = returns_window[list(graph.asset_names)].dropna()
     corr = rets.corr().to_numpy()
@@ -189,7 +194,8 @@ def d0_weights(
     returns_window: pd.DataFrame,
     linkage_method: str = "single",
 ) -> pd.Series:
-    """D0: embedding distance + sample cov. Identical math to V0'."""
+    """D0: embedding distance and sample covariance. The maths is identical
+    to V0'."""
     return _hrp_from_distance(
         causal_embedding_distance(graph.M), graph,
         _sample_cov(graph, returns_window), linkage_method,
@@ -201,7 +207,8 @@ def d0s_weights(
     returns_window: pd.DataFrame,
     linkage_method: str = "single",
 ) -> pd.Series:
-    """D0s: ``(|M|+|Mᵀ|)/2`` distance + sample cov (2nd symmetrisation)."""
+    """D0s: ``(|M|+|Mᵀ|)/2`` distance and sample covariance (the second
+    symmetrisation)."""
     return _hrp_from_distance(
         symmetrise_distance(graph.M), graph,
         _sample_cov(graph, returns_window), linkage_method,
@@ -213,8 +220,9 @@ def d0lw_weights(
     returns_window: pd.DataFrame,
     linkage_method: str = "single",
 ) -> pd.Series:
-    """D0lw: D0's clustering with a Ledoit-Wolf covariance. Direction-free
-    shrinkage control (PREDICTIONS_COVARIANCE_CONTROLS.md)."""
+    """D0lw: D0's clustering with a Ledoit-Wolf covariance. This is the
+    shrinkage control that uses no edge directions
+    (PREDICTIONS_COVARIANCE_CONTROLS.md)."""
     rets = returns_window[list(graph.asset_names)].dropna()
     return _hrp_from_distance(
         causal_embedding_distance(graph.M), graph,
@@ -227,8 +235,8 @@ def d0df_weights(
     returns_window: pd.DataFrame,
     linkage_method: str = "single",
 ) -> pd.Series:
-    """D0df: D0's clustering with a single-factor residual covariance.
-    Direction-free de-factoring control."""
+    """D0df: D0's clustering with a single-factor residual covariance. This
+    is the de-factoring control that uses no edge directions."""
     rets = returns_window[list(graph.asset_names)].dropna()
     return _hrp_from_distance(
         causal_embedding_distance(graph.M), graph,
@@ -243,8 +251,8 @@ def _herc_from_distance(
     linkage_method: str,
     psd_project_distance: bool = False,
 ) -> pd.Series:
-    """HERC on the given clustering distance (same flag semantics as
-    :func:`_hrp_from_distance`)."""
+    """Run HERC on the given clustering distance. The flag means the same as
+    in :func:`_hrp_from_distance`."""
     if psd_project_distance:
         dist_arr = nearest_psd(dist_arr)
     D = pd.DataFrame(dist_arr, index=graph.asset_names, columns=graph.asset_names)
@@ -256,8 +264,8 @@ def hercc_weights(
     returns_window: pd.DataFrame,
     linkage_method: str = "single",
 ) -> pd.Series:
-    """HERCC: correlation-distance HERC, the graph-blind HERC control
-    (PREDICTIONS_HERC.md)."""
+    """HERCC: correlation-distance HERC. This is the HERC baseline that uses
+    no graph (PREDICTIONS_HERC.md)."""
     rets = returns_window[list(graph.asset_names)].dropna()
     corr = rets.corr().to_numpy()
     return _herc_from_distance(
@@ -270,8 +278,8 @@ def herc0_weights(
     returns_window: pd.DataFrame,
     linkage_method: str = "single",
 ) -> pd.Series:
-    """HERC0: embedding-distance HERC + sample cov (D0's distance, HERC's
-    tree-reading rule)."""
+    """HERC0: embedding-distance HERC with sample covariance (D0's distance
+    and HERC's tree-reading rule)."""
     return _herc_from_distance(
         causal_embedding_distance(graph.M), graph,
         _sample_cov(graph, returns_window), linkage_method,
@@ -283,7 +291,7 @@ def herc1_weights(
     returns_window: pd.DataFrame,
     linkage_method: str = "single",
 ) -> pd.Series:
-    """HERC1: embedding-distance HERC on Σ_struct (D1's covariance, HERC's
+    """HERC1: embedding-distance HERC on Σ_struct (D1's covariance and HERC's
     tree-reading rule)."""
     return _herc_from_distance(
         causal_embedding_distance(graph.M), graph,
@@ -296,11 +304,12 @@ def d0pc_weights(
     returns_window: pd.DataFrame,
     linkage_method: str = "single",
 ) -> pd.Series:
-    """D0pc: graph-free skeleton control (PREDICTIONS_SKELETON_CONTROL.md).
+    """D0pc: the skeleton control that uses no graph
+    (PREDICTIONS_SKELETON_CONTROL.md).
 
-    D0 with the discovered skeleton replaced by a thresholded
-    partial-correlation matrix, density-matched to the paired graph's
-    nonzero-cell count. No causal discovery anywhere."""
+    This is D0 with the discovered skeleton replaced by a thresholded
+    partial-correlation matrix. I match its density to the number of nonzero
+    cells in the paired graph. No causal discovery is used anywhere."""
     rets = returns_window[list(graph.asset_names)].dropna()
     theta = np.linalg.inv(ledoit_wolf_covariance(rets).to_numpy())
     d = np.sqrt(np.diag(theta))
@@ -322,7 +331,7 @@ def ew_weights(
     returns_window: pd.DataFrame,
     linkage_method: str = "single",
 ) -> pd.Series:
-    """EW: 1/N over the graph's asset set (naive anchor; graph and window unused)."""
+    """EW: 1/N over the graph's asset set. The graph and the window are unused."""
     names = list(graph.asset_names)
     return pd.Series(1.0 / len(names), index=names)
 
@@ -332,7 +341,8 @@ def ivp_weights(
     returns_window: pd.DataFrame,
     linkage_method: str = "single",
 ) -> pd.Series:
-    """IVP: inverse-variance weights on the window's sample variances (graph unused)."""
+    """IVP: inverse-variance weights on the window's sample variances. The
+    graph is unused."""
     rets = returns_window[list(graph.asset_names)].dropna()
     iv = 1.0 / rets.var().to_numpy(dtype=float)
     return pd.Series(iv / iv.sum(), index=list(graph.asset_names))
@@ -343,8 +353,8 @@ def d1_weights(
     returns_window: pd.DataFrame,
     linkage_method: str = "single",
 ) -> pd.Series:
-    """D1: D0's distance but allocation on Σ_struct, so direction enters
-    recursive bisection through ``B``."""
+    """D1: D0's distance with allocation on Σ_struct, so that edge direction
+    enters recursive bisection through ``B``."""
     return _hrp_from_distance(
         causal_embedding_distance(graph.M), graph,
         structural_covariance_v2(graph), linkage_method,
@@ -354,9 +364,10 @@ def d1_weights(
 def d3_srp_weights(
     graph: AssetGraphWindow,
     returns_window: pd.DataFrame,
-    linkage_method: str = "single",  # unused; kept for the dispatch contract
+    linkage_method: str = "single",  # unused, kept so that dispatch has 1 signature
 ) -> pd.Series:
-    """D3: structural-shock risk parity, long-only ERC on Σ_struct (no hierarchy)."""
+    """D3: structural-shock risk parity, i.e. long-only ERC on Σ_struct with
+    no hierarchy."""
     cov = structural_covariance_v2(graph)
     w = erc_weights(cov.to_numpy())
     return pd.Series(w, index=graph.asset_names, name="weight")
@@ -367,8 +378,9 @@ def d4_coancestry_weights(
     returns_window: pd.DataFrame,
     linkage_method: str = "single",
 ) -> pd.Series:
-    """D4: co-ancestry clustering. Similarity ``S = B̃ B̃ᵀ`` on row-normalised
-    ``B``, distance ``√(2(1−S))``, then standard HRP on sample cov."""
+    """D4: co-ancestry clustering. I take the similarity ``S = B̃ B̃ᵀ`` on the
+    row-normalised ``B``, the distance ``√(2(1−S))`` and then standard HRP on
+    the sample covariance."""
     B = total_effect_matrix(graph.M, is_dag=graph.is_dag)
     norms = np.linalg.norm(B, axis=1, keepdims=True)
     B_t = B / np.maximum(norms, 1e-12)
@@ -392,9 +404,10 @@ def dispatch_allocator(
     returns_window: pd.DataFrame,
     linkage_method: str = "single",
 ) -> pd.Series:
-    """Route an allocator tag to its weight function (same contract for all)."""
+    """Call the weight function for an allocator tag. All of them have the
+    same signature."""
     if name in ("D2", "D2s"):
-        # Lazy import: topological.py imports from this module.
+        # Import lazily because topological.py imports from this module.
         from pipeline.portfolio.topological import d2_weights
 
         return d2_weights(

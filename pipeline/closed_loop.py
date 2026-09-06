@@ -1,8 +1,8 @@
-"""V2 closed-loop driver: interleaves Stage 1, backtest and feedback per
-rebalance, so the utility update at t actually feeds the selector at t+1
-(the batch stage1/stage2 path cannot do this).
+"""V2 closed-loop driver. It interleaves Stage 1, the backtest and the
+feedback at each rebalance, so that the utility update at t actually feeds
+the selector at t+1. The batch stage1 and stage2 path cannot do this.
 
-Entry point: :func:`run_closed_loop`.
+The entry point is :func:`run_closed_loop`.
 """
 
 from __future__ import annotations
@@ -52,7 +52,7 @@ class ClosedLoopResult:
     config: dict = field(default_factory=dict)
 
     def summary(self) -> pd.DataFrame:
-        """One row per rebalance with the key V2 diagnostics."""
+        """Return 1 row per rebalance with the key V2 diagnostics."""
         rows = []
         for rec, attr in zip(self.backtest.rebalances, self.credit_history):
             rows.append(
@@ -101,12 +101,12 @@ def run_closed_loop(
     output_dir: Path | None = None,
     discovery_cache: bool = False,
 ) -> ClosedLoopResult:
-    """Run V2 closed-loop end-to-end with genuine per-rebalance feedback.
+    """Run the V2 closed loop end to end with real feedback at each rebalance.
 
-    ``holding_days`` must match ``MIN_LOOKAHEAD_GAP_DAYS`` semantics in
+    ``holding_days`` must agree with ``MIN_LOOKAHEAD_GAP_DAYS`` in
     ``UtilityStore.lookup_utility``. ``utility_lookup`` overrides the default
-    ``utility_store.as_lookup()``; tests can inject a leaky lookup to verify
-    the lookahead guard matters. Returns a :class:`ClosedLoopResult`.
+    ``utility_store.as_lookup()``. Tests can pass in a leaky lookup to check
+    that the lookahead guard matters. Return a :class:`ClosedLoopResult`.
     """
     discovery_kwargs = dict(discovery_kwargs or {})
     selector_kwargs = dict(selector_kwargs or {})
@@ -130,7 +130,7 @@ def run_closed_loop(
     stage1_cache: dict[pd.Timestamp, Stage1Rebalance] = {}
     credit_history: list[CreditAttribution] = []
 
-    # Strategy: just-in-time Stage 1 at this t, then HSP allocation
+    # The strategy runs Stage 1 at this t and then allocates with HSP.
     def strategy(t: pd.Timestamp, asset_names: list[str]) -> pd.Series:
         # Slice the Stage 1 lookback window ending at t (exclusive).
         end_pos = joint_frame.index.searchsorted(t, side="right")
@@ -144,8 +144,8 @@ def run_closed_loop(
             return equal_weight(asset_names)
         joint_window = joint_frame.iloc[start_pos:end_pos]
 
-        # Slice any eligibility mask to this window so the FFNN keeps
-        # pre-inception zero-fills out of its per-asset loss.
+        # Slice any eligibility mask to this window so that the FFNN keeps
+        # zero-filled days before inception out of its per-asset loss.
         if asset_eligibility is not None:
             window_dates = joint_window.index
             eligibility_window = asset_eligibility.reindex(window_dates).reindex(
@@ -177,8 +177,8 @@ def run_closed_loop(
         )
         stage1_cache[pd.Timestamp(t)] = s1
 
-        # V0' asset-only Causal-HRP: cluster on the asset-asset causal block
-        # (no drivers, no sensitivities).
+        # V0' asset-only Causal-HRP clusters on the asset-to-asset causal
+        # block, with no drivers and no sensitivities.
         if selection_method == "asset_only":
             disc_cols = list(s1.discovery.asset_columns)
             common = [a for a in asset_names if a in disc_cols]
@@ -188,15 +188,15 @@ def run_closed_loop(
             start_pos_ret = max(0, end_pos_ret - lookback_days)
             ret_window = asset_returns.iloc[start_pos_ret:end_pos_ret][common]
             if allocator is None:
-                # V0' path, byte-identical to Phase I.
+                # The V0' path, which is byte-identical to Phase I.
                 pos = [disc_cols.index(a) for a in common]
                 W_aa = s1.discovery.asset_to_asset_block(0)[np.ix_(pos, pos)]
                 w = v0prime_asset_only_causal_hrp(
                     W_aa, common, ret_window, linkage_method=linkage_method
                 )
             else:
-                # Phase-II D-variant path: same graph, direction-aware
-                # allocation.
+                # The Phase II D-variant path uses the same graph with a
+                # direction-aware allocation.
                 graph = asset_graph_from_discovery(
                     s1.discovery, joint_window,
                     method=discovery_method or "dynotears",
@@ -209,7 +209,7 @@ def run_closed_loop(
             total = padded.sum()
             return padded / total if total > 1e-12 else equal_weight(asset_names)
 
-        # Build the V2 portfolio; empty selection falls back to equal-weight.
+        # Build the V2 portfolio. An empty selection falls back to equal weight.
         S = s1.sensitivities.S
         sens_assets = list(s1.sensitivities.asset_names)
         common = [a for a in asset_names if a in sens_assets]
@@ -226,14 +226,14 @@ def run_closed_loop(
         w = v2_causal_hsp_closed_loop(
             S_sub, common, ret_window, linkage_method=linkage_method
         )
-        # Pad to full universe (zero on assets with no signal).
+        # Pad to the full universe, with zero on assets that have no signal.
         padded = w.reindex(asset_names).fillna(0.0)
         total = padded.sum()
         if total < 1e-12:
             return equal_weight(asset_names)
         return padded / total
 
-    # Hook: credit attribution + EMA update + store.append
+    # The hook does credit attribution, the EMA update and store.append.
     def on_rebalance_complete(rec) -> None:
         t = pd.Timestamp(rec.rebalance_date)
         s1 = stage1_cache.get(t)
@@ -249,8 +249,8 @@ def run_closed_loop(
             rec.weights, sens_df, rec.holding_reward,
             rec.rebalance_date, rec.holding_end,
         )
-        # Non-strict read is fine here; the strict lookahead guard applies
-        # where the selector reads U, not on this bookkeeping path.
+        # A non-strict read is fine here. The strict lookahead guard applies
+        # where the selector reads U rather than on this bookkeeping path.
         if utility_store.frame.empty:
             prior = pd.Series(dtype=float, name="utility")
         else:
@@ -273,10 +273,10 @@ def run_closed_loop(
         on_rebalance_complete=on_rebalance_complete,
     )
 
-    # Persist the store (only writes if a parquet_path is set).
+    # Save the store. This only writes if a parquet_path is set.
     try:
         utility_store.save()
-    except Exception as exc:  # pragma: no cover - best-effort persistence
+    except Exception as exc:  # pragma: no cover - a failed save must not fail the run
         logger.warning("Could not persist UtilityStore to %s: %s",
                        utility_store.parquet_path, exc)
 
@@ -299,7 +299,7 @@ def run_closed_loop(
         "correlation_kwargs": correlation_kwargs,
         "n_rebalances": len(rebalance_dates),
     }
-    # Cheap pickle for downstream analysis.
+    # Pickle the result for downstream analysis.
     try:
         with (output_dir / "closed_loop.pkl").open("wb") as fh:
             pickle.dump(
@@ -310,7 +310,7 @@ def run_closed_loop(
                     "utility_frame": utility_store.frame,
                 }, fh,
             )
-    except Exception as exc:  # pragma: no cover - best-effort persistence
+    except Exception as exc:  # pragma: no cover - a failed save must not fail the run
         logger.warning("Could not persist closed_loop.pkl: %s", exc)
 
     return ClosedLoopResult(

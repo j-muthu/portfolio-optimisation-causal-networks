@@ -1,8 +1,8 @@
-"""Data layer: universe membership, prices (WRDS/CRSP with yfinance fallback),
-drivers, and calendar alignment.
+"""Data layer: universe membership, prices (WRDS/CRSP with a yfinance
+fallback), drivers and calendar alignment.
 
-Re-exports the legacy ``Dataset`` / ``build_dataset`` API so old scripts keep
-working.
+I re-export the legacy ``Dataset`` and ``build_dataset`` API so that old
+scripts keep working.
 """
 
 from __future__ import annotations

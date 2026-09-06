@@ -1,8 +1,8 @@
-"""Final-report figure set (frozen-EEM), regenerated from committed artefacts.
+"""Final-report figure set (frozen EEM), regenerated from committed files.
 
-Saved to results/figures/; the submitted interim_report/figures/ are left
-untouched. Figures 8-9 need results/robust_stats.csv, so run
-scripts.robust_stats first.
+The figures are saved to results/figures/, and the submitted
+interim_report/figures/ are left untouched. Figures 8 and 9 need
+results/robust_stats.csv, so run scripts.robust_stats first.
 
 Run:  python -m scripts.plot_thesis_figures
 """
@@ -38,7 +38,7 @@ LABEL = {
     "V1-DYNOTEARS": "causal-hsp  (DYNOTEARS)",
     "V1-VARLiNGAM": "causal-hsp  (VARLiNGAM)",
 }
-# bundle tag per (variant, window)
+# The bundle tag per (variant, window)
 TAG = {
     "V0": "phase_i_v0_w{w}", "V0prime": "phase_i_v0prime_w{w}",
     "V1-DYNOTEARS": "phase_i_v1_w{w}", "V1-VARLiNGAM": "phase_i_v1_varlingam_w{w}",
@@ -60,7 +60,7 @@ def _csv(name: str) -> pd.DataFrame | None:
     return pd.read_csv(p) if p.exists() else None
 
 
-# 1. NAV curves
+# Figure 1: NAV curves
 def fig_nav_curves():
     fig, axes = plt.subplots(1, 2, figsize=(12, 5.2), sharey=True)
     for ax, w in zip(axes, (252, 504)):
@@ -80,7 +80,7 @@ def fig_nav_curves():
     _save(fig, "nav_curves.png")
 
 
-# 2. Sharpe matrix
+# Figure 2: Sharpe matrix
 def fig_sharpe_matrix():
     windows = [252, 504]
     sharpe = {v: {w: (annualised_sharpe(_nav(v, w).pct_change().dropna())
@@ -107,7 +107,7 @@ def fig_sharpe_matrix():
     _save(fig, "sharpe_matrix.png")
 
 
-# 3. K-sensitivity (J4a)
+# Figure 3: K sensitivity (J4a)
 def fig_k_sensitivity():
     df = _csv("j4a_k_sensitivity.csv")
     if df is None:
@@ -132,7 +132,7 @@ def fig_k_sensitivity():
     _save(fig, "k_sensitivity.png")
 
 
-# 4. Feedback grid (J4b)
+# Figure 4: feedback grid (J4b)
 def fig_feedback_grid():
     df = _csv("j4b_alpha_gamma.csv")
     if df is None:
@@ -155,7 +155,7 @@ def fig_feedback_grid():
     _save(fig, "feedback_grid.png")
 
 
-# 5. Regime-conditional excess over V0 (w252)
+# Figure 5: excess over V0 by regime (w252)
 def fig_regime_excess():
     df = _csv("regime_analysis/daily_metrics.csv")
     if df is None:
@@ -183,13 +183,13 @@ def fig_regime_excess():
     _save(fig, "regime_excess.png")
 
 
-# 6. Directional prior (J1)
-# Regime label per sampled window (matches SAMPLE_DATES in verify_directional_prior).
+# Figure 6: directional prior (J1)
+# The regime label per sampled window. This matches SAMPLE_DATES in verify_directional_prior.
 PRIOR_REGIME = {
     "2008-10": "GFC", "2011-09": "Euro crisis", "2014-06": "Calm bull",
     "2018-12": "2018Q4 selloff", "2020-03": "COVID crash", "2022-06": "Rate hikes",
 }
-# One-hue ordinal ramp for the top-K cut-offs (light -> dark as K grows).
+# A single-hue ramp for the top-K cut-offs, from light to dark as K grows.
 PRIOR_K_SERIES = [
     (10, "jaccard_k10", "#E8904A"), (15, "jaccard_k15", "#C25400"),
     (20, "jaccard_k20", "#6E3000"),
@@ -209,8 +209,8 @@ def fig_directional_prior():
     ax.set_ylabel("Implausible asset→driver mass (%)")
     ax.set_xlabel("Regime")
     ax.set_xticks(x); ax.set_xticklabels(labels, fontsize=8)
-    # Left/right tick positions coincide (0..50 step 10 <-> 0..1 step 0.2),
-    # so one set of gridlines serves both axes.
+    # The left and right tick positions coincide (0 to 50 in steps of 10
+    # against 0 to 1 in steps of 0.2), so 1 set of gridlines serves both axes.
     ax.set_ylim(0, 55); ax.set_yticks(np.arange(0, 51, 10))
     ax.grid(True, axis="y", alpha=0.5, zorder=0); ax.set_axisbelow(True)
     ax2 = ax.twinx()
@@ -221,7 +221,7 @@ def fig_directional_prior():
                  label=f"top-{k} IoU")
     ax2.set_ylabel("Top-K driver intersection over union")
     ax2.set_ylim(0, 1.1); ax2.set_yticks(np.arange(0, 1.01, 0.2))
-    # Two legend rows below the plot: the bar series, then the K series in order.
+    # Put 2 legend rows below the plot: the bar series, then the K series in order.
     fig.legend(*ax.get_legend_handles_labels(), frameon=False, fontsize=8,
                loc="lower center", ncol=1, bbox_to_anchor=(0.5, 0.045))
     h2, l2 = ax2.get_legend_handles_labels()
@@ -232,7 +232,7 @@ def fig_directional_prior():
     _save(fig, "directional_prior.png")
 
 
-# 7. NTS-NOTEARS probe (J5)
+# Figure 7: NTS-NOTEARS probe (J5)
 def fig_nts_probe():
     df = _csv("j5_nts_probe.csv")
     if df is None:
@@ -262,7 +262,7 @@ def fig_nts_probe():
     _save(fig, "nts_probe.png")
 
 
-# 8. Returns distribution (fat tails motivate PSR/DSR)
+# Figure 8: returns distribution (the fat tails motivate PSR and DSR)
 def fig_returns_distribution():
     from scipy import stats
     pooled = []
@@ -279,7 +279,7 @@ def fig_returns_distribution():
     xs = np.linspace(r.min(), r.max(), 500)
     ax.plot(xs, stats.norm.pdf(xs, r.mean(), r.std(ddof=0)), color="#D55E00",
             lw=1.8, label="fitted normal")
-    ax.set_yscale("log")  # log-y exposes the tails
+    ax.set_yscale("log")  # a log y-axis shows the tails
     ax.set_xlabel("daily net return")
     ax.set_ylabel("density (log)")
     ax.legend(frameon=False, loc="upper right")
@@ -288,7 +288,7 @@ def fig_returns_distribution():
     _save(fig, "returns_distribution.png")
 
 
-# 9. DSR / MCS adjudication
+# Figure 9: DSR and MCS results
 def fig_dsr_mcs():
     df = _csv("robust_stats.csv")
     if df is None:
@@ -337,7 +337,7 @@ def main():
                fig_returns_distribution, fig_dsr_mcs):
         try:
             fn()
-        except Exception as exc:  # one figure failing must not kill the rest
+        except Exception as exc:  # 1 figure failing must not stop the rest
             print(f"  [skip] {fn.__name__}: {exc}")
     print("Done.")
 

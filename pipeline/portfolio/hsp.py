@@ -1,7 +1,8 @@
-"""Hierarchical Sensitivity Parity (Rodriguez-Dominguez 2023): HRP with the
-distance matrix replaced by Euclidean distance in sensitivity space.
+"""Hierarchical Sensitivity Parity (Rodriguez-Dominguez 2023). This is HRP
+with the correlation distance replaced by Euclidean distance in sensitivity
+space.
 
-V0 / V1 / V2 differ only in how the input ``S`` was selected upstream.
+V0, V1 and V2 differ only in how the input ``S`` was selected upstream.
 """
 
 from __future__ import annotations
@@ -20,12 +21,12 @@ logger = logging.getLogger(__name__)
 
 # Covariance helpers
 def sample_covariance(returns: pd.DataFrame) -> pd.DataFrame:
-    """Plain sample covariance of asset returns over the supplied window."""
+    """Return the sample covariance of asset returns over the supplied window."""
     return returns.cov()
 
 
 def ledoit_wolf_covariance(returns: pd.DataFrame) -> pd.DataFrame:
-    """Ledoit-Wolf shrunk covariance (recommended at N ≈ T)."""
+    """Return the Ledoit-Wolf shrunk covariance (useful when N is close to T)."""
     from sklearn.covariance import LedoitWolf
 
     lw = LedoitWolf().fit(returns.dropna().to_numpy())
@@ -33,9 +34,10 @@ def ledoit_wolf_covariance(returns: pd.DataFrame) -> pd.DataFrame:
 
 
 def defactored_covariance(returns: pd.DataFrame) -> pd.DataFrame:
-    """Single-factor residual covariance: regress each asset on the equal-weight
-    cross-sectional mean and return the residual covariance (same ddof as
-    ``DataFrame.cov``). The direction-free de-factoring control.
+    """Return the single-factor residual covariance. I regress each asset on
+    the equal-weight cross-sectional mean and take the covariance of the
+    residuals (same ddof as ``DataFrame.cov``). This is the de-factoring
+    control that uses no edge directions.
     """
     rets = returns.dropna()
     X = rets.to_numpy(dtype=float)
@@ -56,12 +58,13 @@ def hsp_weights_from_S(
     use_ledoit_wolf: bool = False,
     psd_project_distance: bool = False,
 ) -> pd.Series:
-    """HSP weights from an ``(N, K)`` sensitivity matrix + a return window.
+    """Return HSP weights from an ``(N, K)`` sensitivity matrix and a return
+    window.
 
-    Rows of ``S`` must align with ``asset_names``. ``psd_project_distance``
-    projects the distance to nearest-PSD before clustering. Leave it off:
-    a Euclidean distance matrix has one positive eigenvalue, so the
-    projection collapses it to rank one (see ``directed._hrp_from_distance``).
+    The rows of ``S`` must align with ``asset_names``. ``psd_project_distance``
+    projects the distance to the nearest PSD matrix before clustering. Leave
+    it off, because a Euclidean distance matrix has 1 positive eigenvalue and
+    the projection collapses it to rank 1 (see ``directed._hrp_from_distance``).
     """
     if S.shape[0] != len(asset_names):
         raise ValueError(
@@ -75,7 +78,7 @@ def hsp_weights_from_S(
         )
     cov_fn = ledoit_wolf_covariance if use_ledoit_wolf else sample_covariance
     cov = cov_fn(returns)
-    # Align cov to D's index ordering (defensive).
+    # Align cov to the index ordering of D as a precaution.
     cov = cov.loc[D.index, D.columns]
     return hrp_weights(D, cov, linkage_method=linkage_method)
 
@@ -85,7 +88,8 @@ def hsp_weights_from_window(
     returns_window: pd.DataFrame,
     **kwargs,
 ) -> pd.Series:
-    """Convenience wrapper that pulls ``S`` / ``asset_names`` from a SensitivityWindow."""
+    """Convenience wrapper that takes ``S`` and ``asset_names`` from a
+    SensitivityWindow."""
     return hsp_weights_from_S(
         S=window.S,
         asset_names=window.asset_names,

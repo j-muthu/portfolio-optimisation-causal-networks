@@ -1,10 +1,10 @@
-"""Stage B: conditional greedy refinement on the Stage-A pool.
+"""Stage B: conditional greedy refinement on the Stage A pool.
 
-Repeatedly add the candidate whose lagged ridge regression of asset returns
-on the selected set gives the largest held-out gain, until K is reached or
-the marginal gain falls below epsilon. Validation is a chronological 20%
-tail; the score is negative half MSE (equivalent to Gaussian log-likelihood
-up to constants that cancel in the gain).
+I repeatedly add the candidate whose lagged ridge regression of asset
+returns on the selected set gives the largest held-out gain, until K is
+reached or the marginal gain falls below epsilon. The validation set is the
+chronological 20% tail. The score is the negative half MSE, which equals the
+Gaussian log-likelihood up to constants that cancel in the gain.
 """
 
 from __future__ import annotations
@@ -26,14 +26,15 @@ def _make_lagged_design(
     selected: Sequence[str],
     lags: int,
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
-    """Build train/val (X, Y) matrices: lagged-driver predictors -> asset returns.
+    """Build the train and validation (X, Y) matrices, with lagged drivers as
+    predictors and asset returns as targets.
 
-    Validation is the chronological 20% tail of the post-lag sample; X stacks
-    the lagged copies of the selected drivers.
+    The validation set is the chronological 20% tail of the sample after
+    lagging. X stacks the lagged copies of the selected drivers.
     """
     selected = list(selected)
     if not selected:
-        # Intercept-only baseline: a single column of ones fits just the mean.
+        # The intercept-only baseline is a single column of ones, which fits just the mean.
         n = len(target_window) - lags
         X = np.ones((n, 1))
         Y = target_window.iloc[lags:].to_numpy(dtype=float)
@@ -57,7 +58,7 @@ def _ridge_val_score(
     X_va: np.ndarray, Y_va: np.ndarray,
     alpha: float = 1.0,
 ) -> float:
-    """Aggregate held-out negative-half MSE across all asset targets.
+    """Return the held-out negative half MSE summed across all asset targets.
     Larger is better."""
     from sklearn.linear_model import Ridge
 
@@ -71,7 +72,7 @@ def _ridge_val_score(
 # Stage B
 @dataclass
 class StageBStep:
-    """One iteration of the greedy expansion."""
+    """Record of 1 iteration of the greedy expansion."""
 
     step: int
     candidate_added: str | None
@@ -107,19 +108,20 @@ def greedy_select(
     epsilon: float | None = None,
     alpha: float = 1.0,
 ) -> StageBResult:
-    """Stage B greedy expansion; see the module docstring for the algorithm.
+    """Run the Stage B greedy expansion. See the module docstring for the
+    algorithm.
 
-    ``driver_window`` / ``asset_window`` must already be z-scored and share
-    an index. ``epsilon`` is the minimum marginal gain to accept a candidate
-    (``None`` disables the early stop). Returns a :class:`StageBResult` with
-    the selection in addition order, a gain log, and the stop reason.
+    ``driver_window`` and ``asset_window`` must already be z-scored and share
+    an index. ``epsilon`` is the minimum marginal gain to accept a candidate,
+    and ``None`` disables the early stop. Return a :class:`StageBResult`
+    with the selection in addition order, a gain log and the stop reason.
     """
     pool = [c for c in pool if c in driver_window.columns]
     selected: list[str] = []
     steps: list[StageBStep] = []
     remaining = list(pool)
 
-    # Baseline (intercept-only) NLL for the first step's gain calculation.
+    # The intercept-only baseline score, for the first step's gain calculation.
     X_tr, Y_tr, X_va, Y_va = _make_lagged_design(driver_window, asset_window, [], lags)
     baseline = _ridge_val_score(X_tr, Y_tr, X_va, Y_va, alpha=alpha)
     current = baseline
