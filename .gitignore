@@ -18,9 +18,12 @@ venv/
 # Data cache (downloaded prices / Wikipedia tables — regenerable)
 cache/
 
-# Rodriguez-Dominguez HSP reference dataset — published-paper supplements
-# kept locally for tests/test_hsp_reference.py but not redistributed.
-HSP/
+# Rodriguez-Dominguez HSP reference dataset (published-paper supplements).
+# The two Excel panels are tracked because tests/test_hsp_reference.py needs
+# them; the authors' notebook and scripts are not.
+HSP/*
+!HSP/Assets_SPX.xlsx
+!HSP/Drivers_no_SB_Sectors.xlsx
 
 # Experiment artefacts: pickled results are large; CSVs/PNGs/logs are tracked
 results/**/*.pkl
