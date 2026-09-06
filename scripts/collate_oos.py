@@ -1,8 +1,12 @@
 """Collate the 2025-26 out-of-sample slice (PREDICTIONS_OOS.md).
 
-Emits results/oos_slice.csv (Sharpe per cell, pre-committed contrasts;
-point estimates only, no bootstrap by pre-commitment) and the
-_generated/oos_stats.tex macros for the report's tab:oos.
+I write results/oos_slice.csv (the Sharpe per cell), results/oos_contrasts.csv
+(the contrasts I predicted in advance, with a stationary block bootstrap
+standard error for each) and the _generated/oos_stats.tex macros for the
+report's tab:oos. The standard errors are the same Politis-Romano bootstrap
+as the in-sample contrasts (21-day mean block, 10,000 resamples, seed 42),
+reported as a scale for the point estimates only; PREDICTIONS_OOS.md rules
+out reading any p-value from the slice, so I emit none.
 
 Usage:  python -m scripts.collate_oos
 """
@@ -13,6 +17,7 @@ import pickle
 import pandas as pd
 
 from pipeline._vendored import THESIS_ROOT
+from pipeline.evaluation.bootstrap import sharpe_difference_ci
 from pipeline.evaluation.metrics import annualised_sharpe
 
 RESULTS = THESIS_ROOT / "results"
@@ -20,7 +25,7 @@ WINDOWS = (189, 252, 378, 504)
 ALLOCS = ("CORR", "D0", "D0s", "D1", "D2", "D2s", "D0df")
 
 GEN_DIRS = (THESIS_ROOT / "final_report" / "_generated",)
-# Window suffixes follow the robust_stats macro convention.
+# The window suffixes follow the robust_stats macro convention.
 WINDOW_SUFFIX = {189: "Wone", 252: "Wtwo", 378: "Wthree", 504: "Wfive"}
 MACRO_STEMS = {"skeleton (D0-CORR)": "rsOosSkel",
                "orientation (D1-D0)": "rsOosOrient",
@@ -71,9 +76,16 @@ def main() -> None:
         for name, (a, b) in pairs.items():
             sa, sb = sh(a, w), sh(b, w)
             if sa is not None and sb is not None:
+                ci = sharpe_difference_ci(rets[(a, w)], rets[(b, w)],
+                                          n_resamples=10_000)
+                # Half the 95% percentile interval, in SE units.
+                se = (ci.ci_upper - ci.ci_lower) / (2 * 1.96)
                 contrasts.append({"contrast": name, "window": w,
-                                  "delta_sharpe": round(sa - sb, 4)})
-                macros[f"{MACRO_STEMS[name]}{WINDOW_SUFFIX[w]}"] = f"{sa - sb:+.3f}"
+                                  "delta_sharpe": round(sa - sb, 4),
+                                  "se_bootstrap": round(se, 4)})
+                stem = f"{MACRO_STEMS[name]}{WINDOW_SUFFIX[w]}"
+                macros[stem] = f"{sa - sb:+.3f}"
+                macros[f"{MACRO_STEMS[name]}Se{WINDOW_SUFFIX[w]}"] = f"{se:.3f}"
     cdf = pd.DataFrame(contrasts)
 
     out = RESULTS / "oos_slice.csv"
@@ -91,9 +103,11 @@ def main() -> None:
     print("=== OOS levels (net annualised Sharpe, 2025-01..2026-07) ===")
     print(levels.pivot_table(index="allocator", columns="window",
                              values="sharpe").to_string(float_format=lambda x: f"{x:.3f}"))
-    print("\n=== OOS contrasts (point estimates only, per PREDICTIONS_OOS.md) ===")
+    print("\n=== OOS contrasts (point estimate, bootstrap SE; no p-values per PREDICTIONS_OOS.md) ===")
     print(cdf.pivot_table(index="contrast", columns="window",
                           values="delta_sharpe").to_string(float_format=lambda x: f"{x:+.3f}"))
+    print(cdf.pivot_table(index="contrast", columns="window",
+                          values="se_bootstrap").to_string(float_format=lambda x: f"{x:.3f}"))
     print(f"\nsaved -> {out} and oos_contrasts.csv")
 
 
