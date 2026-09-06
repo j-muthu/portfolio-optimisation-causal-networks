@@ -1,8 +1,8 @@
-"""Integration test: the ablation isolates edge direction.
+"""Integration test that the ablation isolates edge direction.
 
-Controls (D0, D0s, D0lw, D0df) must be transpose-invariant; the
-direction-aware allocators must respond to edge reversal. A
-graph-sensitivity check guards against allocators ignoring the graph.
+The controls (D0, D0s, D0lw and D0df) must be invariant to transposing the
+graph, and the direction-aware allocators must respond to edge reversal. A
+graph-sensitivity check guards against allocators that ignore the graph.
 """
 
 from __future__ import annotations
@@ -19,13 +19,13 @@ NAMES = [f"A{i}" for i in range(N)]
 
 
 def _chainlike_dag(seed=13):
-    """Asymmetric DAG with real depth; the node sequence is seed-permuted,
-    so different seeds give structurally different graphs."""
+    """Build an asymmetric DAG with real depth. The node sequence is permuted
+    by the seed, so different seeds give structurally different graphs."""
     rng = np.random.default_rng(seed)
     seq = rng.permutation(N)
     M = np.zeros((N, N))
     for a in range(N - 1):
-        M[seq[a], seq[a + 1]] = rng.uniform(0.4, 0.9)  # backbone chain
+        M[seq[a], seq[a + 1]] = rng.uniform(0.4, 0.9)  # the backbone chain
     M[seq[0], seq[3]], M[seq[1], seq[5]], M[seq[2], seq[7]] = 0.5, 0.35, 0.45
     return M
 
@@ -80,8 +80,12 @@ def test_treatments_respond_to_edge_reversal(name):
 
 
 def test_d2_responds_to_topological_structure():
-    """D2 skips the reversal test (recursive bisection is mirror-invariant),
-    but a star vs a chain must move its weights."""
+    """D2 is not in the reversal test above because on this N=8 universe
+    reversing every edge exactly reverses the topological order, and recursive
+    bisection splits at len // 2, so with power-of-two cluster sizes the
+    mirrored order yields the same partition tree and identical weights. That
+    invariance is specific to power-of-two sizes (see the odd-N test below).
+    Here a star against a chain must change the weights."""
     rets = _returns()
     chain = _chainlike_dag(seed=13)
     star = np.zeros((N, N))
@@ -91,6 +95,44 @@ def test_d2_responds_to_topological_structure():
     w_chain = dispatch_allocator("D2", _graph(chain), rets)
     w_star = dispatch_allocator("D2", _graph(star), rets)
     assert not np.allclose(w_chain.to_numpy(), w_star.to_numpy(), atol=1e-10)
+
+
+def test_d2_responds_to_edge_reversal_on_odd_universe():
+    """Recursive bisection is mirror-invariant only when every cluster has
+    even size at every level. On an odd-sized universe (as with the 99-asset
+    panel) the halves differ in size, so reversing every edge, which reverses
+    the topological order, must change the D2 weights."""
+    n = 9
+    names = [f"B{i}" for i in range(n)]
+    rng = np.random.default_rng(13)
+    seq = rng.permutation(n)
+    M = np.zeros((n, n))
+    for a in range(n - 1):
+        M[seq[a], seq[a + 1]] = rng.uniform(0.4, 0.9)
+    M[seq[0], seq[3]], M[seq[1], seq[5]], M[seq[2], seq[7]] = 0.5, 0.35, 0.45
+    idx = pd.bdate_range("2019-01-02", periods=260)
+    rets = pd.DataFrame(
+        np.random.default_rng(3).standard_normal((260, n)) * 0.01,
+        index=idx, columns=names,
+    )
+
+    def graph(mat):
+        return AssetGraphWindow(
+            end_date=pd.Timestamp("2020-06-30"),
+            asset_names=names,
+            M=np.asarray(mat, dtype=float),
+            zscore_std=np.linspace(0.8, 1.4, n),
+            resid_var_z=np.linspace(0.5, 1.5, n),
+            method="dynotears",
+            tau=0.0,
+            is_dag=True,
+        )
+
+    w_fwd = dispatch_allocator("D2", graph(M), rets)
+    w_rev = dispatch_allocator("D2", graph(M.T), rets)
+    assert not np.allclose(w_fwd.to_numpy(), w_rev.to_numpy(), atol=1e-10), (
+        "D2 must respond to edge reversal when the universe size is odd"
+    )
 
 
 @pytest.mark.parametrize("name", ["D0", "D1", "D2", "D3", "D4"])
@@ -103,7 +145,7 @@ def test_graph_sensitivity_leak_canary(name):
 
 
 def _dag_with_edges(n_edges: int, seed: int):
-    """Random DAG on N nodes with exactly n_edges directed edges."""
+    """Build a random DAG on N nodes with exactly n_edges directed edges."""
     rng = np.random.default_rng(seed)
     seq = rng.permutation(N)
     pairs = [(seq[a], seq[b]) for a in range(N) for b in range(a + 1, N)]
@@ -116,9 +158,10 @@ def _dag_with_edges(n_edges: int, seed: int):
 
 
 def _factor_returns(seed=3, T=260):
-    """One-factor returns with a few strong pairwise links, so the Ledoit-Wolf
-    precision matrix has non-trivial partial correlations. On i.i.d. noise the
-    shrinkage hits 1.0, the precision is diagonal, and D0pc degenerates."""
+    """Build one-factor returns with a few strong pairwise links, so that the
+    Ledoit-Wolf precision matrix has non-trivial partial correlations. On
+    i.i.d. noise the shrinkage reaches 1.0, the precision is diagonal and
+    D0pc degenerates."""
     rng = np.random.default_rng(seed)
     idx = pd.bdate_range("2019-01-02", periods=T)
     f = rng.standard_normal(T)
@@ -130,9 +173,9 @@ def _factor_returns(seed=3, T=260):
 
 
 def test_d0pc_sees_the_graph_only_through_its_edge_count():
-    """The partial-correlation control must depend on the graph only via its
-    nonzero-cell count: equal counts give identical weights, and a different
-    count changes them."""
+    """The partial-correlation control must depend on the graph only through
+    its nonzero-cell count. Equal counts give identical weights and a
+    different count changes them."""
     rets = _factor_returns()
     w_a = dispatch_allocator("D0pc", _graph(_dag_with_edges(9, seed=1)), rets)
     w_b = dispatch_allocator("D0pc", _graph(_dag_with_edges(9, seed=2)), rets)
