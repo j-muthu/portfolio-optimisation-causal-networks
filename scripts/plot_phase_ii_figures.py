@@ -1,8 +1,8 @@
-"""Phase-II figure set (F1-F7): oriented-allocator results.
+"""Phase II figure set (F1 to F7) for the direction-aware allocator results.
 
-Regenerated entirely from committed artefacts so the figures always match
-FINDINGS.md. Saved to results/figures/. Window sets come from the matrix
-CSV, so the same code renders two-window and four-window grids.
+I regenerate every figure from committed files so that the figures always
+match FINDINGS.md. They are saved to results/figures/. The window sets come
+from the matrix CSV, so the same code draws 2-window and 4-window grids.
 
 Run order: collate_phase_ii, regime_analysis, then this script.
 Run:  python -m scripts.plot_phase_ii_figures
@@ -35,11 +35,12 @@ C = {
     "w378": "#CC79A7",
     "w504": "#D55E00",
 }
-# The reported family. D3/D4 were run but fall outside the crossing.
+# The reported family. D3 and D4 were run but are outside the crossing.
 ALLOC_ORDER = ["D0", "D0s", "D1", "D2", "D2s"]
 
-# Report display names; CSV tags stay D0/D0s/D1/D2/D2s. Mirrors the \corrhrp,
-# \skelhrp, ... macros in final_report/main.tex; keep the two in step.
+# Display names for the report. The CSV tags stay D0, D0s, D1, D2 and D2s.
+# These match the \corrhrp, \skelhrp, ... macros in final_report/main.tex,
+# so keep the two in step.
 DISPLAY = {"D0": "skeleton-hrp", "D0s": "undirected-hrp", "D1": "semcov-hrp",
            "D2": "topo-hrp", "D2s": "topo-semcov-hrp", "CORR-HRP": "correlation-hrp",
            "V0": "hsp-baseline", "V1": "causal-hsp",
@@ -48,7 +49,7 @@ METHOD_LABEL = {"dynotears": "DYNOTEARS", "varlingam": "VARLiNGAM", "granger": "
 
 
 def _windows(matrix: pd.DataFrame) -> list[int]:
-    """Windows with at least one DYNOTEARS Phase-II cell, ascending."""
+    """Return the windows with at least 1 DYNOTEARS Phase II cell, ascending."""
     m = matrix[matrix.method == "dynotears"]
     return sorted(int(w) for w in m.window.unique())
 
@@ -86,7 +87,7 @@ def f1_heatmap(matrix: pd.DataFrame) -> None:
                 if np.isfinite(vals[i, j]):
                     ax.text(j, i, f"{vals[i, j]:.3f}", ha="center", va="center",
                             fontsize=8.5)
-        # Box the D0 (symmetrised control) column.
+        # Draw a box around the D0 column (the symmetrised control).
         j0 = ALLOC_ORDER.index("D0")
         ax.add_patch(plt.Rectangle((j0 - 0.5, -0.5), 1, len(methods), fill=False,
                                    edgecolor="black", lw=2))
@@ -131,7 +132,7 @@ def f2_forest(contrasts: pd.DataFrame) -> None:
         ax.set_yticks(range(len(allocs)), [DISPLAY[a] for a in allocs], fontsize=8)
         ax.set_title(METHOD_LABEL[m], fontsize=10)
         ax.set_xlabel("ΔSharpe vs skeleton control skeleton-hrp")
-        # Legend goes upper left; lower right holds the D0s/w189 star.
+        # The legend goes in the upper left, because the lower right holds the D0s w189 star.
         ax.margins(y=0.14)
         ax.legend(loc="upper left", fontsize=8, framealpha=0.9)
     fig.savefig(FIG / "phase_ii_forest.png", dpi=200)
@@ -173,7 +174,7 @@ def f4_seed(matrix: pd.DataFrame) -> None:
     committed = float(audit.loc[audit.seed == 0, "sharpe"].iloc[0])
     ax.annotate("committed value\n(seed 0)", (0.09, committed),
                 fontsize=8, color="#444444", va="center")
-    # D-variants are deterministic: single points, no seed variance.
+    # The D-variants are deterministic, so they are single points with no seed variance.
     m = matrix[(matrix.method == "dynotears") & (matrix.window == 252)]
     for k, (a, color) in enumerate((("D0", C["D0"]), ("D1", C["D1"]), ("D2s", C["D2s"]))):
         val = float(m.loc[m.allocator == a, "sharpe"].iloc[0])
@@ -202,9 +203,10 @@ def f5_regime() -> None:
     regimes = ["nber_recession", "nber_expansion", "high_vol", "low_vol"]
     df = df[df.regime.isin(regimes)]
     base = df[df.variant == "CORR-HRP"].set_index("regime")["sharpe"]
+    # The three DYNOTEARS allocators of the decomposition only; the first-phase
+    # causal-hsp series is appendix material and is not plotted here.
     show = [("V0prime", "skeleton-hrp", C["D0"]), ("DYNO-D1", "semcov-hrp", C["D1"]),
-            ("DYNO-D2s", "topo-semcov-hrp", C["D2s"]),
-            ("V1-DYNOTEARS", "causal-hsp", C["V1"])]
+            ("DYNO-D2s", "topo-semcov-hrp", C["D2s"])]
     fig, ax = plt.subplots(figsize=(8.5, 3.8), constrained_layout=True)
     width = 0.8 / len(show)
     xs = np.arange(len(regimes))
@@ -224,7 +226,8 @@ def f5_regime() -> None:
 
 # F6: the decomposition
 def f6_decomposition(matrix: pd.DataFrame, contrasts: pd.DataFrame) -> None:
-    """Net Sharpe of CORR, D0, D1/D2s with bootstrap deltas on each step."""
+    """Plot the net Sharpe of CORR, D0, D1 and D2s with the bootstrap
+    difference at each step."""
     def sharpe(method, alloc, w):
         m = matrix[(matrix.method == method) & (matrix.allocator == alloc)
                    & (matrix.window == w)]
@@ -252,7 +255,7 @@ def f6_decomposition(matrix: pd.DataFrame, contrasts: pd.DataFrame) -> None:
     axes = np.atleast_1d(axes).ravel()
     for ax in axes[len(ws):]:
         ax.set_visible(False)
-    # Each bar's step relative to its reference (CORR for D0; D0 for D1/D2s).
+    # Each bar's step relative to its reference (CORR for D0, and D0 for D1 and D2s).
     steps = {1: ("D0-CORR", "+ skeleton"), 2: ("D1-D0", "+ orientation"),
              3: ("D2s-D0", "+ orientation")}
     for ax, w in zip(axes, ws):
@@ -281,7 +284,7 @@ def f6_decomposition(matrix: pd.DataFrame, contrasts: pd.DataFrame) -> None:
 
 # F7: skeleton vs orientation additions across estimation horizons
 def f7_window_gradient(contrasts: pd.DataFrame) -> None:
-    """The decomposition as a function of estimation-window length."""
+    """Plot the decomposition as a function of the estimation-window length."""
     def series(name: str, method: str):
         c = contrasts[(contrasts.contrast == name) & (contrasts.method == method)]
         c = c.sort_values("window")
@@ -312,7 +315,7 @@ def f7_window_gradient(contrasts: pd.DataFrame) -> None:
     ax.set_ylabel("ΔSharpe added")
     ax.legend(fontsize=8.5)
 
-    # Right panel: stacked additions, the split of the total gain.
+    # The right panel stacks the 2 additions, which is the split of the total gain.
     wsx = np.arange(len(skel[0]))
     width = 0.55
     axr.bar(wsx, skel[1], width, color=C["D0"], label="skeleton")
