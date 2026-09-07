@@ -11,6 +11,8 @@
 \RequirePackage{amsmath, amssymb}
 \RequirePackage{graphicx}
 \RequirePackage{setspace}
+\RequirePackage{todonotes}
+
 \RequirePackage[style=vancouver, backend=biber]{biblatex}
 
 % hyperref should almost always be loaded last to prevent macro conflicts
@@ -45,12 +47,12 @@
         
         \centering
         \vspace*{3cm}
-        {\huge \bfseries \@title \par}
+        {\LARGE \bfseries \@title \par}
         \vspace{2.5cm}
-        {\LARGE \textbf{\@author} \par}
+        {\Large \textbf{\@author} \par}
         {\large \@cid \par}
         \vspace{2.5cm}
-        {\Large \textbf{Supervisor:} \@supervisor \par}
+        {\Large \textbf{Supervisor(s):} \@supervisor \par}
         \vspace{0.5cm}
         {\Large \textbf{Second Marker:} \@secondmarker \par}
         \vfill
@@ -59,6 +61,13 @@
         {\Large \@date \par}
     \end{titlepage}
 }
+
+% --- Supervisor / marker review comments ---
+% Inline margin notes for feedback. Requires todonotes (loaded above).
+%   \cguo{...}  -- Ce Guo's comments    (cyan)
+%   \wluk{...}  -- Wayne Luk's comments (orange)
+\newcommand{\cguo}[1]{\todo[color=cyan!30,inline]{Ce: #1}}
+\newcommand{\wluk}[1]{\todo[color=orange!30,inline]{Wayne: #1}}
 
 \renewenvironment{abstract}{
     \chapter*{Abstract}

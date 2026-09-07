@@ -79,3 +79,4 @@ Pangram documentation.md
 # Pangram scoring outputs (contain the thesis text + API results)
 results/pangram/
 PANGRAM_REPORT.md
+*.md
