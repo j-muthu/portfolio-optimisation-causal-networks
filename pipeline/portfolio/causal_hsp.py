@@ -1,4 +1,4 @@
-"""Strategy variants V0, V0', V1 and V2 (see ``Closed-Loop Causal-HSP Portfolio.md``).
+"""Strategy variants V0, V0', V1 and V2.
 
 They differ only in which distance matrix goes into HRP's clustering step.
 Each one is a thin wrapper over :mod:`pipeline.portfolio.hrp` and

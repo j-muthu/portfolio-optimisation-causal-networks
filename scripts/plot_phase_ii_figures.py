@@ -1,7 +1,7 @@
-"""Phase II figure set (F1 to F7) for the direction-aware allocator results.
+"""Phase II figure set for the direction-aware allocator results.
 
 I regenerate every figure from committed files so that the figures always
-match FINDINGS.md. They are saved to results/figures/. The window sets come
+match the collated CSVs. They are saved to results/figures/. The window sets come
 from the matrix CSV, so the same code draws 2-window and 4-window grids.
 
 Run order: collate_phase_ii, regime_analysis, then this script.
@@ -23,7 +23,7 @@ REPO = pathlib.Path(__file__).resolve().parent.parent
 RESULTS = REPO / "results"
 FIG = RESULTS / "figures"
 
-# Okabe-Ito (consistent with plot_thesis_figures.py).
+# Okabe-Ito palette.
 C = {
     "V0": "#999999",
     "D0": "#009E73",
@@ -56,14 +56,6 @@ def _windows(matrix: pd.DataFrame) -> list[int]:
     """Return the windows with at least 1 DYNOTEARS Phase II cell, ascending."""
     m = matrix[matrix.method == "dynotears"]
     return sorted(int(w) for w in m.window.unique())
-
-
-def _nav(tag: str) -> pd.Series | None:
-    path = RESULTS / tag / "closed_loop.pkl"
-    if not path.exists():
-        return None
-    with path.open("rb") as fh:
-        return pickle.load(fh)["backtest"].nav_net
 
 
 # F1: Sharpe heat-map
@@ -178,27 +170,6 @@ def f2_forest(contrasts: pd.DataFrame) -> None:
     plt.close(fig)
 
 
-# F3: NAV curves (w252)
-def f3_nav() -> None:
-    curves = {
-        "CORRELATION-HRP  correlation-distance HRP": ("phase_ii_corr_hrp_w252", "#000000", ":"),
-        "HSP  as published": ("phase_i_v0_w252", C["V0"], "-"),
-        "SKELETON-HRP  skeleton": ("phase_ii_dynotears_D0_w252", C["D0"], "-"),
-        "SEMCOV-HRP  SEM-implied covariance": ("phase_ii_dynotears_D1_w252", C["D1"], "-"),
-        "TOPO-SEMCOV-HRP  topological order + SEM cov.": ("phase_ii_dynotears_D2s_w252", C["D2s"], "-"),
-        "CAUSAL-HSP  causal drivers + FFNN": ("phase_i_v1_w252", C["V1"], "--"),
-    }
-    fig, ax = plt.subplots(figsize=(9, 4.2), constrained_layout=True)
-    for label, (tag, color, ls) in curves.items():
-        nav = _nav(tag)
-        if nav is not None:
-            ax.plot(nav.index, nav.values, color=color, ls=ls, lw=1.4, label=label)
-    ax.set_ylabel("cumulative net NAV (start = 1.0)")
-    ax.legend(fontsize=8.5, loc="upper left")
-    fig.savefig(FIG / "phase_ii_nav.png", dpi=200)
-    plt.close(fig)
-
-
 # F4: seed audit
 def f4_seed(matrix: pd.DataFrame) -> None:
     audit = pd.read_csv(RESULTS / "seed_audit.csv")
@@ -260,64 +231,6 @@ def f5_regime() -> None:
     ax.set_ylabel("Sharpe excess over CORRELATION-HRP")
     ax.legend(fontsize=8.5)
     fig.savefig(FIG / "phase_ii_regime.png", dpi=200)
-    plt.close(fig)
-
-
-# F6: the decomposition
-def f6_decomposition(matrix: pd.DataFrame, contrasts: pd.DataFrame) -> None:
-    """Plot the net Sharpe of CORR, D0, D1 and D2s with the bootstrap
-    difference at each step."""
-    def sharpe(method, alloc, w):
-        m = matrix[(matrix.method == method) & (matrix.allocator == alloc)
-                   & (matrix.window == w)]
-        return float(m.sharpe.iloc[0])
-
-    def delta(name, w, method="dynotears"):
-        c = contrasts[(contrasts.contrast == name) & (contrasts.window == w)
-                      & (contrasts.method == method)]
-        if c.empty:
-            return None
-        return float(c.delta_sharpe.iloc[0]), float(c.p_value.iloc[0])
-
-    bars = [("CORR-HRP", "#000000"), ("D0", C["D0"]), ("D1", C["D1"]),
-            ("D2s", C["D2s"])]
-    ws = _windows(matrix)
-    all_vals = {w: [sharpe("phase_i", "CORR-HRP", w)] + [
-        sharpe("dynotears", a, w) for a, _ in bars[1:]] for w in ws}
-    lo = min(v for vs in all_vals.values() for v in vs) - 0.014
-    hi = max(v for vs in all_vals.values() for v in vs) + 0.007
-
-    ncol = 2 if len(ws) > 2 else len(ws)
-    nrow = int(np.ceil(len(ws) / ncol))
-    fig, axes = plt.subplots(nrow, ncol, figsize=(10.5, 3.7 * nrow),
-                             sharey=True, constrained_layout=True)
-    axes = np.atleast_1d(axes).ravel()
-    for ax in axes[len(ws):]:
-        ax.set_visible(False)
-    # Each bar's step relative to its reference (CORR for D0, and D0 for D1 and D2s).
-    steps = {1: ("D0-CORR", "+ skeleton"), 2: ("D1-D0", "+ orientation"),
-             3: ("D2s-D0", "+ orientation")}
-    for ax, w in zip(axes, ws):
-        vals = all_vals[w]
-        xs = np.arange(len(bars))
-        ax.bar(xs, vals, 0.74, color=[c for _, c in bars])
-        ax.axhline(vals[0], color="#000000", lw=0.9, ls=":")
-        for x, v in zip(xs, vals):
-            ax.annotate(f"{v:.3f}", (x, v + 0.0012), ha="center", fontsize=9)
-            if x in steps:
-                d = delta(steps[x][0], w)
-                if d is not None:
-                    dv, p = d
-                    ax.annotate(f"{steps[x][1]}\n{dv:+.3f}\n(p={p:.2f})",
-                                (x, lo + 0.002),
-                                ha="center", va="bottom", fontsize=7.4,
-                                color="white", fontweight="bold")
-        ax.set_xticks(xs, [DISPLAY[b] for b, _ in bars], fontsize=8, rotation=15, ha="right")
-        ax.set_ylim(lo, hi)
-        ax.set_title(f"{w}-day window", fontsize=10)
-    for k in range(0, len(ws), ncol):
-        axes[k].set_ylabel("net Sharpe")
-    fig.savefig(FIG / "phase_ii_decomposition.png", dpi=200)
     plt.close(fig)
 
 
@@ -385,10 +298,8 @@ def main() -> None:
     contrasts = pd.read_csv(RESULTS / "phase_ii_contrasts.csv")
     f1_heatmap(matrix)
     f2_forest(contrasts)
-    f3_nav()
     f4_seed(matrix)
     f5_regime()
-    f6_decomposition(matrix, contrasts)
     f7_window_gradient(contrasts)
     print(f"figures → {FIG}/phase_ii_*.png")
 

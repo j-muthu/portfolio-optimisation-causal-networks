@@ -222,7 +222,7 @@ def d0lw_weights(
 ) -> pd.Series:
     """D0lw: D0's clustering with a Ledoit-Wolf covariance. This is the
     shrinkage control that uses no edge directions
-    (PREDICTIONS_COVARIANCE_CONTROLS.md)."""
+    (pre-registered on 2026-08-15)."""
     rets = returns_window[list(graph.asset_names)].dropna()
     return _hrp_from_distance(
         causal_embedding_distance(graph.M), graph,
@@ -265,7 +265,7 @@ def hercc_weights(
     linkage_method: str = "single",
 ) -> pd.Series:
     """HERCC: correlation-distance HERC. This is the HERC baseline that uses
-    no graph (PREDICTIONS_HERC.md)."""
+    no graph (pre-registered on 2026-08-15)."""
     rets = returns_window[list(graph.asset_names)].dropna()
     corr = rets.corr().to_numpy()
     return _herc_from_distance(
@@ -305,7 +305,7 @@ def d0pc_weights(
     linkage_method: str = "single",
 ) -> pd.Series:
     """D0pc: the skeleton control that uses no graph
-    (PREDICTIONS_SKELETON_CONTROL.md).
+    (pre-registered on 2026-08-15).
 
     This is D0 with the discovered skeleton replaced by a thresholded
     partial-correlation matrix. I match its density to the number of nonzero

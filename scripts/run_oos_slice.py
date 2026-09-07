@@ -1,4 +1,4 @@
-"""Run the 2025-26 out-of-sample slice (PREDICTIONS_OOS.md).
+"""Run the 2025-26 out-of-sample slice.
 
 The Phase II harness is unchanged and I use DYNOTEARS only. I redirect the
 caches to cache/prices_oos and cache/drivers_oos before any fetch, because
@@ -28,7 +28,7 @@ from pipeline.portfolio.directed import ALLOCATORS          # noqa: E402
 from pipeline.shakedown import run_shakedown                # noqa: E402
 from scripts.run_phase_ii import DROP_DRIVERS, UNIVERSE_FILE  # noqa: E402
 
-# Fixed in PREDICTIONS_OOS.md. The data start is padded so that the 504-day
+# Fixed before any out-of-sample price was pulled. The data start is padded so that the 504-day
 # lookback is burned in at the first 2025 rebalance.
 DATA_START = "2022-07-01"
 BACKTEST_START = "2025-01-02"

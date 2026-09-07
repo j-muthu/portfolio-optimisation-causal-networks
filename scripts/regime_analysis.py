@@ -65,8 +65,7 @@ VARIANTS = [
 ]
 WINDOWS = [189, 252, 378, 504]
 
-# Hand-picked stress windows. These replace the hard-coded values in
-# plot_interim_results.py with computed ones.
+# Hand-picked stress windows.
 NAMED_WINDOWS = {
     "GFC 2007-09":   ("2007-07-01", "2009-06-30"),
     "2018Q4 selloff":("2018-10-01", "2018-12-31"),

@@ -275,7 +275,6 @@ def step_collate(opts: Options) -> None:
 
 
 def step_figures(opts: Options) -> None:
-    run("plot_thesis_figures", ["scripts.plot_thesis_figures"], opts)
     run("plot_phase_ii_figures", ["scripts.plot_phase_ii_figures"], opts)
 
 
@@ -315,7 +314,7 @@ STEPS: list[tuple[str, str, Callable[[Options], None]]] = [
     ("gates", "cache-hit gate, DAG diagnostics, replication gate", step_gates),
     ("checks", "directional prior, FFNN seed audit, NTS-NOTEARS probe", step_checks),
     ("collate", "phase_ii matrix and contrasts, regimes, robust stats", step_collate),
-    ("figures", "Phase I and Phase II figures", step_figures),
+    ("figures", "the Phase II figures", step_figures),
     ("oos", "2025-26 out-of-sample slice", step_oos),
     ("compile", "latexmk the report", step_compile),
 ]

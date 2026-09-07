@@ -12,39 +12,18 @@ venv/
 # Claude local settings
 .claude/settings.local.json
 
-# Reference PDFs — papers kept locally, not version-controlled
-*.pdf
-
-# Data cache (downloaded prices / Wikipedia tables — regenerable)
+# Data cache (downloaded prices, drivers, membership and discovery fits).
+# Regenerable, but the discovery fits take hours per cell.
 cache/
-
-# Rodriguez-Dominguez HSP reference dataset (published-paper supplements).
-# The two Excel panels are tracked because tests/test_hsp_reference.py needs
-# them; the authors' notebook and scripts are not.
-HSP/*
-!HSP/Assets_SPX.xlsx
-!HSP/Drivers_no_SB_Sectors.xlsx
 
 # Experiment artefacts: pickled results are large; CSVs/PNGs/logs are tracked
 results/**/*.pkl
-# Per-run feedback state — regenerable, and the exploratory runs are noise.
+# Per-run feedback state — regenerable
 results/**/utility.parquet
 
-# Local secrets (API keys / WRDS credentials) — never commit
-.env
-*.env.local
-
-old_notes/
-
-# Superseded report folders + old notes, kept locally only.
-archive/
-
-varlingam_docs/
-
-latex_template/*
-
 # final_report: track LaTeX source + figures + generated macros, but not the
-# LaTeX build intermediates.
+# LaTeX build outputs.
+final_report/main.pdf
 final_report/main.aux
 final_report/main.bbl
 final_report/main.bcf
@@ -58,25 +37,3 @@ final_report/main.toc
 final_report/main.lof
 final_report/main.lot
 final_report/main.synctex.gz
-
-# Personal notes / assessment material — not part of the project codebase
-MSc Project Assessment Criteria.md
-key weaknesses.md
-summary_of_workflow.md
-supervisor_checkin_email.md
-
-# Personal notes removed from main; still tracked on report branches
-# (tracking overrides ignore, so these entries are inert there).
-# NB: FINDINGS.md, PHASE_II_PLAN.md and the two plan docs stay tracked on main
-# — pipeline/ and scripts/ cite them as the spec they implement.
-hrp_hsp_notes.md
-marking-criteria-for-report.md
-examiner-precision.bundle
-causal-network-representations-in-factor-investing.md
-WRITING_STYLE.md
-WriteHuman API — LLM Integration Refer.md
-Pangram documentation.md
-# Pangram scoring outputs (contain the thesis text + API results)
-results/pangram/
-PANGRAM_REPORT.md
-*.md

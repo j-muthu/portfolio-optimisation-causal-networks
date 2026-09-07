@@ -33,7 +33,7 @@ ANCHORS = {
     "EW": "phase_ii_ew_w{w}",
     "IVP": "phase_ii_ivp_w{w}",
 }
-# HERC cells (PREDICTIONS_HERC.md). I decided in advance to keep them outside both SPA families.
+# HERC cells. I decided in advance to keep them outside both SPA families.
 HERC = {
     "HERCC": "phase_ii_herc_corr_w{w}",
     "HERC0": "phase_ii_dynotears_HERC0_w{w}",

@@ -1,11 +1,11 @@
-"""Collate the 2025-26 out-of-sample slice (PREDICTIONS_OOS.md).
+"""Collate the 2025-26 out-of-sample slice.
 
 I write results/oos_slice.csv (the Sharpe per cell), results/oos_contrasts.csv
 (the contrasts I predicted in advance, with a stationary block bootstrap
 standard error for each) and the _generated/oos_stats.tex macros for the
 report's tab:oos. The standard errors are the same Politis-Romano bootstrap
 as the in-sample contrasts (21-day mean block, 10,000 resamples, seed 42),
-reported as a scale for the point estimates only; PREDICTIONS_OOS.md rules
+reported as a scale for the point estimates only; the pre-registered protocol rules
 out reading any p-value from the slice, so I emit none.
 
 Usage:  python -m scripts.collate_oos
@@ -103,7 +103,7 @@ def main() -> None:
     print("=== OOS levels (net annualised Sharpe, 2025-01..2026-07) ===")
     print(levels.pivot_table(index="allocator", columns="window",
                              values="sharpe").to_string(float_format=lambda x: f"{x:.3f}"))
-    print("\n=== OOS contrasts (point estimate, bootstrap SE; no p-values per PREDICTIONS_OOS.md) ===")
+    print("\n=== OOS contrasts (point estimate, bootstrap SE; no p-values, as pre-registered) ===")
     print(cdf.pivot_table(index="contrast", columns="window",
                           values="delta_sharpe").to_string(float_format=lambda x: f"{x:+.3f}"))
     print(cdf.pivot_table(index="contrast", columns="window",

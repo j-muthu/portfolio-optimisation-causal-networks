@@ -15,7 +15,9 @@ is idempotent and can be restarted after a failure. Child output goes to
 ## 1. Set up
 
 Python 3.13 is required. The vendored `causalnex/`, `lingam/` and
-`nts-notears/` trees are imported directly, so do not pip-install them.
+`nts-notears/` trees are pruned copies (only the modules the pipeline
+imports, plus their licences) and are imported directly, so do not
+pip-install them.
 
 ```bash
 python3.13 -m venv .venv
@@ -69,7 +71,7 @@ The steps, in order:
 | `gates` | cache-hit gate, DAG diagnostics, and the D0/V0' replication gate |
 | `checks` | directional prior, FFNN seed audit, NTS-NOTEARS probe |
 | `collate` | Phase II matrix and contrasts, regimes, robust statistics |
-| `figures` | Phase I and Phase II figures |
+| `figures` | the Phase II figures |
 | `oos` | the 2025-26 out-of-sample slice (Yahoo prices, separate caches) |
 | `compile` | `latexmk -pdf main.tex` (skipped if latexmk is absent) |
 
@@ -95,6 +97,5 @@ collapsed the distance to rank one and single linkage degenerated to a chain.
 The projection is now off by default and kept behind
 `psd_project_distance=True` in `pipeline/portfolio/directed.py` and
 `causal_hsp.py` so the original Phase I bundle can still be replayed. All
-affected cells, batteries and figures were re-run; the projected-run results
-are archived under `archive/results_psd_legacy/`. The report's Appendix
+affected cells, batteries and figures were re-run. The report's Appendix
 records what changed.

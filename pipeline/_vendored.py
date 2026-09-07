@@ -1,8 +1,10 @@
 """Imports from the vendored ``causalnex`` and ``lingam`` source trees.
 
-I register stub packages in ``sys.modules`` so that the submodules I need
-import without running the packages' heavy ``__init__.py`` files (which pull
-in torch and LiNA). Other modules import from here, e.g.
+The trees are pruned copies of causalnex 0.12.1 and lingam 1.12.2: only the
+modules imported here (and their in-package dependencies) are kept, with the
+licences. I register stub packages in ``sys.modules`` so that those
+submodules import without the packages' ``__init__.py`` files, which are not
+vendored. Other modules import from here, e.g.
 ``from pipeline._vendored import from_pandas_dynamic``.
 """
 
