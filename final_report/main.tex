@@ -59,7 +59,7 @@
 \noindent Hierarchical portfolio allocators typically use 
 the return correlation matrix as an input to their allocation. 
 However, this matrix lacks any notion of directionality or causality.
-Causal discovery algorithms ameliorate this, producing
+Causal discovery algorithms provide this, producing
 a directed acyclic graph (DAG) which can be decomposed into a skeleton
 (which assets are linked) and edge orientations
 (which assets causally affect others).
@@ -78,20 +78,15 @@ to HRP as a baseline. I estimate this decomposition over
 2007--2024, using 4 estimation windows 
 (9 months to 2 years), on a 99-asset subset of the S\&P~500. 
 I use DYNOTEARS and VARLiNGAM as causal discovery algorithms,
-with ridge-Granger as a control on edge magnitudes.
+with ridge-Granger as an ancillary control.
 
 I find that replacing the correlation matrix with a causal DAG
-does not improve the Sharpe ratio. Textbook HRP on the
-correlation matrix is the strongest HRP allocator at
-the two shorter windows, and the graph-fed allocators are within
-noise of it at the two longer ones. The decomposition shows why.
-The graph's skeleton costs performance at
-every window, most at the 1-year window, while the edge orientations
-add a comparable amount back at every window, so the total is within
-noise of zero at every window. The edge orientations' contribution is due to the DAG's
-removal of the common market factor, as providing a de-factored
-covariance matrix built without any graph reproduces it. No
-contrast survives correction for the search over allocators.
+does not improve the Sharpe ratio. Standard HRP is the strongest hierarchical allocator at
+the two shorter windows, and the graph-fed allocators are insignificantly different from it at the two longer ones. The decomposition shows that the graph's skeleton reduces performance at
+every window, while the edge orientations
+have a positive offsetting effect, so the total is within
+indistinguishable from zero at every estimation window. The edge orientations' contribution is due to the DAG's
+removal of the common market factor, because it is reproduced by a de-factored covariance matrix that is built without any graph. None of the comparisons are statistically significant after accounting for the search over allocators.
 \end{abstract}
 
 \begin{acknowledgements}
@@ -695,7 +690,8 @@ Thus, the only factor that changes is
 how the graph enters the allocator.
 The resulting decomposition consists of two differences: $\skelhrp{}-\corrhrp{}$ (the marginal impact of the skeleton over HRP) and $\oriented{}-\skelhrp{}$ (the marginal impact of the edge orientations over the skeleton allocator, where \oriented{} denotes any of the 3 edge-orientation-aware allocators I consider). Adding the two yields the total performance impact of using causal graphs (both their edge orientations and their skeleton) over HRP.
 
-Table~\ref{tab:variants} lists the primary family: the baseline \corrhrp{}, plus the 5 graph-consuming allocators that form the narrowed family of Chapter~\ref{chap:evaluation}, namely the skeleton control \skelhrp{}, its robustness check \undirhrp{}, and the three edge-orientation-aware allocators. 
+Table~\ref{tab:variants} lists the primary family: the baseline \corrhrp{}, plus the 5 \\
+graph-consuming allocators that form the narrowed family of Chapter~\ref{chap:evaluation}, namely the skeleton control \skelhrp{}, its robustness check \undirhrp{}, and the three edge-orientation-aware allocators. 
 Each of these is run under both discovery methods (DYNOTEARS and VARLiNGAM), at each of
 the four estimation windows (189, 252, 378 and 504 days). This yields the full set of results as in Chapter~\ref{chap:evaluation}.
 Separately, I also use the ridge-Granger control, and a robustness check across sparsity and cost parameters.
@@ -972,7 +968,8 @@ With this many highly correlated variants, whose Sharpe ratios span $0.35$--$0.4
 \section{Out-of-sample testing}
 \label{sec:oos}
 
-To verify whether the in-sample results of the decomposition generalise, I run the same DYNOTEARS allocators, and compare them to \corrhrp{}, on out-of-sample data: 19 rebalances from January 2025 to August 2026. 
+To verify whether the in-sample results of the decomposition generalise, I run the same \\
+DYNOTEARS allocators, and compare them to \corrhrp{}, on out-of-sample data: 19 rebalances from January 2025 to August 2026. 
 I take price data from Yahoo Finance, as CRSP daily data ends on 2024-12-31. 
 I find that the performance impact of the edge-orientation-aware allocators over the skeleton allocators is positive at all 4 windows for both \semcovhrp{} and for \toposemcovhrp{} (though at 189 days \toposemcovhrp{}'s orientation gain is only $+0.002$).
 The total performance effect of edge-orientation-aware less \corrhrp{} is positive out-of-sample: from $+0.096$ to $+0.142$. This contrasts with the in-sample results that are statistically indistinguishable from zero at every window ($-0.017$ to $+0.013$, Table~\ref{tab:decomp}). This positive out-of-sample result is driven by the skeleton yielding a positive impact: in-sample, it had a negative effect relative to \corrhrp{}, but on this out-of-sample data, its effect is positive at 3 of the 4 windows (and is $-0.009$ at the 378-day window).
