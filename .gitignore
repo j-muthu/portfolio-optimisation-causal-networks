@@ -9,8 +9,9 @@ venv/
 # OS
 .DS_Store
 
-# Claude local settings
+# Claude settings and project instructions
 .claude/settings.local.json
+CLAUDE.md
 
 # Data cache (downloaded prices, drivers, membership and discovery fits).
 # Regenerable, but the discovery fits take hours per cell.
@@ -20,6 +21,8 @@ cache/
 results/**/*.pkl
 # Per-run feedback state — regenerable
 results/**/utility.parquet
+# Per-run logs written by reproduction.py — regenerable
+results/reproduction_logs/
 
 # final_report: track LaTeX source + figures + generated macros, but not the
 # LaTeX build outputs.

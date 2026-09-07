@@ -23,12 +23,11 @@ semopy==2.3.11           # imported transitively by lingam.utils
 
 # Data download
 yfinance==1.3.0
-lxml==6.1.1              # pandas.read_html (Wikipedia tables)
-requests==2.34.2
+requests==2.34.2         # FRED driver pulls, S&P 500 membership history
 
 # Analysis / parallelism
 joblib==1.5.3            # rolling-window parallelism
-matplotlib==3.10.9       # graph_analysis plots
+matplotlib==3.10.9       # report figures, and lingam.utils imports it
 # Data-snooping / distribution-aware Sharpe battery for the final report:
 # White's Reality Check, Hansen's SPA, and the Model Confidence Set.
 # See scripts/robust_stats.py. PSR/DSR are hand-rolled on scipy regardless.
