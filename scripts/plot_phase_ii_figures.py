@@ -35,6 +35,9 @@ C = {
     "w378": "#CC79A7",
     "w504": "#D55E00",
 }
+# High-contrast pair for the window-gradient figure (F7).
+F7_SKEL = "#E6A800"    # yellow
+F7_ORIENT = "#5D3A9B"  # purple
 # The reported family. D3 and D4 were run but are outside the crossing.
 ALLOC_ORDER = ["D0", "D0s", "D1", "D2", "D2s"]
 
@@ -77,19 +80,30 @@ def f1_heatmap(matrix: pd.DataFrame) -> None:
     for ax, w in zip(axes, ws):
         sub = m[m.window == w].pivot(index="method", columns="allocator", values="sharpe")
         sub = sub.reindex(index=methods, columns=ALLOC_ORDER)
+        # Only show the methods that were run at this window. The ridge-Granger
+        # control is run at 252 days only, so it gets a row in that panel alone.
+        rows = [x for x in methods if sub.loc[x].notna().any()]
+        sub = sub.loc[rows]
         vals = sub.to_numpy(dtype=float)
         im = ax.imshow(vals, cmap="RdYlGn", vmin=0.35, vmax=0.42, aspect="auto")
         ax.set_xticks(range(len(ALLOC_ORDER)), [DISPLAY[a] for a in ALLOC_ORDER],
                       fontsize=8, rotation=20, ha="right")
-        ax.set_yticks(range(len(methods)), [METHOD_LABEL[x] for x in methods])
+        ax.set_yticks(range(len(rows)), [METHOD_LABEL[x] for x in rows])
         for i in range(vals.shape[0]):
             for j in range(vals.shape[1]):
                 if np.isfinite(vals[i, j]):
                     ax.text(j, i, f"{vals[i, j]:.3f}", ha="center", va="center",
                             fontsize=8.5)
+                else:
+                    # Grey out the cells outside a control's allocator scope
+                    # (matches the "---" entries in the full matrix table).
+                    ax.add_patch(plt.Rectangle((j - 0.5, i - 0.5), 1, 1,
+                                               facecolor="#d9d9d9", edgecolor="none"))
+                    ax.text(j, i, "---", ha="center", va="center", fontsize=8.5,
+                            color="#707070")
         # Draw a box around the D0 column (the symmetrised control).
         j0 = ALLOC_ORDER.index("D0")
-        ax.add_patch(plt.Rectangle((j0 - 0.5, -0.5), 1, len(methods), fill=False,
+        ax.add_patch(plt.Rectangle((j0 - 0.5, -0.5), 1, len(rows), fill=False,
                                    edgecolor="black", lw=2))
         corr = matrix[(matrix.method == "phase_i") & (matrix.allocator == "CORR-HRP")
                       & (matrix.window == w)].sharpe
@@ -302,8 +316,8 @@ def f7_window_gradient(contrasts: pd.DataFrame) -> None:
     fig, (ax, axr) = plt.subplots(1, 2, figsize=(10.5, 3.9),
                                   constrained_layout=True)
     for (w, d, lo, hi, _), label, color, marker in (
-            (skel, "skeleton  (skeleton-hrp − correlation-hrp)", C["D0"], "o"),
-            (orient, "orientation  (semcov-hrp − skeleton-hrp)", C["D1"], "s")):
+            (skel, "skeleton  (skeleton-hrp − correlation-hrp)", F7_SKEL, "o"),
+            (orient, "orientation  (semcov-hrp − skeleton-hrp)", F7_ORIENT, "s")):
         ax.errorbar(w, d, yerr=[d - lo, hi - d], fmt=f"-{marker}", ms=6,
                     capsize=3, lw=1.6, color=color, label=label)
     if len(orient_var[0]):
@@ -317,17 +331,21 @@ def f7_window_gradient(contrasts: pd.DataFrame) -> None:
 
     # The right panel stacks the 2 additions, which is the split of the total gain.
     wsx = np.arange(len(skel[0]))
-    width = 0.55
-    axr.bar(wsx, skel[1], width, color=C["D0"], label="skeleton")
+    width = 0.45
+    axr.bar(wsx, skel[1], width, color=F7_SKEL, label="skeleton")
     # Negative components extend below their own base.
     base = np.where(np.sign(skel[1]) == np.sign(orient[1]), skel[1], 0.0)
-    axr.bar(wsx, orient[1], width, bottom=base, color=C["D1"],
+    axr.bar(wsx, orient[1], width, bottom=base, color=F7_ORIENT,
             label="orientation")
+    # The diamond marks the net of the 2 additions (semcov-hrp − correlation-hrp).
     total = skel[1] + orient[1]
+    axr.plot(wsx, total, "D", ms=6, color="black", mec="white", mew=0.8,
+             ls="none", label="net", zorder=5)
     for x, t in zip(wsx, total):
-        axr.annotate(f"total {t:+.3f}", (x, max(t, 0) + 0.0015), ha="center",
-                     fontsize=8)
+        axr.annotate(f"{t:+.3f}", (x + width / 2 + 0.05, t), ha="left",
+                     va="center", fontsize=8)
     axr.margins(y=0.15)
+    axr.set_xlim(-0.5, len(wsx) - 1 + 0.72)
     axr.axhline(0, color="grey", lw=1)
     axr.set_xticks(wsx, [f"{int(x)} d" for x in skel[0]])
     axr.set_ylabel("ΔSharpe over correlation-hrp")
