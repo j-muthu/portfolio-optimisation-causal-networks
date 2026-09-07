@@ -1,7 +1,8 @@
-"""Walk-forward backtest simulator, strategy-agnostic.
+"""Walk-forward backtest simulator that works with any strategy.
 
-Charges transaction costs on one-way turnover at rebalance and records the
-excess Sharpe vs equal-weight over each holding period (the V2 reward).
+I charge transaction costs on one-way turnover at each rebalance and record
+the excess Sharpe ratio over equal weight for each holding period (this is
+the V2 reward).
 """
 
 from __future__ import annotations
@@ -19,17 +20,17 @@ logger = logging.getLogger(__name__)
 # Result containers
 @dataclass
 class RebalanceRecord:
-    """One rebalance event."""
+    """Record of 1 rebalance event."""
 
     index: int
     rebalance_date: pd.Timestamp
     holding_end: pd.Timestamp
     asset_names: list[str]
     weights: pd.Series
-    turnover: float            # one-way: 0.5 * Σ |w[t] - w[t-1]| over the union
+    turnover: float            # one-way turnover, 0.5 * sum |w[t] - w[t-1]| over the union
     holding_returns: pd.Series  # gross daily returns of the held portfolio
-    holding_returns_net: pd.Series  # after applying tx-cost at rebalance day
-    holding_reward: float       # annualised Sharpe excess vs 1/N over holding window
+    holding_returns_net: pd.Series  # net of the transaction cost charged on the rebalance day
+    holding_reward: float       # annualised Sharpe ratio in excess of 1/N over the holding window
 
 
 @dataclass
@@ -37,8 +38,8 @@ class BacktestResult:
     """Walk-forward backtest output."""
 
     rebalances: list[RebalanceRecord]
-    nav_gross: pd.Series        # net-asset-value over the full backtest, gross
-    nav_net: pd.Series          # ... net of tx costs
+    nav_gross: pd.Series        # net asset value over the full backtest, gross of costs
+    nav_net: pd.Series          # net asset value net of transaction costs
     meta: dict = field(default_factory=dict)
 
     def to_frame(self) -> pd.DataFrame:
@@ -67,7 +68,7 @@ def _annualised_sharpe(returns: pd.Series, periods_per_year: int = 252) -> float
 
 
 def _one_way_turnover(prev: pd.Series, new: pd.Series) -> float:
-    """``0.5 · Σ |w_new - w_prev|`` across the union of asset names."""
+    """Return ``0.5 * sum |w_new - w_prev|`` over the union of asset names."""
     union = sorted(set(prev.index) | set(new.index))
     p = prev.reindex(union).fillna(0.0)
     n = new.reindex(union).fillna(0.0)
@@ -85,12 +86,13 @@ def run_backtest(
     log_every: int = 12,
     on_rebalance_complete: Callable[["RebalanceRecord"], None] | None = None,
 ) -> BacktestResult:
-    """Walk-forward backtest; returns per-rebalance records plus gross/net NAV.
+    """Run a walk-forward backtest and return the per-rebalance records plus
+    the gross and net NAV.
 
-    ``prices`` must cover through ``last_rebalance + holding_days``.
-    Transaction costs hit the net track only. ``on_rebalance_complete`` fires
-    after each holding period so a closed-loop driver can update state (e.g.
-    the V2 UtilityStore) before the next ``strategy`` call.
+    ``prices`` must cover up to ``last_rebalance + holding_days``. Transaction
+    costs are charged on the net track only. ``on_rebalance_complete`` is
+    called after each holding period so that a closed-loop driver can update
+    its state (e.g. the V2 UtilityStore) before the next ``strategy`` call.
     """
     rebalances: list[RebalanceRecord] = []
     prev_weights = pd.Series(dtype=float)
@@ -104,7 +106,7 @@ def run_backtest(
     for i, t in enumerate(rebalance_dates):
         universe = universe_at(t)
         weights = strategy(t, universe)
-        # Defensive normalisation.
+        # Normalise the weights as a precaution.
         weights = weights.reindex(universe).fillna(0.0)
         total = weights.sum()
         if total < 1e-12:
@@ -117,19 +119,19 @@ def run_backtest(
         end_idx = prices.index.searchsorted(t) + holding_days
         end_idx = min(end_idx, len(prices.index) - 1)
         holding_idx = prices.index[prices.index.searchsorted(t):end_idx + 1]
-        holding_idx = holding_idx[holding_idx > t]  # strictly after rebalance day
+        holding_idx = holding_idx[holding_idx > t]  # strictly after the rebalance day
         held_returns = daily_returns.loc[holding_idx, universe].fillna(0.0)
         portfolio_returns = held_returns @ weights
 
         turnover = _one_way_turnover(prev_weights, weights) if not prev_weights.empty else weights.abs().sum() / 2.0
         tx_cost = turnover * (transaction_cost_bps / 10_000)
 
-        # Costs hit the first day of the holding period.
+        # Costs are charged on the first day of the holding period.
         portfolio_returns_net = portfolio_returns.copy()
         if len(portfolio_returns_net) > 0:
             portfolio_returns_net.iloc[0] = portfolio_returns_net.iloc[0] - tx_cost
 
-        # Reward: excess annualised Sharpe vs 1/N.
+        # The reward is the annualised Sharpe ratio in excess of 1/N.
         equal_returns = held_returns.mean(axis=1)
         reward = _annualised_sharpe(portfolio_returns) - _annualised_sharpe(equal_returns)
 
@@ -154,8 +156,8 @@ def run_backtest(
         rebalances.append(record)
         prev_weights = weights
 
-        # Fire before advancing so a closed-loop driver can update state
-        # that the next strategy() call reads.
+        # Call this before advancing so that a closed-loop driver can update
+        # the state that the next strategy() call reads.
         if on_rebalance_complete is not None:
             on_rebalance_complete(record)
 

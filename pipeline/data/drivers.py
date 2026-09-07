@@ -1,9 +1,10 @@
-"""Exogenous driver pool (~40 FRED/Yahoo series) supplying the D block of
-X = [D | A].
+"""Exogenous driver pool (roughly 40 FRED and Yahoo series) that supplies
+the D block of X = [D | A].
 
-Sector SPDRs, Fama-French factors and broad US index returns are excluded as
-non-exogenous to the S&P-100. VIX is borderline (S&P 500 options) but kept,
-with a VIX-excluded robustness check planned.
+I exclude sector SPDRs, Fama-French factors and broad US index returns
+because they are not exogenous to the S&P 100. VIX is borderline (it is
+built from S&P 500 options) but I keep it, with a robustness check that
+excludes it.
 """
 
 from __future__ import annotations
@@ -30,7 +31,7 @@ CACHE_DIR = THESIS_ROOT / "cache" / "drivers"
 CACHE_DIR.mkdir(parents=True, exist_ok=True)
 
 FRED_CSV_BASE = "https://fred.stlouisfed.org/graph/fredgraph.csv"
-# FRED silently returns an empty body for non-browser User-Agents.
+# FRED silently returns an empty body for a User-Agent that is not a browser.
 _HTTP_HEADERS = {"User-Agent": "Mozilla/5.0 (X11; Linux x86_64) thesis-research"}
 FRED_TIMEOUT = 30
 FRED_BACKOFF_S = (1.0, 2.0, 5.0)
@@ -42,9 +43,9 @@ Preprocessing = Literal["log_return", "first_diff", "yoy_pct", "level", "yoy_dif
 # Driver catalogue
 @dataclass(frozen=True)
 class DriverSpec:
-    """One driver: column name, source backend, series ID / ticker,
-    stationarising transform, and optional availability gate (used for the
-    pre-2007 HYG/VVIX substitutions)."""
+    """One driver. It holds the column name, the source backend, the series
+    ID or ticker, the stationarising transform and an optional availability
+    date (used for the pre-2007 HYG and VVIX substitutions)."""
 
     name: str
     source: Source
@@ -54,7 +55,7 @@ class DriverSpec:
     description: str = ""
 
 
-# Downstream code keys by name, not position.
+# Downstream code keys by name rather than by position.
 DRIVER_CATALOGUE: list[DriverSpec] = [
     # Macro
     DriverSpec("cpi_yoy",          "fred", "CPIAUCSL",  "yoy_pct",   description="CPI all urban consumers, YoY % change"),
@@ -119,12 +120,12 @@ class DriverPool:
         return self.frame.shape[1]
 
 
-# FRED backend (free CSV; no API key required)
+# FRED backend (a free CSV endpoint that needs no API key)
 def fetch_fred_series(series_id: str, use_cache: bool = True) -> pd.Series:
-    """Download a FRED series via the fredgraph CSV endpoint.
+    """Download a FRED series from the fredgraph CSV endpoint.
 
-    Cache is keyed by series ID only; delete the file or pass use_cache=False
-    to refresh.
+    The cache is keyed by series ID only. Delete the file or pass
+    use_cache=False to refresh it.
     """
     cache = CACHE_DIR / f"fred_{series_id}.parquet"
     if use_cache and cache.exists():
@@ -139,7 +140,7 @@ def fetch_fred_series(series_id: str, use_cache: bool = True) -> pd.Series:
         raise RuntimeError(f"FRED fetch for {series_id} failed (no HTTP backend succeeded)")
 
     raw = pd.read_csv(io.StringIO(text))
-    # Date column is 'observation_date', or 'DATE' on older endpoints.
+    # The date column is 'observation_date', or 'DATE' on older endpoints.
     cols = {c.lower(): c for c in raw.columns}
     date_col = cols.get("observation_date") or cols.get("date")
     if date_col is None or series_id not in raw.columns:
@@ -158,8 +159,8 @@ def fetch_fred_series(series_id: str, use_cache: bool = True) -> pd.Series:
 
 
 def _http_get_text(url: str, timeout: int = 30) -> str | None:
-    """GET url as text via requests, falling back to system curl (some
-    sandboxes stall on Python's TLS stack)."""
+    """GET the url as text with requests. Fall back to the system curl,
+    because some sandboxes stall on Python's TLS stack."""
     last_exc: Exception | None = None
     try:
         import requests
@@ -205,7 +206,7 @@ def fetch_yahoo_series(
     end: pd.Timestamp,
     use_cache: bool = True,
 ) -> pd.Series:
-    """Download a Yahoo series' adjusted close."""
+    """Download the adjusted close of a Yahoo series."""
     safe_name = ticker.replace("^", "caret_").replace("=", "_")
     cache = CACHE_DIR / f"yahoo_{safe_name}.parquet"
     meta_path = cache.with_suffix(".parquet.meta")
@@ -213,10 +214,11 @@ def fetch_yahoo_series(
         df = pd.read_parquet(cache)
         series = df.iloc[:, 0]
         # Accept the cache if the data spans [start, end], or if a previous
-        # fetch requested a containing span (sidecar .meta). The second route
-        # matters for late-inception series (e.g. EEM): their data never
-        # reaches a padded start, and re-fetching live each run gives
-        # nondeterministic auto-adjusted values that perturb DYNOTEARS.
+        # fetch requested a span that contains it (recorded in the .meta
+        # file). The second case matters for series with a late start (e.g.
+        # EEM). Their data never reaches a padded start, and re-fetching live
+        # each run gives nondeterministic auto-adjusted values that change
+        # the DYNOTEARS fit.
         cov_ok = series.index.min() <= start and series.index.max() >= end
         req_ok = False
         if meta_path.exists():
@@ -256,8 +258,8 @@ def fetch_yahoo_series(
     close = close.dropna().astype(float)
     close.name = ticker
     close.index = pd.to_datetime(close.index)
-    # Atomic writes so parallel first-fetches can't tear the parquet/meta.
-    # The meta records the requested span for the cache-acceptance check above.
+    # Write atomically so that parallel first fetches cannot tear the parquet
+    # or meta file. The meta file records the requested span for the check above.
     tmp = cache.with_suffix(f".parquet.{os.getpid()}.tmp")
     close.to_frame().to_parquet(tmp)
     os.replace(tmp, cache)
@@ -270,8 +272,9 @@ def fetch_yahoo_series(
 
 # Preprocessing
 def _preprocess(series: pd.Series, mode: Preprocessing) -> pd.Series:
-    """Stationarising transform per mode: log_return, first_diff, yoy_pct /
-    yoy_diff (monthly resample then 12-period change), or level."""
+    """Apply the stationarising transform for the mode. The modes are
+    log_return, first_diff, yoy_pct and yoy_diff (monthly resample, then the
+    12-period change) and level."""
     if mode == "log_return":
         return np.log(series / series.shift(1)).dropna()
     if mode == "first_diff":
@@ -291,7 +294,7 @@ def _preprocess(series: pd.Series, mode: Preprocessing) -> pd.Series:
 
 # Derived series (BAA-AAA, HYG-LQD)
 def _build_derived(name: str, use_cache: bool) -> pd.Series:
-    """Compute the spreads referenced by DriverSpec.source='derived'."""
+    """Compute the spreads that DriverSpec.source='derived' refers to."""
     if name == "BAA-AAA":
         baa = fetch_fred_series("BAA", use_cache=use_cache)
         aaa = fetch_fred_series("AAA", use_cache=use_cache)
@@ -299,7 +302,7 @@ def _build_derived(name: str, use_cache: bool) -> pd.Series:
         spread.name = "BAA-AAA"
         return spread
     if name == "HYG-LQD":
-        # Wide range so the cache is reusable across runs.
+        # Use a wide range so that the cache can be reused across runs.
         wide_start, wide_end = pd.Timestamp("2007-01-01"), pd.Timestamp.now().normalize()
         hyg = fetch_yahoo_series("HYG", wide_start, wide_end, use_cache=use_cache)
         lqd = fetch_yahoo_series("LQD", wide_start, wide_end, use_cache=use_cache)
@@ -311,8 +314,8 @@ def _build_derived(name: str, use_cache: bool) -> pd.Series:
 
 # Daily alignment
 def _to_daily(series: pd.Series, daily_index: pd.DatetimeIndex) -> pd.Series:
-    """Forward-fill onto the trading-day calendar: the value an observer
-    would actually have known on day t."""
+    """Forward-fill onto the trading-day calendar. This gives the value an
+    observer would actually have known on day t."""
     return series.reindex(daily_index, method="ffill")
 
 
@@ -326,9 +329,9 @@ def build_driver_pool(
 ) -> DriverPool:
     """Fetch and preprocess the full driver pool over [start, end].
 
-    daily_index should be the asset panel's index; if None a weekday union of
-    the drivers' own indices is used. specs overrides DRIVER_CATALOGUE (e.g.
-    the VIX-excluded robustness check).
+    daily_index should be the index of the asset panel. If it is None, I use
+    the weekday union of the drivers' own indices. specs overrides
+    DRIVER_CATALOGUE (e.g. for the robustness check that excludes VIX).
     """
     start_ts = pd.Timestamp(start).normalize()
     end_ts = pd.Timestamp(end).normalize()
@@ -346,7 +349,7 @@ def build_driver_pool(
             if spec.source == "fred":
                 raw_series = fetch_fred_series(spec.identifier, use_cache=use_cache)
             elif spec.source == "yahoo":
-                # Pad the download so YoY transforms have room.
+                # Pad the download so that the year-on-year transforms have room.
                 pad_start = (start_ts - pd.Timedelta(days=365 * 2)).normalize()
                 raw_series = fetch_yahoo_series(
                     spec.identifier, pad_start, end_ts, use_cache=use_cache
@@ -372,7 +375,7 @@ def build_driver_pool(
     daily_index = pd.DatetimeIndex(daily_index)
     daily_index = daily_index[(daily_index >= start_ts) & (daily_index <= end_ts)]
 
-    # Forward-fill onto the daily calendar (what an observer knew at day t).
+    # Forward-fill onto the daily calendar, which is what an observer knew on day t.
     columns: dict[str, pd.Series] = {}
     for name, series in processed.items():
         spec = next(s for s in specs if s.name == name)
@@ -381,7 +384,7 @@ def build_driver_pool(
             gated = series.loc[series.index >= spec.available_from]
         daily = _to_daily(gated, daily_index)
         if spec.available_from is not None:
-            # NaN before availability so downstream can drop or substitute.
+            # Set NaN before the availability date so that downstream code can drop or substitute.
             daily.loc[daily.index < spec.available_from] = np.nan
         columns[name] = daily
 

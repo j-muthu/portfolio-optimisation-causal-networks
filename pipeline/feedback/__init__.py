@@ -1,6 +1,6 @@
-"""Closed-loop feedback: credit attribution and EMA utility update (utility),
-lookahead-safe persistence (storage), and a deliberately leaky lookup used as
-a leak-detection canary (leak_canary)."""
+"""Closed-loop feedback: credit attribution and the EMA utility update
+(utility), lookahead-safe persistence (storage) and a deliberately leaky
+lookup that I use to check that leak detection works (leak_canary)."""
 
 from __future__ import annotations
 

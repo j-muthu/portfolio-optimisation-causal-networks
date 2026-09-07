@@ -1,6 +1,7 @@
 """Portfolio performance metrics: Sharpe, Sortino, Calmar, CER, drawdown,
-turnover, concentration. Inputs are pd.Series of period returns (daily,
-252 periods/year by default). CER = mean - 0.5 * gamma_RA * var, annualised.
+turnover and concentration. The inputs are pd.Series of period returns
+(daily, with 252 periods per year by default).
+CER = mean - 0.5 * gamma_RA * var, annualised.
 """
 
 from __future__ import annotations
@@ -48,16 +49,18 @@ def calmar_ratio(returns: pd.Series, periods_per_year: int = 252) -> float:
     return float(cagr / mdd)
 
 
-# Distribution- and multiplicity-aware Sharpe (Bailey & Lopez de Prado).
-# These operate on per-period (non-annualised) Sharpes; PSR/DSR are unitless
-# probabilities, so all Sharpes entering them must share per-period units.
+# Sharpe ratios adjusted for the return distribution and for multiple
+# testing (Bailey and Lopez de Prado). These work on per-period (not
+# annualised) Sharpes. PSR and DSR are unitless probabilities, so every
+# Sharpe that goes into them must be in per-period units.
 
 _EULER_MASCHERONI = 0.5772156649015329
 
 
 def _per_period_sharpe_moments(returns: pd.Series) -> tuple[float, float, float, int]:
-    """(sr_hat, skew, kurt, T) for the per-period Sharpe. kurt is non-excess
-    (3.0 for normal), the Bailey & Lopez de Prado convention."""
+    """Return (sr_hat, skew, kurt, T) for the per-period Sharpe. kurt is the
+    non-excess kurtosis (3.0 for a normal), which is the Bailey and Lopez de
+    Prado convention."""
     from scipy import stats
 
     r = returns.dropna().to_numpy(dtype=float)
@@ -76,9 +79,10 @@ def _per_period_sharpe_moments(returns: pd.Series) -> tuple[float, float, float,
 def probabilistic_sharpe_ratio(
     returns: pd.Series, sr_benchmark: float = 0.0
 ) -> float:
-    """Probabilistic Sharpe Ratio (Bailey & Lopez de Prado 2012): probability
-    the true per-period SR exceeds sr_benchmark, adjusting for skew and
-    kurtosis. sr_benchmark must be per-period."""
+    """Return the Probabilistic Sharpe Ratio (Bailey and Lopez de Prado
+    2012). This is the probability that the true per-period Sharpe exceeds
+    sr_benchmark, adjusted for skew and kurtosis. sr_benchmark must be
+    per-period."""
     from scipy.stats import norm
 
     sr_hat, skew, kurt, T = _per_period_sharpe_moments(returns)
@@ -91,9 +95,10 @@ def probabilistic_sharpe_ratio(
 
 
 def expected_max_sharpe(sr_variance: float, n_trials: int) -> float:
-    """Expected max of n_trials IID Sharpe estimates under zero true skill:
-    the DSR benchmark SR* of Bailey & Lopez de Prado (2014). sr_variance is
-    the cross-trial variance, in the same per-period units as the Sharpes."""
+    """Return the expected maximum of n_trials IID Sharpe estimates under
+    zero true skill. This is the DSR benchmark SR* of Bailey and Lopez de
+    Prado (2014). sr_variance is the variance across trials, in the same
+    per-period units as the Sharpes."""
     from scipy.stats import norm
 
     if n_trials <= 1 or sr_variance <= 0.0:
@@ -108,9 +113,10 @@ def expected_max_sharpe(sr_variance: float, n_trials: int) -> float:
 def deflated_sharpe_ratio(
     returns: pd.Series, all_trial_sharpes
 ) -> float:
-    """Deflated Sharpe Ratio: PSR against the multiplicity-adjusted SR*.
-    all_trial_sharpes are the per-period Sharpes of every configuration tried
-    (including this one); with a single trial the DSR collapses to PSR(0)."""
+    """Return the Deflated Sharpe Ratio, which is the PSR against the SR*
+    adjusted for multiple testing. all_trial_sharpes are the per-period
+    Sharpes of every configuration tried, including this one. With 1 trial
+    the DSR reduces to PSR(0)."""
     sharpes = np.asarray([s for s in all_trial_sharpes if np.isfinite(s)], dtype=float)
     n = len(sharpes)
     sr_star = expected_max_sharpe(float(np.var(sharpes, ddof=1)) if n > 1 else 0.0, n)
@@ -119,7 +125,7 @@ def deflated_sharpe_ratio(
 
 # Drawdown
 def max_drawdown(returns: pd.Series) -> float:
-    """Maximum peak-to-trough drawdown (a negative number)."""
+    """Return the maximum peak-to-trough drawdown (a negative number)."""
     r = returns.dropna()
     if r.empty:
         return 0.0
@@ -130,7 +136,7 @@ def max_drawdown(returns: pd.Series) -> float:
 
 
 def time_underwater(returns: pd.Series) -> int:
-    """Longest run of consecutive periods below the prior peak."""
+    """Return the longest run of consecutive periods below the prior peak."""
     r = returns.dropna()
     if r.empty:
         return 0
@@ -171,13 +177,14 @@ def downside_deviation(returns: pd.Series, periods_per_year: int = 252) -> float
 
 # Concentration
 def herfindahl_index(weights: pd.Series) -> float:
-    """Sum of squared weights; 1/N for an equal-weighted portfolio."""
+    """Return the sum of squared weights. This is 1/N for an equal-weighted
+    portfolio."""
     w = weights.fillna(0.0).to_numpy()
     return float((w ** 2).sum())
 
 
 def effective_n(weights: pd.Series) -> float:
-    """1 / HHI: number of effective positions."""
+    """Return 1 / HHI, the number of effective positions."""
     hhi = herfindahl_index(weights)
     return float("inf") if hhi < 1e-12 else float(1.0 / hhi)
 
@@ -190,7 +197,7 @@ def max_weight(weights: pd.Series) -> float:
 def one_way_annualised_turnover(
     rebalance_weights: list[pd.Series], rebalances_per_year: int = 12
 ) -> float:
-    """mean(0.5 * sum|w[t] - w[t-1]|) * rebalances_per_year."""
+    """Return mean(0.5 * sum|w[t] - w[t-1]|) * rebalances_per_year."""
     if len(rebalance_weights) < 2:
         return 0.0
     deltas = []
@@ -206,7 +213,7 @@ def one_way_annualised_turnover(
 def certainty_equivalent_return(
     returns: pd.Series, gamma_ra: float = 3.0, periods_per_year: int = 252
 ) -> float:
-    """CER = mean - 0.5 * gamma_RA * var, annualised."""
+    """Return CER = mean - 0.5 * gamma_RA * var, annualised."""
     r = returns.dropna()
     if r.empty:
         return 0.0
@@ -224,7 +231,7 @@ def performance_summary(
     periods_per_year: int = 252,
     gamma_ras: tuple[float, ...] = (1.0, 3.0, 5.0),
 ) -> dict:
-    """Every metric in one call, as a flat dict."""
+    """Return every metric in 1 call, as a flat dict."""
     out: dict = {
         "annualised_return": annualised_return(returns, periods_per_year),
         "annualised_volatility": annualised_volatility(returns, periods_per_year),

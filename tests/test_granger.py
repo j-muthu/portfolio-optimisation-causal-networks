@@ -1,7 +1,7 @@
 """Unit tests for the ridge-VAR(1) GRANGER comparator (granger.py).
 
-Checks support recovery on a simulated VAR(1), density matching, zero
-driver blocks, and interface parity with the joint discovery windows.
+I check support recovery on a simulated VAR(1), density matching, zero
+driver blocks, and that the interface matches the joint discovery windows.
 """
 
 from __future__ import annotations
@@ -19,7 +19,7 @@ COLUMNS = DRIVERS + ASSETS
 
 
 def _simulated_var1(T=1500, seed=21):
-    """VAR(1) asset panel with a known sparse lag matrix (i -> j)."""
+    """Build a VAR(1) asset panel with a known sparse lag matrix (i -> j)."""
     rng = np.random.default_rng(seed)
     N = len(ASSETS)
     true = np.zeros((N, N))
@@ -63,7 +63,7 @@ def test_driver_blocks_are_zero_and_stats_full_length():
     assert np.all(win.asset_to_driver_block(0) == 0.0)
     assert win.zscore_mean.shape == (len(COLUMNS),)
     assert win.zscore_std.shape == (len(COLUMNS),)
-    # Magnitudes only, zero diagonal.
+    # Magnitudes only, with a zero diagonal.
     A = win.asset_to_asset_block(0)
     assert np.all(A >= 0.0)
     assert np.all(np.diag(A) == 0.0)
@@ -76,5 +76,5 @@ def test_chokepoint_consumes_granger_window():
     assert g.asset_names == ASSETS
     np.testing.assert_array_equal(g.M, win.asset_to_asset_block(0))
     assert g.resid_var_z is not None and g.resid_var_z.shape == (len(ASSETS),)
-    # is_dag recorded honestly (may be either on simulated data).
+    # is_dag must match the matrix. It may be either value on simulated data.
     assert g.is_dag == win.is_dag

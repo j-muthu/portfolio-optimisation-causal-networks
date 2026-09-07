@@ -1,8 +1,8 @@
-"""Phase-II figure set (F1-F7): oriented-allocator results.
+"""Phase II figure set (F1 to F7) for the direction-aware allocator results.
 
-Regenerated entirely from committed artefacts so the figures always match
-FINDINGS.md. Saved to results/figures/. Window sets come from the matrix
-CSV, so the same code renders two-window and four-window grids.
+I regenerate every figure from committed files so that the figures always
+match FINDINGS.md. They are saved to results/figures/. The window sets come
+from the matrix CSV, so the same code draws 2-window and 4-window grids.
 
 Run order: collate_phase_ii, regime_analysis, then this script.
 Run:  python -m scripts.plot_phase_ii_figures
@@ -35,20 +35,25 @@ C = {
     "w378": "#CC79A7",
     "w504": "#D55E00",
 }
-# The reported family. D3/D4 were run but fall outside the crossing.
+# High-contrast pair for the window-gradient figure (F7).
+F7_SKEL = "#E6A800"    # yellow
+F7_ORIENT = "#5D3A9B"  # purple
+# The reported family. D3 and D4 were run but are outside the crossing.
 ALLOC_ORDER = ["D0", "D0s", "D1", "D2", "D2s"]
 
-# Report display names; CSV tags stay D0/D0s/D1/D2/D2s. Mirrors the \corrhrp,
-# \skelhrp, ... macros in final_report/main.tex; keep the two in step.
-DISPLAY = {"D0": "skeleton-hrp", "D0s": "undirected-hrp", "D1": "semcov-hrp",
-           "D2": "topo-hrp", "D2s": "topo-semcov-hrp", "CORR-HRP": "correlation-hrp",
-           "V0": "hsp-baseline", "V1": "causal-hsp",
-           "V2": "causal-hsp-feedback"}
+# Display names for the report, in capitals to match the small-caps macros.
+# The CSV tags stay D0, D0s, D1, D2 and D2s.
+# These match the \corrhrp, \skelhrp, ... macros in final_report/main.tex,
+# so keep the two in step.
+DISPLAY = {"D0": "SKELETON-HRP", "D0s": "UNDIRECTED-HRP", "D1": "SEMCOV-HRP",
+           "D2": "TOPO-HRP", "D2s": "TOPO-SEMCOV-HRP", "CORR-HRP": "CORRELATION-HRP",
+           "V0": "HSP", "V1": "CAUSAL-HSP",
+           "V2": "CAUSAL-HSP-FEEDBACK"}
 METHOD_LABEL = {"dynotears": "DYNOTEARS", "varlingam": "VARLiNGAM", "granger": "ridge-Granger"}
 
 
 def _windows(matrix: pd.DataFrame) -> list[int]:
-    """Windows with at least one DYNOTEARS Phase-II cell, ascending."""
+    """Return the windows with at least 1 DYNOTEARS Phase II cell, ascending."""
     m = matrix[matrix.method == "dynotears"]
     return sorted(int(w) for w in m.window.unique())
 
@@ -73,31 +78,60 @@ def f1_heatmap(matrix: pd.DataFrame) -> None:
     axes = np.atleast_1d(axes).ravel()
     for ax in axes[len(ws):]:
         ax.set_visible(False)
+    nrows_by_ax: dict = {}
     for ax, w in zip(axes, ws):
         sub = m[m.window == w].pivot(index="method", columns="allocator", values="sharpe")
         sub = sub.reindex(index=methods, columns=ALLOC_ORDER)
+        # Only show the methods that were run at this window. The ridge-Granger
+        # control is run at 252 days only, so it gets a row in that panel alone.
+        rows = [x for x in methods if sub.loc[x].notna().any()]
+        sub = sub.loc[rows]
+        nrows_by_ax[ax] = len(rows)
         vals = sub.to_numpy(dtype=float)
         im = ax.imshow(vals, cmap="RdYlGn", vmin=0.35, vmax=0.42, aspect="auto")
         ax.set_xticks(range(len(ALLOC_ORDER)), [DISPLAY[a] for a in ALLOC_ORDER],
                       fontsize=8, rotation=20, ha="right")
-        ax.set_yticks(range(len(methods)), [METHOD_LABEL[x] for x in methods])
+        ax.set_yticks(range(len(rows)), [METHOD_LABEL[x] for x in rows])
         for i in range(vals.shape[0]):
             for j in range(vals.shape[1]):
                 if np.isfinite(vals[i, j]):
                     ax.text(j, i, f"{vals[i, j]:.3f}", ha="center", va="center",
                             fontsize=8.5)
-        # Box the D0 (symmetrised control) column.
+                else:
+                    # Grey out the cells outside a control's allocator scope
+                    # (matches the "---" entries in the full matrix table).
+                    ax.add_patch(plt.Rectangle((j - 0.5, i - 0.5), 1, 1,
+                                               facecolor="#d9d9d9", edgecolor="none"))
+                    ax.text(j, i, "---", ha="center", va="center", fontsize=8.5,
+                            color="#707070")
+        # Draw a box around the D0 column (the symmetrised control).
         j0 = ALLOC_ORDER.index("D0")
-        ax.add_patch(plt.Rectangle((j0 - 0.5, -0.5), 1, len(methods), fill=False,
+        ax.add_patch(plt.Rectangle((j0 - 0.5, -0.5), 1, len(rows), fill=False,
                                    edgecolor="black", lw=2))
         corr = matrix[(matrix.method == "phase_i") & (matrix.allocator == "CORR-HRP")
                       & (matrix.window == w)].sharpe
-        base = f"   (correlation-hrp baseline: {float(corr.iloc[0]):.3f})" if len(corr) else ""
+        base = f"   (CORRELATION-HRP baseline: {float(corr.iloc[0]):.3f})" if len(corr) else ""
         ax.set_title(f"{w}-day window{base}", fontsize=10)
     fig.colorbar(im, ax=list(axes[:len(ws)]), shrink=0.85, label="net Sharpe")
-    fig.suptitle("Net Sharpe by discovery method × allocator (boxed = skeleton control skeleton-hrp)",
-                 fontsize=11)
-    fig.savefig(FIG / "phase_ii_heatmap.png", dpi=200)
+    # Equalise the cell height across panels: let the layout engine place the
+    # panels, freeze it, then shrink the panels with fewer rows from the bottom
+    # so they stay top-aligned and the blank space is outside the frame.
+    fig.canvas.draw()
+    fig.set_layout_engine("none")
+    nmax = max(nrows_by_ax.values())
+    shift = 0.0
+    for r in range(nrow):
+        row_axes = [ax for ax in axes[r * ncol:(r + 1) * ncol] if ax in nrows_by_ax]
+        slack = []
+        for ax in row_axes:
+            box = ax.get_position()
+            h = box.height * nrows_by_ax[ax] / nmax
+            ax.set_position([box.x0, box.y1 - h + shift, box.width, h])
+            slack.append(box.height - h)
+        # Later grid rows move up by the smallest shrink in this row.
+        shift += min(slack)
+    fig.savefig(FIG / "phase_ii_heatmap.png", dpi=200, bbox_inches="tight",
+                pad_inches=0.1)
     plt.close(fig)
 
 
@@ -130,14 +164,16 @@ def f2_forest(contrasts: pd.DataFrame) -> None:
                     ax.annotate("*", (row.ci_upper + 0.002, yi - 0.12),
                                 color=C[f"w{w}"], fontsize=13)
         ax.axvline(0, color="grey", lw=1, ls="--")
+        # Dashed separator between the orientation-blind control D0s (row 0)
+        # and the orientation-aware treatments above it.
+        if "D0s" in allocs:
+            ax.axhline(allocs.index("D0s") + 0.5, color="grey", lw=0.8, ls="--")
         ax.set_yticks(range(len(allocs)), [DISPLAY[a] for a in allocs], fontsize=8)
         ax.set_title(METHOD_LABEL[m], fontsize=10)
-        ax.set_xlabel("ΔSharpe vs skeleton control skeleton-hrp")
-        # Legend goes upper left; lower right holds the D0s/w189 star.
+        ax.set_xlabel("ΔSharpe vs skeleton control SKELETON-HRP")
+        # The legend goes in the upper left, because the lower right holds the D0s w189 star.
         ax.margins(y=0.14)
         ax.legend(loc="upper left", fontsize=8, framealpha=0.9)
-    fig.suptitle("The direction effect, graph held fixed (Politis–Romano 95% CI; * p<0.05)",
-                 fontsize=11)
     fig.savefig(FIG / "phase_ii_forest.png", dpi=200)
     plt.close(fig)
 
@@ -145,12 +181,12 @@ def f2_forest(contrasts: pd.DataFrame) -> None:
 # F3: NAV curves (w252)
 def f3_nav() -> None:
     curves = {
-        "correlation-hrp  correlation-distance HRP": ("phase_ii_corr_hrp_w252", "#000000", ":"),
-        "hsp-baseline  HSP as published": ("phase_i_v0_w252", C["V0"], "-"),
-        "skeleton-hrp  skeleton": ("phase_ii_dynotears_D0_w252", C["D0"], "-"),
-        "semcov-hrp  SEM-implied covariance": ("phase_ii_dynotears_D1_w252", C["D1"], "-"),
-        "topo-semcov-hrp  topological order + SEM cov.": ("phase_ii_dynotears_D2s_w252", C["D2s"], "-"),
-        "causal-hsp  causal drivers + FFNN": ("phase_i_v1_w252", C["V1"], "--"),
+        "CORRELATION-HRP  correlation-distance HRP": ("phase_ii_corr_hrp_w252", "#000000", ":"),
+        "HSP  as published": ("phase_i_v0_w252", C["V0"], "-"),
+        "SKELETON-HRP  skeleton": ("phase_ii_dynotears_D0_w252", C["D0"], "-"),
+        "SEMCOV-HRP  SEM-implied covariance": ("phase_ii_dynotears_D1_w252", C["D1"], "-"),
+        "TOPO-SEMCOV-HRP  topological order + SEM cov.": ("phase_ii_dynotears_D2s_w252", C["D2s"], "-"),
+        "CAUSAL-HSP  causal drivers + FFNN": ("phase_i_v1_w252", C["V1"], "--"),
     }
     fig, ax = plt.subplots(figsize=(9, 4.2), constrained_layout=True)
     for label, (tag, color, ls) in curves.items():
@@ -159,8 +195,6 @@ def f3_nav() -> None:
             ax.plot(nav.index, nav.values, color=color, ls=ls, lw=1.4, label=label)
     ax.set_ylabel("cumulative net NAV (start = 1.0)")
     ax.legend(fontsize=8.5, loc="upper left")
-    ax.set_title("Direction-aware allocation from the same DYNOTEARS graphs (252-day window, net of 5 bps)",
-                 fontsize=10.5)
     fig.savefig(FIG / "phase_ii_nav.png", dpi=200)
     plt.close(fig)
 
@@ -172,14 +206,14 @@ def f4_seed(matrix: pd.DataFrame) -> None:
     x_v1 = np.zeros(len(audit))
     ax.scatter(x_v1 + np.random.default_rng(0).uniform(-0.06, 0.06, len(audit)),
                audit.sharpe, s=28, color=C["V1"], zorder=3,
-               label=f"causal-hsp FFNN seeds (n={len(audit)})")
+               label=f"CAUSAL-HSP FFNN seeds (n={len(audit)})")
     bp = ax.boxplot(audit.sharpe, positions=[0], widths=0.3, showfliers=False)
     for elem in ("boxes", "whiskers", "caps", "medians"):
         plt.setp(bp[elem], color="#666666")
     committed = float(audit.loc[audit.seed == 0, "sharpe"].iloc[0])
     ax.annotate("committed value\n(seed 0)", (0.09, committed),
                 fontsize=8, color="#444444", va="center")
-    # D-variants are deterministic: single points, no seed variance.
+    # The D-variants are deterministic, so they are single points with no seed variance.
     m = matrix[(matrix.method == "dynotears") & (matrix.window == 252)]
     for k, (a, color) in enumerate((("D0", C["D0"]), ("D1", C["D1"]), ("D2s", C["D2s"]))):
         val = float(m.loc[m.allocator == a, "sharpe"].iloc[0])
@@ -188,18 +222,16 @@ def f4_seed(matrix: pd.DataFrame) -> None:
                     ha="center", color=color)
     v0 = 0.371
     ax.axhline(v0, color=C["V0"], lw=1, ls=":")
-    ax.annotate("hsp-baseline", (1.5, v0 + 0.0005), fontsize=8, color=C["V0"])
-    ax.set_xticks(range(4), ["causal-hsp\n(FFNN)", "skeleton-hrp", "semcov-hrp", "topo-semcov-hrp"], rotation=12, ha="right",
+    ax.annotate("HSP", (1.5, v0 + 0.0005), fontsize=8, color=C["V0"])
+    ax.set_xticks(range(4), ["CAUSAL-HSP\n(FFNN)", "SKELETON-HRP", "SEMCOV-HRP", "TOPO-SEMCOV-HRP"], rotation=12, ha="right",
                fontsize=8)
     ax.set_ylabel("net Sharpe (252-day window)")
-    ax.set_title("FFNN-seed variability of the neural driver route vs the seed-free graph-based allocators",
-                 fontsize=10)
     ax.legend(fontsize=8, loc="lower right")
     fig.savefig(FIG / "phase_ii_seed.png", dpi=200)
     plt.close(fig)
 
 
-# F5: regime excess over hsp-baseline (w252)
+# F5: regime excess over the CORRELATION-HRP baseline (w252)
 def f5_regime() -> None:
     path = RESULTS / "regime_analysis" / "daily_metrics.csv"
     if not path.exists():
@@ -209,10 +241,11 @@ def f5_regime() -> None:
     df = df[df.window == 252]
     regimes = ["nber_recession", "nber_expansion", "high_vol", "low_vol"]
     df = df[df.regime.isin(regimes)]
-    base = df[df.variant == "V0"].set_index("regime")["sharpe"]
-    show = [("V0prime", "skeleton-hrp", C["D0"]), ("DYNO-D1", "semcov-hrp", C["D1"]),
-            ("DYNO-D2s", "topo-semcov-hrp", C["D2s"]),
-            ("V1-DYNOTEARS", "causal-hsp", C["V1"])]
+    base = df[df.variant == "CORR-HRP"].set_index("regime")["sharpe"]
+    # The three DYNOTEARS allocators of the decomposition only; the first-phase
+    # CAUSAL-HSP series is appendix material and is not plotted here.
+    show = [("V0prime", "SKELETON-HRP", C["D0"]), ("DYNO-D1", "SEMCOV-HRP", C["D1"]),
+            ("DYNO-D2s", "TOPO-SEMCOV-HRP", C["D2s"])]
     fig, ax = plt.subplots(figsize=(8.5, 3.8), constrained_layout=True)
     width = 0.8 / len(show)
     xs = np.arange(len(regimes))
@@ -224,9 +257,7 @@ def f5_regime() -> None:
     ax.axhline(0, color="grey", lw=1)
     ax.set_xticks(xs, ["NBER\nrecession", "NBER\nexpansion", "VIX\ntop quintile",
                        "VIX\nbottom quintile"], fontsize=9)
-    ax.set_ylabel("Sharpe excess over hsp-baseline")
-    ax.set_title("Regime-conditional edge over hsp-baseline (252-day window)",
-                 fontsize=10.5)
+    ax.set_ylabel("Sharpe excess over CORRELATION-HRP")
     ax.legend(fontsize=8.5)
     fig.savefig(FIG / "phase_ii_regime.png", dpi=200)
     plt.close(fig)
@@ -234,7 +265,8 @@ def f5_regime() -> None:
 
 # F6: the decomposition
 def f6_decomposition(matrix: pd.DataFrame, contrasts: pd.DataFrame) -> None:
-    """Net Sharpe of CORR, D0, D1/D2s with bootstrap deltas on each step."""
+    """Plot the net Sharpe of CORR, D0, D1 and D2s with the bootstrap
+    difference at each step."""
     def sharpe(method, alloc, w):
         m = matrix[(matrix.method == method) & (matrix.allocator == alloc)
                    & (matrix.window == w)]
@@ -252,7 +284,7 @@ def f6_decomposition(matrix: pd.DataFrame, contrasts: pd.DataFrame) -> None:
     ws = _windows(matrix)
     all_vals = {w: [sharpe("phase_i", "CORR-HRP", w)] + [
         sharpe("dynotears", a, w) for a, _ in bars[1:]] for w in ws}
-    lo = min(v for vs in all_vals.values() for v in vs) - 0.006
+    lo = min(v for vs in all_vals.values() for v in vs) - 0.014
     hi = max(v for vs in all_vals.values() for v in vs) + 0.007
 
     ncol = 2 if len(ws) > 2 else len(ws)
@@ -262,7 +294,7 @@ def f6_decomposition(matrix: pd.DataFrame, contrasts: pd.DataFrame) -> None:
     axes = np.atleast_1d(axes).ravel()
     for ax in axes[len(ws):]:
         ax.set_visible(False)
-    # Each bar's step relative to its reference (CORR for D0; D0 for D1/D2s).
+    # Each bar's step relative to its reference (CORR for D0, and D0 for D1 and D2s).
     steps = {1: ("D0-CORR", "+ skeleton"), 2: ("D1-D0", "+ orientation"),
              3: ("D2s-D0", "+ orientation")}
     for ax, w in zip(axes, ws):
@@ -277,7 +309,7 @@ def f6_decomposition(matrix: pd.DataFrame, contrasts: pd.DataFrame) -> None:
                 if d is not None:
                     dv, p = d
                     ax.annotate(f"{steps[x][1]}\n{dv:+.3f}\n(p={p:.2f})",
-                                (x, lo + 0.55 * (min(vals) - lo) + 0.004),
+                                (x, lo + 0.002),
                                 ha="center", va="bottom", fontsize=7.4,
                                 color="white", fontweight="bold")
         ax.set_xticks(xs, [DISPLAY[b] for b, _ in bars], fontsize=8, rotation=15, ha="right")
@@ -285,16 +317,13 @@ def f6_decomposition(matrix: pd.DataFrame, contrasts: pd.DataFrame) -> None:
         ax.set_title(f"{w}-day window", fontsize=10)
     for k in range(0, len(ws), ncol):
         axes[k].set_ylabel("net Sharpe")
-    fig.suptitle(
-        "Decomposing the causal-graph gain over the correlation matrix: "
-        "skeleton vs edge orientation (DYNOTEARS)", fontsize=10.5)
     fig.savefig(FIG / "phase_ii_decomposition.png", dpi=200)
     plt.close(fig)
 
 
 # F7: skeleton vs orientation additions across estimation horizons
 def f7_window_gradient(contrasts: pd.DataFrame) -> None:
-    """The decomposition as a function of estimation-window length."""
+    """Plot the decomposition as a function of the estimation-window length."""
     def series(name: str, method: str):
         c = contrasts[(contrasts.contrast == name) & (contrasts.method == method)]
         c = c.sort_values("window")
@@ -312,8 +341,8 @@ def f7_window_gradient(contrasts: pd.DataFrame) -> None:
     fig, (ax, axr) = plt.subplots(1, 2, figsize=(10.5, 3.9),
                                   constrained_layout=True)
     for (w, d, lo, hi, _), label, color, marker in (
-            (skel, "skeleton  (skeleton-hrp − correlation-hrp)", C["D0"], "o"),
-            (orient, "orientation  (semcov-hrp − skeleton-hrp)", C["D1"], "s")):
+            (skel, "skeleton  (SKELETON-HRP − CORRELATION-HRP)", F7_SKEL, "o"),
+            (orient, "orientation  (SEMCOV-HRP − SKELETON-HRP)", F7_ORIENT, "s")):
         ax.errorbar(w, d, yerr=[d - lo, hi - d], fmt=f"-{marker}", ms=6,
                     capsize=3, lw=1.6, color=color, label=label)
     if len(orient_var[0]):
@@ -324,29 +353,28 @@ def f7_window_gradient(contrasts: pd.DataFrame) -> None:
     ax.set_xlabel("estimation window (trading days)")
     ax.set_ylabel("ΔSharpe added")
     ax.legend(fontsize=8.5)
-    ax.set_title("The two additions vs horizon (95% CI)", fontsize=10)
 
-    # Right panel: stacked additions, the split of the total gain.
+    # The right panel stacks the 2 additions, which is the split of the total gain.
     wsx = np.arange(len(skel[0]))
-    width = 0.55
-    axr.bar(wsx, skel[1], width, color=C["D0"], label="skeleton")
+    width = 0.45
+    axr.bar(wsx, skel[1], width, color=F7_SKEL, label="skeleton")
     # Negative components extend below their own base.
     base = np.where(np.sign(skel[1]) == np.sign(orient[1]), skel[1], 0.0)
-    axr.bar(wsx, orient[1], width, bottom=base, color=C["D1"],
+    axr.bar(wsx, orient[1], width, bottom=base, color=F7_ORIENT,
             label="orientation")
+    # The diamond marks the net of the 2 additions (SEMCOV-HRP − CORRELATION-HRP).
     total = skel[1] + orient[1]
+    axr.plot(wsx, total, "D", ms=6, color="black", mec="white", mew=0.8,
+             ls="none", label="net", zorder=5)
     for x, t in zip(wsx, total):
-        axr.annotate(f"total {t:+.3f}", (x, max(t, 0) + 0.0015), ha="center",
-                     fontsize=8)
+        axr.annotate(f"{t:+.3f}", (x + width / 2 + 0.05, t), ha="left",
+                     va="center", fontsize=8)
     axr.margins(y=0.15)
+    axr.set_xlim(-0.5, len(wsx) - 1 + 0.72)
     axr.axhline(0, color="grey", lw=1)
     axr.set_xticks(wsx, [f"{int(x)} d" for x in skel[0]])
-    axr.set_ylabel("ΔSharpe over correlation-hrp")
+    axr.set_ylabel("ΔSharpe over CORRELATION-HRP")
     axr.legend(fontsize=8.5)
-    axr.set_title("Stacked: the total gain over correlation-hrp, split", fontsize=10)
-
-    fig.suptitle("Skeleton vs orientation: relative additions across estimation "
-                 "horizons (DYNOTEARS, net Sharpe)", fontsize=10.5)
     fig.savefig(FIG / "phase_ii_window_gradient.png", dpi=200)
     plt.close(fig)
 

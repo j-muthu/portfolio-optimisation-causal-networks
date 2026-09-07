@@ -1,9 +1,10 @@
-"""E7: seed audit of the Phase-I FFNN path.
+"""E7: seed audit of the Phase I FFNN path.
 
-Re-runs the committed V1-DYNOTEARS w252 K=17 config across FFNN seeds with
-the FFNN cache off, so only the network initialisation varies. Resumable:
-seeds with an existing bundle are skipped. Note torch on Apple-silicon MPS
-is not bit-reproducible even at a fixed seed.
+I re-run the committed V1 DYNOTEARS w252 K=17 configuration across FFNN
+seeds with the FFNN cache off, so that only the network initialisation
+varies. The run can resume, because seeds with an existing bundle are
+skipped. Note that torch on Apple silicon MPS is not bit-reproducible even
+at a fixed seed.
 
 Usage
 -----
@@ -34,7 +35,7 @@ from scripts.run_phase_ii import (
 RESULTS = THESIS_ROOT / "results"
 OUT_CSV = RESULTS / "seed_audit.csv"
 
-# The committed Phase-I V1 w252 configuration.
+# The committed Phase I V1 w252 configuration.
 K = 17
 WINDOW = 252
 ALPHA, GAMMA, BURN_IN = 0.6, 0.3, 3
@@ -101,7 +102,7 @@ def main(argv: list[str] | None = None) -> None:
         m = _metrics(tag)
         m["seed"] = seed
         rows.append(m)
-        # Persist incrementally so a crash loses nothing.
+        # Save after each seed so that a crash loses nothing.
         pd.DataFrame(rows).to_csv(OUT_CSV, index=False)
         log.info("seed %d: Sharpe %.4f (csv updated)", seed, m["sharpe"])
 

@@ -1,10 +1,10 @@
-"""Per-window asset-asset directed graph, extracted from a fitted discovery
-window. The single chokepoint every direction-aware allocator goes through.
+"""Per-window asset-to-asset directed graph, extracted from a fitted
+discovery window. Every direction-aware allocator takes its graph from here.
 
-Conventions: ``M[i, j]`` is i -> j (VARLiNGAM's B0 is already transposed at
-fit time, do not re-transpose). The tau threshold and universe slicing happen
-here, and residual variances are computed on the fit window's z-scored data
-so they match the graph the allocator sees.
+``M[i, j]`` is the edge i -> j. VARLiNGAM's B0 is already transposed at fit
+time, so do not transpose it again. The tau threshold and the universe
+slicing happen here. I compute the residual variances on the fit window's
+z-scored data so that they match the graph the allocator sees.
 """
 
 from __future__ import annotations
@@ -21,7 +21,8 @@ logger = logging.getLogger(__name__)
 
 # DAG check (Kahn's algorithm on the binarised adjacency)
 def is_dag_matrix(M: np.ndarray) -> bool:
-    """True iff the non-zero pattern of ``M`` (i → j) is acyclic."""
+    """Return True if and only if the non-zero pattern of ``M`` (i -> j) is
+    acyclic."""
     adj = (M != 0.0).astype(np.int64)
     np.fill_diagonal(adj, 0)
     in_deg = adj.sum(axis=0).astype(np.int64)
@@ -37,13 +38,14 @@ def is_dag_matrix(M: np.ndarray) -> bool:
     return seen == M.shape[0]
 
 
-# The one type every allocator consumes
+# The one type every allocator takes in
 @dataclass(frozen=True)
 class AssetGraphWindow:
-    """Asset-asset directed graph for one rebalance window.
+    """Asset-to-asset directed graph for 1 rebalance window.
 
-    ``M`` is ``(N, N)``, i -> j, tau-thresholded, sliced to ``asset_names``.
-    ``resid_var_z`` is ``None`` only when no fit window was supplied (tests).
+    ``M`` is ``(N, N)`` with edges i -> j, thresholded at tau and sliced to
+    ``asset_names``. ``resid_var_z`` is ``None`` only when no fit window was
+    supplied (tests).
     """
 
     end_date: pd.Timestamp
@@ -85,12 +87,14 @@ def asset_graph_from_discovery(
     tau: float = 0.0,
     universe: Sequence[str] | None = None,
 ) -> AssetGraphWindow:
-    """Extract the sliced, thresholded asset-asset graph from a fit window.
+    """Extract the sliced and thresholded asset-to-asset graph from a fit
+    window.
 
-    ``joint_window`` is the exact data window the fit saw; it is needed for
-    the residual variances (pass ``None`` only in tests). ``tau`` is applied
-    before residuals are computed, so they match the graph the allocator
-    uses. ``universe`` restricts to the eligible names; ``None`` keeps all.
+    ``joint_window`` is the exact data window the fit saw. I need it for the
+    residual variances, so pass ``None`` only in tests. ``tau`` is applied
+    before the residuals are computed, so they match the graph the allocator
+    uses. ``universe`` restricts the graph to the eligible names, and
+    ``None`` keeps all of them.
     """
     disc_assets = list(disc.asset_columns)
     if universe is None:
@@ -103,19 +107,19 @@ def asset_graph_from_discovery(
         )
     pos = [disc_assets.index(a) for a in names]
 
-    # Rows and columns sliced together so M stays square on `names`.
+    # Slice rows and columns together so that M stays square on `names`.
     M = np.asarray(disc.asset_to_asset_block(0), dtype=float)[np.ix_(pos, pos)].copy()
     if tau > 0.0:
         M[np.abs(M) < tau] = 0.0
     np.fill_diagonal(M, 0.0)
 
-    # z-stats are stored full-length over disc.columns; slice to the asset block.
+    # The z-score statistics cover all of disc.columns, so slice to the asset block.
     asset_idx = np.asarray(disc.asset_idx, dtype=int)
     mean_a = np.asarray(disc.zscore_mean, dtype=float)[asset_idx][pos]
     std_a = np.asarray(disc.zscore_std, dtype=float)[asset_idx][pos]
 
-    # Residuals in z-space with the stored z-stats and thresholded M:
-    # x = x M + eps (row form) so E = X_z (I - M).
+    # Residuals in z-space with the stored z-score statistics and the
+    # thresholded M. In row form x = x M + eps, so E = X_z (I - M).
     resid_var_z: np.ndarray | None = None
     if joint_window is not None:
         missing = [a for a in names if a not in joint_window.columns]

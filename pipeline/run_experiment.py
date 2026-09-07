@@ -1,9 +1,10 @@
 """Rolling-window causal-discovery experiment driver.
 
-Runs DYNOTEARS and/or VARLiNGAM over the configured universe and date range,
-persisting results, metrics and per-window checkpoints to
-``results/<tag>/``. Re-running the same ``--tag`` resumes from checkpoints;
-use a new tag when windowing or algorithm parameters change.
+It runs DYNOTEARS and/or VARLiNGAM over the configured universe and date
+range and saves the results, metrics and per-window checkpoints to
+``results/<tag>/``. Re-running the same ``--tag`` resumes from the
+checkpoints, so use a new tag when the windowing or the algorithm
+parameters change.
 
 Example::
 
@@ -105,7 +106,8 @@ def _setup_logging(output_dir: Path) -> None:
 
 
 def _save_rolling(result, name: str, output_dir: Path) -> None:
-    """Persist a rolling result: pickle + per-window CSV + metrics + plot."""
+    """Save a rolling result as a pickle, a per-window CSV, the metrics and a
+    plot."""
     with open(output_dir / f"{name}.pkl", "wb") as fh:
         pickle.dump(result, fh)
     result.to_frame().to_csv(output_dir / f"{name}_windows.csv", index=False)
@@ -150,7 +152,7 @@ def main(argv: list[str] | None = None) -> None:
         f"meta={dataset.meta}\n"
         f"dropped={dataset.dropped}\n"
     )
-    # Snapshot the dataset in case yfinance later revises history.
+    # Save a snapshot of the dataset in case yfinance later revises its history.
     with open(output_dir / "dataset.pkl", "wb") as fh:
         pickle.dump(dataset, fh)
 

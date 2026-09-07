@@ -1,8 +1,9 @@
-"""Hierarchical Risk Parity (López de Prado 2016) with pluggable distance
+"""Hierarchical Risk Parity (López de Prado 2016) with a pluggable distance
 and covariance.
 
-The distance drives clustering, the covariance drives allocation; the two
-are decoupled so variants can swap either in.
+The distance is used for clustering and the covariance is used for
+allocation. I keep the two separate so that the allocator variants can swap
+either one.
 """
 
 from __future__ import annotations
@@ -18,7 +19,8 @@ logger = logging.getLogger(__name__)
 
 # Quasi-diagonalisation + recursive bisection
 def quasi_diagonal_order(linkage: np.ndarray, n_items: int) -> list[int]:
-    """Leaf order that quasi-diagonalises the linkage tree (López de Prado 2016)."""
+    """Return the leaf order that quasi-diagonalises the linkage tree (López de
+    Prado 2016)."""
     linkage = linkage.astype(int)
     order = pd.Series([linkage[-1, 0], linkage[-1, 1]])
     while order.max() >= n_items:
@@ -34,7 +36,8 @@ def quasi_diagonal_order(linkage: np.ndarray, n_items: int) -> list[int]:
 
 
 def _cluster_variance(cov: np.ndarray, items: list[int]) -> float:
-    """Variance of the *inverse-variance-weighted* portfolio on ``items``."""
+    """Return the variance of the inverse-variance-weighted portfolio on
+    ``items``."""
     sub = cov[np.ix_(items, items)]
     inv_diag = 1.0 / np.maximum(np.diag(sub), 1e-12)
     weights = inv_diag / inv_diag.sum()
@@ -42,7 +45,8 @@ def _cluster_variance(cov: np.ndarray, items: list[int]) -> float:
 
 
 def recursive_bisection(cov: np.ndarray, order: list[int]) -> np.ndarray:
-    """Allocate by HRP recursive bisection over the quasi-diagonal ordering."""
+    """Allocate weights by HRP recursive bisection over the quasi-diagonal
+    ordering."""
     weights = np.ones(len(order))
     clusters = [order]
     while clusters:
@@ -70,8 +74,8 @@ def hrp_weights(
     covariance: pd.DataFrame,
     linkage_method: str = "single",
 ) -> pd.Series:
-    """HRP weights from a (distance, covariance) pair sharing the same
-    asset index. Returns a name-indexed Series summing to 1.
+    """Return HRP weights from a distance and a covariance that share the same
+    asset index. The result is a name-indexed Series that sums to 1.
     """
     from scipy.cluster.hierarchy import linkage as scipy_linkage
     from scipy.spatial.distance import squareform
@@ -99,12 +103,13 @@ def herc_weights(
     covariance: pd.DataFrame,
     linkage_method: str = "single",
 ) -> pd.Series:
-    """Hierarchical Equal Risk Contribution weights (Raffinot 2018),
+    """Return Hierarchical Equal Risk Contribution weights (Raffinot 2018),
     full-recursion variant.
 
-    Same clustering stage as :func:`hrp_weights`, but allocation walks the
-    dendrogram's actual topology top-down, splitting each node's budget by
-    inverse cluster variance. The only change from HRP is how the tree is read.
+    The clustering step is the same as in :func:`hrp_weights`. However, the
+    allocation goes down the actual dendrogram from the root and splits each
+    node's budget by inverse cluster variance. The only change from HRP is
+    how the tree is read.
     """
     from scipy.cluster.hierarchy import linkage as scipy_linkage
     from scipy.spatial.distance import squareform
@@ -122,7 +127,7 @@ def herc_weights(
 
     cov = covariance.to_numpy()
 
-    # leaves(node): leaf ids < N; internal node N+j has children tree[j, 0:2].
+    # Leaf ids are below N. Internal node N+j has the children tree[j, 0:2].
     def leaves(node: int) -> list[int]:
         if node < N:
             return [node]

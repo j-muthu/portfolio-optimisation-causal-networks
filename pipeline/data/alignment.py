@@ -1,7 +1,8 @@
 """NYSE calendar alignment, joint [D | A] matrix construction, per-window
 z-scoring and stationarity flags.
 
-zscore_window must be called inside the rolling loop, never on the full panel.
+zscore_window must be called inside the rolling loop and never on the full
+panel.
 """
 
 from __future__ import annotations
@@ -22,10 +23,10 @@ def trading_calendar(
     end: str | pd.Timestamp,
     use_market_calendars: bool = True,
 ) -> pd.DatetimeIndex:
-    """NYSE trading days for [start, end] inclusive.
+    """Return the NYSE trading days for [start, end] inclusive.
 
-    Prefers pandas_market_calendars; falls back to SPY's trading dates via
-    yfinance (equivalent, but SPY history starts 1993).
+    I use pandas_market_calendars if it is installed. Otherwise I fall back to
+    SPY's trading dates from yfinance, which are equivalent but start in 1993.
     """
     start_ts = pd.Timestamp(start).normalize()
     end_ts = pd.Timestamp(end).normalize()
@@ -43,7 +44,7 @@ def trading_calendar(
                 "canonical path)"
             )
 
-    # Fallback: derive from SPY.
+    # Otherwise derive the calendar from SPY.
     import warnings
 
     import yfinance as yf
@@ -69,8 +70,8 @@ def trading_calendar(
 # Joint matrix
 @dataclass
 class JointMatrix:
-    """Discovery-ready [D | A] panel; columns are always drivers first, then
-    assets."""
+    """The [D | A] panel ready for discovery. The columns are always the
+    drivers first, then the assets."""
 
     frame: pd.DataFrame
     driver_columns: list[str]
@@ -79,8 +80,8 @@ class JointMatrix:
     asset_idx: np.ndarray
     rows_dropped: int = 0
     meta: dict = field(default_factory=dict)
-    # Per-(row, asset) "real data" mask, populated only under
-    # drop_na='drivers_only'. False means the cell was NaN and zero-filled.
+    # Mask of real data per (row, asset), filled only under
+    # drop_na='drivers_only'. False means the cell was NaN and was zero-filled.
     asset_eligibility: pd.DataFrame | None = None
 
     @property
@@ -100,8 +101,8 @@ class JointMatrix:
     def assets_eligible_in_window(
         self, start: pd.Timestamp, end: pd.Timestamp,
     ) -> list[str]:
-        """Assets with real (non-filled) data on every trading day in the
-        window."""
+        """Return the assets with real (not filled) data on every trading day
+        in the window."""
         if self.asset_eligibility is None:
             return list(self.asset_columns)
         mask = self.asset_eligibility.loc[start:end]
@@ -117,12 +118,13 @@ def build_joint_matrix(
     calendar: pd.DatetimeIndex | None = None,
     drop_na: bool | str = True,
 ) -> JointMatrix:
-    """Combine driver and asset frames into X = [D | A] on a shared calendar.
+    """Combine the driver and asset frames into X = [D | A] on a shared
+    calendar.
 
-    drop_na: True/"any" drops any row with a NaN; "drivers_only" drops rows
-    with driver NaNs but keeps asset-NaN rows, zero-filling them and recording
-    the fills in asset_eligibility (consumers must not trust the zeros);
-    False leaves NaNs in place.
+    drop_na=True or "any" drops any row with a NaN. "drivers_only" drops rows
+    with driver NaNs but keeps rows with asset NaNs, zero-fills them and
+    records the fills in asset_eligibility (callers must not trust the
+    zeros). False leaves the NaNs in place.
     """
     drivers = drivers.copy()
     assets = assets.copy()
@@ -136,7 +138,7 @@ def build_joint_matrix(
     aligned_d = drivers.reindex(calendar)
     aligned_a = assets.reindex(calendar)
 
-    # Refuse to silently shadow a driver name with an asset name.
+    # Refuse to let an asset name silently shadow a driver name.
     overlap = set(aligned_d.columns) & set(aligned_a.columns)
     if overlap:
         raise ValueError(f"Driver/asset column overlap: {sorted(overlap)}")
@@ -157,8 +159,8 @@ def build_joint_matrix(
                 "build_joint_matrix: dropped %d/%d rows with NaN", rows_dropped, before
             )
     elif drop_na == "drivers_only":
-        # Drop driver-NaN rows; zero-fill asset NaNs and record them in the
-        # eligibility mask.
+        # Drop rows with driver NaNs. Zero-fill asset NaNs and record them in
+        # the eligibility mask.
         before = len(joint)
         driver_nan_rows = joint[driver_columns].isna().any(axis=1)
         joint = joint.loc[~driver_nan_rows]
@@ -208,10 +210,10 @@ def zscore_window(
     ddof: int = 0,
     eps: float = 1e-12,
 ) -> tuple[pd.DataFrame, pd.Series, pd.Series]:
-    """Z-score each column with this window's mean and std.
+    """Z-score each column with this window's mean and standard deviation.
 
-    Returns (normalised, mean, std). eps floors the std so constant columns
-    don't divide by zero.
+    Return (normalised, mean, std). eps is the minimum standard deviation, so
+    that constant columns do not divide by zero.
     """
     mean = frame.mean(axis=0)
     std = frame.std(axis=0, ddof=ddof)
@@ -225,9 +227,9 @@ def zscore_window(
 # Stationarity flags
 @dataclass
 class StationarityFlags:
-    """Per-column ADF and KPSS outcomes. Note the nulls point opposite ways:
-    ADF stationary = low p, KPSS stationary = high p. Flagged series are kept,
-    not dropped."""
+    """Per-column ADF and KPSS outcomes. Note that the nulls point opposite
+    ways. A low p means stationary for ADF and a high p means stationary for
+    KPSS. Flagged series are kept rather than dropped."""
 
     adf_pvalues: pd.Series
     kpss_pvalues: pd.Series
@@ -248,7 +250,8 @@ def stationarity_flags(
     alpha: float = 0.05,
     skip_columns: Iterable[str] = (),
 ) -> StationarityFlags:
-    """Run ADF + KPSS on every column. Returns flags; never drops columns."""
+    """Run ADF and KPSS on every column. Return the flags. This never drops
+    columns."""
     import warnings
 
     from statsmodels.tsa.stattools import adfuller, kpss

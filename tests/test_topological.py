@@ -1,7 +1,8 @@
 """Unit tests for causal-ordered bisection (topological.py).
 
-Property-tests the topological order, the deterministic tie-break, the
-cycle branch (raise + feedback-arc fallback), and the DAG diagnostics.
+I test the properties of the topological order, the deterministic
+tie-break, the cycle branch (the raise and the feedback-arc fallback) and
+the DAG diagnostics.
 """
 
 from __future__ import annotations
@@ -81,12 +82,12 @@ def test_cycle_raises():
 # remove_feedback_arcs
 def test_feedback_arc_removal_drops_minimum_edge_on_3cycle():
     M = np.zeros((3, 3))
-    M[0, 1], M[1, 2], M[2, 0] = 0.9, 0.5, 0.1  # weakest closes the cycle
+    M[0, 1], M[1, 2], M[2, 0] = 0.9, 0.5, 0.1  # the weakest edge closes the cycle
     cleaned, dropped = remove_feedback_arcs(M)
     assert dropped == 1
     assert cleaned[2, 0] == 0.0
     assert cleaned[0, 1] == 0.9 and cleaned[1, 2] == 0.5
-    topological_order(cleaned)  # now sortable
+    topological_order(cleaned)  # this now succeeds
 
 
 # d2_weights

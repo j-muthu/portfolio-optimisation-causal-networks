@@ -1,7 +1,7 @@
 """Byte-exact verification of the discovery cache.
 
-Hit must equal miss to the array level, ``use_cache=False`` must not touch
-disk, and any changed input must change the key.
+A hit must equal a miss at the array level, ``use_cache=False`` must not
+touch the disk, and any changed input must change the key.
 """
 
 from __future__ import annotations
@@ -42,20 +42,20 @@ def _fit(frame, dcols, acols, **kw):
 
 
 def test_cache_hit_is_byte_exact(tmp_path, monkeypatch):
-    """A cached fit must equal a fresh fit to the array level."""
+    """A cached fit must equal a fresh fit at the array level."""
     monkeypatch.setattr(disc_cache, "CACHE_DIR", tmp_path)
     frame, dcols, acols = _small_joint()
     kwargs = {"p": 1, "w_threshold": 0.01}
 
-    fresh = _fit(frame, dcols, acols)  # ground truth, no cache
+    fresh = _fit(frame, dcols, acols)  # the ground truth, with no cache
 
-    # Miss: computes and writes.
+    # A miss computes and writes.
     miss = load_or_compute_discovery(
         lambda: _fit(frame, dcols, acols),
         joint_window=frame, driver_columns=dcols, asset_columns=acols,
         method="dynotears", discovery_kwargs=kwargs, use_cache=True,
     )
-    # Hit: loads from disk; the thunk raises if ever called.
+    # A hit loads from disk. The compute function raises if it is ever called.
     hit = load_or_compute_discovery(
         lambda: (_ for _ in ()).throw(AssertionError("cache miss on warm key")),
         joint_window=frame, driver_columns=dcols, asset_columns=acols,
@@ -87,15 +87,16 @@ def test_use_cache_false_touches_no_disk(tmp_path, monkeypatch):
 
 
 def test_key_isolation():
-    """Distinct inputs give distinct keys; same inputs give the same key."""
+    """Distinct inputs give distinct keys and the same inputs give the same
+    key."""
     frame, dcols, acols = _small_joint()
     base = discovery_cache_key(frame, dcols, acols, "dynotears", {"lambda_w": 0.05})
 
-    # Changed hyper-parameter.
+    # A changed hyper-parameter.
     assert base != discovery_cache_key(
         frame, dcols, acols, "dynotears", {"lambda_w": 0.10}
     )
-    # Changed method.
+    # A changed method.
     assert base != discovery_cache_key(frame, dcols, acols, "varlingam", {"lambda_w": 0.05})
     # Changed data content.
     perturbed = frame.copy()
@@ -103,15 +104,15 @@ def test_key_isolation():
     assert base != discovery_cache_key(
         perturbed, dcols, acols, "dynotears", {"lambda_w": 0.05}
     )
-    # Deterministic.
+    # The key is deterministic.
     assert base == discovery_cache_key(
         frame, dcols, acols, "dynotears", {"lambda_w": 0.05}
     )
 
 
 def test_cache_key_invariant_to_datetime_index_unit():
-    """Key must not depend on the index's datetime64 unit: a us -> ns flip
-    once silently re-keyed 1,684 byte-identical fits."""
+    """The key must not depend on the datetime64 unit of the index. A change
+    from us to ns once silently re-keyed 1684 byte-identical fits."""
     import numpy as np
     import pandas as pd
 

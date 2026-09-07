@@ -1,8 +1,8 @@
-"""Stage 2 orchestration: turn Stage 1 outputs into backtests and metrics
-per variant (V0' / V1 / V2), with the V2 utility feedback written per
-rebalance.
+"""Stage 2 orchestration. It turns the Stage 1 outputs into backtests and
+metrics for each variant (V0', V1 and V2), and writes the V2 utility
+feedback at each rebalance.
 
-Entry point: :func:`run_stage2`.
+The entry point is :func:`run_stage2`.
 """
 
 from __future__ import annotations
@@ -63,7 +63,8 @@ def _build_strategy_v1_or_v2(
     returns_frame: pd.DataFrame,
     lookback_days: int,
 ) -> Callable[[pd.Timestamp, list[str]], pd.Series]:
-    """Build a strategy callable for V1 or V2 that pulls S from the Stage 1 cache."""
+    """Build a strategy callable for V1 or V2 that reads S from the Stage 1
+    cache."""
     wrapper = v1_causal_hsp_open_loop if variant == "V1" else v2_causal_hsp_closed_loop
 
     def strategy(t, asset_names):
@@ -81,7 +82,7 @@ def _build_strategy_v1_or_v2(
         start_pos = max(0, end_pos - lookback_days)
         ret_window = returns_frame.iloc[start_pos:end_pos][common]
         w = wrapper(S_sub, common, ret_window, linkage_method=linkage_method)
-        # Pad to full universe (zero on assets with no signal).
+        # Pad to the full universe, with zero on assets that have no signal.
         return w.reindex(asset_names).fillna(0.0).pipe(lambda s: s / s.sum() if s.sum() > 0 else s)
 
     return strategy
@@ -93,7 +94,8 @@ def _build_strategy_v0prime(
     returns_frame: pd.DataFrame,
     lookback_days: int,
 ) -> Callable[[pd.Timestamp, list[str]], pd.Series]:
-    """Asset-only Causal-HRP using the (asset, asset) block of Stage 1's W."""
+    """Build the asset-only Causal-HRP strategy on the (asset, asset) block of
+    Stage 1's W."""
 
     def strategy(t, asset_names):
         if t not in stage1_by_date:
@@ -132,8 +134,9 @@ def run_stage2(
     """Run the Stage 2 backtest for the requested variants.
 
     ``variants`` is a subset of {"V0prime", "V1", "V2"}. V2 requires Stage 1
-    to have been run with a ``UtilityStore.as_lookup`` callable. Sharpe-diff
-    CIs are computed against V1 as the open-loop reference.
+    to have been run with a ``UtilityStore.as_lookup`` callable. I compute
+    the confidence intervals on Sharpe differences against V1, the open-loop
+    reference.
     """
     tag = tag or stage1.tag
     if output_dir is None:
@@ -174,7 +177,7 @@ def run_stage2(
             transaction_cost_bps=transaction_cost_bps,
         )
 
-        # V2: write the credit attribution + EMA update per rebalance.
+        # For V2, write the credit attribution and the EMA update at each rebalance.
         if variant == "V2":
             assert store is not None
             for rec in bt.rebalances:
@@ -199,7 +202,7 @@ def run_stage2(
                 store.append(rec.rebalance_date, rec.holding_end, updated, rec.holding_reward)
             store.save()
 
-        # Gross daily returns of the backtest for summary purposes.
+        # Gross daily returns of the backtest, for the summary.
         daily_ret = bt.nav_gross.pct_change().dropna()
         summary = performance_summary(
             daily_ret,
@@ -213,7 +216,7 @@ def run_stage2(
         )
         logger.info("variant %s: Sharpe=%.4f, MDD=%.4f", variant, summary["annualised_sharpe"], summary["max_drawdown"])
 
-    # Sharpe-diff CIs vs V1 (the open-loop reference).
+    # Confidence intervals on Sharpe differences against V1, the open-loop reference.
     sharpe_cis: dict[str, SharpeDiffCI] = {}
     if "V1" in variant_results and bootstrap_resamples > 0:
         ref_ret = variant_results["V1"].backtest.nav_gross.pct_change().dropna()

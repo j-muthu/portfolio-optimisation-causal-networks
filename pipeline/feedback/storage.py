@@ -1,9 +1,10 @@
-"""Lookahead-safe persistence of the driver-utility table U[t].
+"""Lookahead-safe storage of the driver-utility table U[t].
 
-Rows are keyed by holding-period-end date, not rebalance date: credit for a
-rebalance isn't known until the holding period ends, so "what was known at t"
-is a single lookup. lookup_utility asserts end_date <= t - 21d to guard
-against same-day leaks.
+I key the rows by the holding-period end date rather than the rebalance
+date, because the credit for a rebalance is not known until the holding
+period ends. This makes "what was known at t" a single lookup.
+lookup_utility asserts that end_date <= t - 21 days to guard against
+same-day leaks.
 """
 
 from __future__ import annotations
@@ -18,8 +19,8 @@ import pandas as pd
 
 logger = logging.getLogger(__name__)
 
-# Minimum calendar-day gap between a queried rebalance and the latest visible
-# utility row (one monthly rebalance).
+# Minimum gap in calendar days between a queried rebalance and the latest
+# visible utility row (1 monthly rebalance).
 MIN_LOOKAHEAD_GAP_DAYS = 21
 
 
@@ -27,7 +28,8 @@ MIN_LOOKAHEAD_GAP_DAYS = 21
 @dataclass
 class UtilityStore:
     """Driver-utility table indexed by end_date, with hard lookahead
-    assertions. aux_columns are non-utility columns excluded from lookups."""
+    assertions. aux_columns are the non-utility columns, which are excluded
+    from lookups."""
 
     parquet_path: Path
     frame: pd.DataFrame = field(default_factory=pd.DataFrame)
@@ -61,7 +63,7 @@ class UtilityStore:
         updated_utility: pd.Series,
         reward: float,
     ) -> None:
-        """Append (or replace) the row keyed by holding_end."""
+        """Append the row keyed by holding_end, or replace it."""
         end_ts = pd.Timestamp(holding_end).normalize()
         row = updated_utility.copy()
         row["rebalance_date"] = pd.Timestamp(rebalance_date)
@@ -72,7 +74,7 @@ class UtilityStore:
             df = self.frame.copy()
             df.loc[end_ts] = row
         df = df.sort_index()
-        # Keep last write per end_date.
+        # Keep the last write per end_date.
         df = df.loc[~df.index.duplicated(keep="last")]
         self.frame = df
 
@@ -83,9 +85,10 @@ class UtilityStore:
         min_gap_days: int = MIN_LOOKAHEAD_GAP_DAYS,
         require_strict: bool = True,
     ) -> tuple[pd.Series, pd.Timestamp | None]:
-        """(U, end_date) valid at rebalance t: latest row with end_date <=
-        t - min_gap_days, or (empty, None) during burn-in. require_strict
-        asserts the gap; only the leak canary bypasses it."""
+        """Return the (U, end_date) valid at rebalance t. This is the latest
+        row with end_date <= t - min_gap_days, or (empty, None) during
+        burn-in. require_strict asserts the gap, and only the leak check
+        bypasses it."""
         t = pd.Timestamp(rebalance_date).normalize()
         if self.frame.empty:
             return pd.Series(dtype=float, name="utility"), None
@@ -106,7 +109,8 @@ class UtilityStore:
         return utility, latest
 
     def as_lookup(self) -> Callable[[pd.Timestamp], tuple[pd.Series, pd.Timestamp | None]]:
-        """Callable with the signature selector.select_drivers expects."""
+        """Return a callable with the signature that selector.select_drivers
+        expects."""
         return lambda t: self.lookup_utility(t)
 
 

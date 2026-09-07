@@ -1,8 +1,9 @@
-"""Import bridge to the vendored ``causalnex`` and ``lingam`` source trees.
+"""Imports from the vendored ``causalnex`` and ``lingam`` source trees.
 
-Registers stub packages in ``sys.modules`` so the submodules we need import
-without running the packages' heavy ``__init__.py`` files (torch, LiNA, ...).
-Import from here: ``from pipeline._vendored import from_pandas_dynamic``.
+I register stub packages in ``sys.modules`` so that the submodules I need
+import without running the packages' heavy ``__init__.py`` files (which pull
+in torch and LiNA). Other modules import from here, e.g.
+``from pipeline._vendored import from_pandas_dynamic``.
 """
 
 from __future__ import annotations
@@ -21,8 +22,8 @@ _LINGAM_PKG = THESIS_ROOT / "lingam" / "lingam"
 
 # Compatibility shims
 def _patch_pandas_compat() -> None:
-    """Re-add ``pd.Index.is_integer`` (removed in pandas 2.1) for the vendored
-    DynamicDataTransformer."""
+    """Re-add ``pd.Index.is_integer`` (removed in pandas 2.1) because the
+    vendored DynamicDataTransformer uses it."""
     if not hasattr(pd.Index, "is_integer"):
         pd.Index.is_integer = lambda self: pd.api.types.is_integer_dtype(self)
 

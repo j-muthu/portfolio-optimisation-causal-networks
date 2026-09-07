@@ -1,11 +1,12 @@
 """Content-keyed disk cache for the per-window causal-graph fit.
 
-The fit depends only on the window data and discovery hyper-parameters, not
-on K, alpha or gamma, so sweeps over those refit the identical graph; caching
-by the exact fit inputs lets every later sweep config reuse the first fit.
-Reads are tolerant (corrupt file -> recompute) and writes are atomic
-(tmp file + os.replace), so concurrent runs are safe. Opt-in via
-``use_cache=True``; otherwise a pure passthrough that touches no disk.
+The fit depends only on the window data and the discovery hyper-parameters.
+It does not depend on K, alpha or gamma, so sweeps over those refit the
+identical graph. I key the cache on the exact fit inputs so that every later
+sweep configuration reuses the first fit. A corrupt file is recomputed, and
+writes are atomic (a temporary file followed by os.replace), so concurrent
+runs are safe. The cache is used only with ``use_cache=True``. Otherwise the
+function is a passthrough that touches no disk.
 """
 
 from __future__ import annotations
@@ -34,10 +35,12 @@ def discovery_cache_key(
     method: str,
     discovery_kwargs: dict,
 ) -> str:
-    """Stable 24-char hex key over the exact discovery fit inputs.
+    """Return a stable 24-character hex key over the exact discovery fit
+    inputs.
 
-    Hashes the full window content plus column ordering, method and
-    hyper-parameters, so any change to the data or params yields a new key.
+    I hash the full window content plus the column ordering, the method and
+    the hyper-parameters, so any change to the data or the parameters gives
+    a new key.
     """
     h = hashlib.sha256()
     h.update(method.encode())
@@ -45,16 +48,16 @@ def discovery_cache_key(
     h.update("|".join(driver_columns).encode())
     h.update(b"\x00assets\x00")
     h.update("|".join(asset_columns).encode())
-    # Full content fingerprint: float64 values plus the date index.
+    # Hash the full content, i.e. the float64 values plus the date index.
     values = np.ascontiguousarray(joint_window.to_numpy(dtype=np.float64))
     h.update(values.tobytes())
     idx = joint_window.index
     if isinstance(idx, pd.DatetimeIndex):
-        # Normalise to microsecond resolution before hashing. The index's
-        # datetime unit can flip (us <-> ns) with environment changes,
-        # silently re-keying every window on byte-identical data (this
+        # Normalise to microsecond resolution before hashing. The datetime
+        # unit of the index can change between us and ns when the environment
+        # changes, which silently re-keys every window on identical data (this
         # happened on 2026-08-15). The committed cache was keyed with
-        # us-resolution bytes, so "us" keeps every existing key reachable.
+        # microsecond bytes, so "us" keeps every existing key reachable.
         h.update(idx.as_unit("us").asi8.tobytes())
     else:
         h.update("|".join(map(str, idx)).encode())
@@ -72,10 +75,11 @@ def load_or_compute_discovery(
     discovery_kwargs: dict,
     use_cache: bool,
 ):
-    """Return a cached discovery window if present, else compute and cache it.
+    """Return the cached discovery window if there is one. Otherwise compute
+    it and cache it.
 
-    ``compute_fn`` is a zero-arg thunk running the actual fit; its result must
-    be picklable. With ``use_cache=False`` this is a pure passthrough.
+    ``compute_fn`` is a zero-argument function that runs the actual fit. Its
+    result must be picklable. With ``use_cache=False`` this is a passthrough.
     """
     if not use_cache:
         return compute_fn()
@@ -91,7 +95,7 @@ def load_or_compute_discovery(
                 obj = pickle.load(fh)
             logger.debug("discovery cache hit (%s): %s", method, cache_path.name)
             return obj
-        except Exception as exc:  # torn/corrupt: recompute
+        except Exception as exc:  # the file is torn or corrupt, so recompute
             logger.warning(
                 "discovery cache read failed (%s: %s) — recomputing",
                 cache_path.name, exc,
@@ -99,14 +103,14 @@ def load_or_compute_discovery(
 
     obj = compute_fn()
 
-    # Atomic write: unique temp file then os.replace.
+    # Write atomically through a unique temporary file and os.replace.
     tmp_path = cache_path.with_suffix(f".{os.getpid()}.tmp")
     try:
         with tmp_path.open("wb") as fh:
             pickle.dump(obj, fh, protocol=pickle.HIGHEST_PROTOCOL)
         os.replace(tmp_path, cache_path)
         logger.debug("discovery cache write (%s): %s", method, cache_path.name)
-    except Exception as exc:  # best-effort persistence, never fail the fit
+    except Exception as exc:  # a failed write must never fail the fit
         logger.warning("discovery cache write failed (%s): %s", cache_path.name, exc)
         try:
             if tmp_path.exists():

@@ -1,10 +1,10 @@
 """Run the 2025-26 out-of-sample slice (PREDICTIONS_OOS.md).
 
-Phase-II harness unchanged, DYNOTEARS only. Caches are redirected to
-cache/prices_oos and cache/drivers_oos before any fetch, because the cache
-writer replaces a ticker's parquet wholesale and must not clobber the
-in-sample series. WRDS is disabled (CRSP daily ends 2024-12-31); slice
-prices come from Yahoo Finance.
+The Phase II harness is unchanged and I use DYNOTEARS only. I redirect the
+caches to cache/prices_oos and cache/drivers_oos before any fetch, because
+the cache writer replaces a ticker's parquet file wholesale and must not
+overwrite the in-sample series. WRDS is disabled because CRSP daily data
+ends on 2024-12-31, so the slice prices come from Yahoo Finance.
 
 Usage:  python -m scripts.run_oos_slice --allocator D1 --window 252
 """
@@ -16,10 +16,10 @@ import logging
 from pipeline._vendored import THESIS_ROOT
 from pipeline.data import assets, drivers
 
-# Cache isolation + backend pin, before any fetch.
+# Isolate the caches and pin the backend before any fetch.
 assets.PRICES_DIR = THESIS_ROOT / "cache" / "prices_oos"
 assets.PRICES_DIR.mkdir(parents=True, exist_ok=True)
-assets.fetch_from_wrds = lambda *a, **k: None  # CRSP daily ends 2024-12-31
+assets.fetch_from_wrds = lambda *a, **k: None  # CRSP daily data ends on 2024-12-31
 drivers.CACHE_DIR = THESIS_ROOT / "cache" / "drivers_oos"
 drivers.CACHE_DIR.mkdir(parents=True, exist_ok=True)
 
@@ -28,8 +28,8 @@ from pipeline.portfolio.directed import ALLOCATORS          # noqa: E402
 from pipeline.shakedown import run_shakedown                # noqa: E402
 from scripts.run_phase_ii import DROP_DRIVERS, UNIVERSE_FILE  # noqa: E402
 
-# Fixed in PREDICTIONS_OOS.md; data start padded so the 504-day lookback
-# is burned in at the first 2025 rebalance.
+# Fixed in PREDICTIONS_OOS.md. The data start is padded so that the 504-day
+# lookback is burned in at the first 2025 rebalance.
 DATA_START = "2022-07-01"
 BACKTEST_START = "2025-01-02"
 DATA_END = "2026-08-14"
@@ -88,7 +88,7 @@ def main(argv: list[str] | None = None) -> None:
         bt = res.closed_loop.backtest
         print(f"final NAV (gross/net): {bt.nav_gross.iloc[-1]:.4f} / "
               f"{bt.nav_net.iloc[-1]:.4f} | rebalances: {len(bt.rebalances)}")
-    except Exception as exc:  # cosmetic only
+    except Exception as exc:  # the summary print must not abort the run
         log.warning("Could not print final NAV (%s); results persisted.", exc)
     print("=" * 70)
 

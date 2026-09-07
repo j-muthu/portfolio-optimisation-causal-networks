@@ -1,5 +1,5 @@
 """Stage 1 driver selection: Stage A pruning, K calibration, Stage B greedy
-refinement, and the top-level alpha-blended selector."""
+refinement and the top-level alpha-blended selector."""
 
 from __future__ import annotations
 
@@ -24,7 +24,7 @@ __all__ = [
     "greedy_select",
     "SelectionResult",
     "select_drivers",
-    # V0 baseline (cumulative-correlation selection)
+    # V0 baseline (selection by cumulative correlation)
     "CorrelationSelectionResult",
     "cumulative_correlation_score",
     "select_top_k_corr",

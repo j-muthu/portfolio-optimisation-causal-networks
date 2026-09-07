@@ -1,8 +1,8 @@
-"""Run one (method, allocator, window, tau) cell of the Phase-II ablation.
+"""Run 1 (method, allocator, window, tau) cell of the Phase II ablation.
 
-Everything upstream of the allocator is the identical Phase-I protocol, so
-the discovery cache hits the Phase-I graph fits. All data pre-cached; no
-WRDS calls.
+Everything upstream of the allocator is the identical Phase I protocol, so
+the discovery cache hits the Phase I graph fits. All data is already cached,
+so this makes no WRDS calls.
 
 Usage
 -----
@@ -27,7 +27,7 @@ from pipeline.data.drivers import DRIVER_CATALOGUE
 from pipeline.portfolio.directed import ALLOCATORS
 from pipeline.shakedown import run_shakedown
 
-# Same exclusions as Phase I, mandatory for the discovery-cache keys to match.
+# The same exclusions as Phase I. These are required for the discovery-cache keys to match.
 DROP_DRIVERS = {"hyg_lqd_logret", "vvix"}
 
 _TRACKED_UNIVERSE = pathlib.Path(__file__).resolve().parent / "phase_i_universe.txt"
@@ -65,8 +65,8 @@ def main(argv: list[str] | None = None) -> None:
     universe = UNIVERSE_FILE.read_text().strip().split(",")
     driver_specs = [s for s in DRIVER_CATALOGUE if s.name not in DROP_DRIVERS]
 
-    # Discovery kwargs must match Phase I exactly for the cache keys to hit.
-    # GRANGER windows are new fits, density-matched to DYNOTEARS.
+    # The discovery kwargs must match Phase I exactly for the cache keys to hit.
+    # The GRANGER windows are new fits with their density matched to DYNOTEARS.
     if args.method == "varlingam":
         discovery_kwargs: dict | None = {"prune": False}
     elif args.method == "granger":
@@ -77,7 +77,7 @@ def main(argv: list[str] | None = None) -> None:
     else:
         discovery_kwargs = None
 
-    # CORR, EW/IVP and HERCC are graph-blind, so their tags are method-independent.
+    # CORR, EW, IVP and HERCC use no graph, so their tags do not depend on the method.
     if args.allocator == "CORR":
         tag = f"phase_ii_corr_hrp_w{args.window}"
     elif args.allocator in ("EW", "IVP"):
@@ -104,7 +104,7 @@ def main(argv: list[str] | None = None) -> None:
         universe_override=universe,
         driver_specs=driver_specs,
         K_default=10,                 # unused on the asset_only path
-        use_k_calibration=False,      # no drivers selected, nothing to calibrate
+        use_k_calibration=False,      # no drivers are selected, so there is nothing to calibrate
         window_size=args.window,
         lookback_days=args.window,
         holding_days=21,
@@ -117,7 +117,7 @@ def main(argv: list[str] | None = None) -> None:
         discovery_kwargs=discovery_kwargs,
         tag=tag,
         use_cache=True,
-        discovery_cache=True,         # Phase II is cache-fed by design
+        discovery_cache=True,         # Phase II reads the cache by design
     )
 
     print("\n" + "=" * 70)
@@ -125,7 +125,7 @@ def main(argv: list[str] | None = None) -> None:
     try:
         bt = res.closed_loop.backtest
         print(f"final NAV (gross/net): {bt.nav_gross.iloc[-1]:.4f} / {bt.nav_net.iloc[-1]:.4f}")
-    except Exception as exc:  # cosmetic print must not abort a run
+    except Exception as exc:  # the summary print must not abort a run
         log.warning("Could not print final NAV (%s); results are persisted regardless.", exc)
     print("=" * 70)
 

@@ -1,7 +1,9 @@
-"""Politis-Romano (1994) stationary block bootstrap for Sharpe-difference CIs.
+"""Politis-Romano (1994) stationary block bootstrap for confidence intervals
+on Sharpe differences.
 
-iid resampling destroys the autocorrelation in returns and underestimates
-Sharpe variance; block resampling preserves the local time-series structure.
+I use block resampling because iid resampling destroys the autocorrelation
+in returns and underestimates the variance of the Sharpe ratio. Block
+resampling keeps the local time-series structure.
 """
 
 from __future__ import annotations
@@ -21,8 +23,9 @@ logger = logging.getLogger(__name__)
 def stationary_block_indices(
     n: int, mean_block_length: float, rng: np.random.Generator,
 ) -> np.ndarray:
-    """n resample indices: blocks start uniformly at random, have geometric
-    length with the given mean, and wrap around the series end."""
+    """Return n resample indices. Blocks start uniformly at random, have a
+    geometric length with the given mean and wrap around the end of the
+    series."""
     if mean_block_length <= 1.0:
         return rng.integers(0, n, size=n)
     p = 1.0 / mean_block_length
@@ -45,8 +48,8 @@ def bootstrap_statistic(
     mean_block_length: float = 21.0,
     seed: int = 42,
 ) -> np.ndarray:
-    """Bootstrap statistic values over n_resamples block resamples. Default
-    block length 21 is roughly one trading month."""
+    """Return the statistic over n_resamples block resamples. The default
+    block length of 21 is roughly 1 trading month."""
     rng = np.random.default_rng(seed)
     arr = series.dropna().to_numpy()
     n = len(arr)
@@ -60,7 +63,8 @@ def bootstrap_statistic(
 # Sharpe-difference CI
 @dataclass
 class SharpeDiffCI:
-    """Bootstrap Sharpe(A) - Sharpe(B) with its CI and two-sided p-value."""
+    """Bootstrap result for Sharpe(A) - Sharpe(B) with its confidence
+    interval and two-sided p-value."""
 
     point_estimate: float
     ci_lower: float
@@ -78,9 +82,10 @@ def sharpe_difference_ci(
     seed: int = 42,
     periods_per_year: int = 252,
 ) -> SharpeDiffCI:
-    """Stationary-block-bootstrap CI on Sharpe(a) - Sharpe(b). Resamples the
-    joint (a, b) panel so cross-strategy correlation is preserved; missing
-    values are dropped pairwise."""
+    """Return a stationary block bootstrap confidence interval on
+    Sharpe(a) - Sharpe(b). I resample the joint (a, b) panel so that the
+    correlation between the 2 strategies is preserved. Missing values are
+    dropped pairwise."""
     df = pd.concat([returns_a.rename("a"), returns_b.rename("b")], axis=1).dropna()
     arr = df.to_numpy()
     n = len(arr)
@@ -97,7 +102,8 @@ def sharpe_difference_ci(
         diffs[b] = diff(arr[idx])
     alpha = (1 - confidence) / 2
     lo, hi = float(np.quantile(diffs, alpha)), float(np.quantile(diffs, 1 - alpha))
-    # Two-sided p-value: bootstrap diffs crossing 0 against the point estimate.
+    # The two-sided p-value is the fraction of bootstrap differences on the
+    # other side of 0 from the point estimate.
     if point >= 0:
         p = float(np.mean(diffs <= 0)) * 2
     else:

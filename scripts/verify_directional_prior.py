@@ -1,9 +1,10 @@
-"""J1: directional-prior verification.
+"""J1: verification of the directional prior.
 
-Refits a sample of windows with and without the asset->driver mask and
-compares: how much the driver->asset block shifts, how much asset->driver
-mass the prior suppresses, and whether Stage-A top-K selection changes.
-Uses the exact Phase I data build. Cache-only, no WRDS.
+I refit a sample of windows with and without the asset -> driver mask and
+compare 3 things. First, how much the driver -> asset block changes.
+Second, how much asset -> driver mass the prior removes. Third, whether
+the Stage A top-K selection changes. This uses the exact Phase I data build
+from the cache and makes no WRDS calls.
 
 Run:  python -m scripts.verify_directional_prior
 """
@@ -21,7 +22,7 @@ from pipeline.data.drivers import DRIVER_CATALOGUE, build_driver_pool
 from pipeline.discovery.dynotears import run_dynotears_joint_window
 from pipeline.factor_selection.prune import stage_a_score
 
-# Reuse Phase I's config so windows line up with the headline run.
+# Reuse the Phase I configuration so that the windows line up with the headline run.
 from scripts.run_phase_i import (
     DATA_END,
     DATA_START,
@@ -31,19 +32,20 @@ from scripts.run_phase_i import (
 
 log = logging.getLogger("verify_prior")
 
-# Sample dates: one calm year plus the major stress regimes.
+# The sample dates are 1 calm year plus the major stress regimes.
 WINDOW = 252
 SAMPLE_DATES = [
-    "2008-10-01",  # GFC core
+    "2008-10-01",  # the core of the GFC
     "2011-09-01",  # Euro crisis
-    "2014-06-02",  # calm bull market
-    "2018-12-03",  # 2018Q4 selloff
-    "2020-03-02",  # COVID crash
-    "2022-06-01",  # rate-hike drawdown
+    "2014-06-02",  # a calm bull market
+    "2018-12-03",  # the 2018 Q4 selloff
+    "2020-03-02",  # the COVID crash
+    "2022-06-01",  # the rate-hike drawdown
 ]
-# DYNOTEARS hyperparameters, matching the Phase I defaults.
+# The DYNOTEARS hyperparameters, matching the Phase I defaults.
 DISC_KWARGS = dict(p=1, lambda_w=0.05, lambda_a=0.05, w_threshold=0.01, max_iter=100)
-TOP_K = 17  # the calibrated Phase I K
+TOP_K = 17  # the calibrated Phase I K, kept for the figure's headline series
+TOP_KS = (5, 10, 15, 20, 25)  # a sweep, so that the overlap does not depend on 1 cut-off
 
 
 def _jaccard(a: list[str], b: list[str]) -> float:
@@ -84,7 +86,7 @@ def main() -> None:
             continue
         window = frame.iloc[start_pos:end_pos]
 
-        # Fit twice: with the asset->driver mask (production) and without it.
+        # Fit twice, with the asset -> driver mask (as in production) and without it.
         masked = run_dynotears_joint_window(
             window, driver_columns=drivers, asset_columns=assets,
             enforce_tabu=True, **DISC_KWARGS,
@@ -94,7 +96,7 @@ def main() -> None:
             enforce_tabu=False, **DISC_KWARGS,
         )
 
-        # (1) Change in the driver->asset block (lag 0 + lag 1 stacked).
+        # First, the change in the driver -> asset block (lag 0 and lag 1 stacked).
         da_masked = np.concatenate(
             [masked.driver_to_asset_block(l).ravel() for l in range(masked.p + 1)]
         )
@@ -105,22 +107,23 @@ def main() -> None:
         da_delta_l1 = float(np.abs(da_masked - da_free).sum())
         da_rel = da_delta_l1 / da_l1 if da_l1 > 0 else float("nan")
 
-        # (2) Asset->driver mass the prior suppresses (only present in `free`).
+        # Second, the asset -> driver mass that the prior removes. This is only present in `free`.
         ad_free = np.concatenate(
             [free.asset_to_driver_block(l).ravel() for l in range(free.p + 1)]
         )
         ad_mass = float(np.abs(ad_free).sum())
         ad_edges = int(np.count_nonzero(ad_free))
-        # As a fraction of total edge mass in the unconstrained fit.
+        # Express it as a fraction of the total edge mass in the unconstrained fit.
         total_free_mass = ad_mass + float(np.abs(da_free).sum())
         ad_frac = ad_mass / total_free_mass if total_free_mass > 0 else float("nan")
 
-        # (3) Does the prior change which drivers Stage A ranks at the top?
-        top_masked = stage_a_score(masked, method="dynotears").scores.sort_values(
-            ascending=False).head(TOP_K).index.tolist()
-        top_free = stage_a_score(free, method="dynotears").scores.sort_values(
-            ascending=False).head(TOP_K).index.tolist()
-        topk_jac = _jaccard(top_masked, top_free)
+        # Third, whether the prior changes which drivers Stage A ranks at the top.
+        rank_masked = stage_a_score(masked, method="dynotears").scores.sort_values(
+            ascending=False).index.tolist()
+        rank_free = stage_a_score(free, method="dynotears").scores.sort_values(
+            ascending=False).index.tolist()
+        topk_jac = _jaccard(rank_masked[:TOP_K], rank_free[:TOP_K])
+        jac_by_k = {k: _jaccard(rank_masked[:k], rank_free[:k]) for k in TOP_KS}
 
         rows.append({
             "window_end": t.date(),
@@ -130,6 +133,7 @@ def main() -> None:
             "ad_edges": ad_edges,
             "ad_frac_of_total": round(ad_frac, 4),
             "topK_jaccard": round(topk_jac, 3),
+            **{f"jaccard_k{k}": round(jac_by_k[k], 3) for k in TOP_KS},
         })
         log.info("%s: da_rel_change=%.3f, ad_mass=%.3f (%d edges, %.1f%% of total), topK_jac=%.3f",
                  t.date(), da_rel, ad_mass, ad_edges, 100 * ad_frac, topk_jac)
@@ -146,6 +150,7 @@ def main() -> None:
     print("  ad_suppressed_mass: L1 mass of asset->driver edges that appear WITHOUT the prior")
     print("  ad_frac_of_total  : that suppressed mass as a fraction of total edge mass (unconstrained)")
     print("  topK_jaccard      : overlap of top-%d Stage-A drivers, masked vs free" % TOP_K)
+    print("  jaccard_k<K>      : the same overlap at K in %s" % (TOP_KS,))
     print()
     print("Interpretation: large ad_frac + low da_rel_change => the prior cheaply removes a real")
     print("chunk of (spurious) asset->driver mass without distorting the driver->asset block it")

@@ -1,7 +1,8 @@
-"""Point-in-time S&P 500 membership (fja05680/sp500 GitHub CSV) and the
-S&P-100 approximation: top 100 by market cap from the S&P 500 at date.
+"""Point-in-time S&P 500 membership (from the fja05680/sp500 GitHub CSV) and
+the S&P 100 approximation, which is the top 100 of the S&P 500 by market
+cap at a date.
 
-Prices and shares are supplied by the caller; this module fetches neither.
+The caller supplies prices and shares. This module fetches neither.
 """
 
 from __future__ import annotations
@@ -37,8 +38,9 @@ _FJA_NAME_RE = re.compile(
 # Membership table
 @dataclass
 class SP500History:
-    """S&P 500 membership snapshots: one row per change date with the active
-    ticker set. Membership at a date = the latest row <= that date."""
+    """S&P 500 membership snapshots, with 1 row per change date holding the
+    active ticker set. The membership at a date is the latest row on or
+    before that date."""
 
     frame: pd.DataFrame
     source_filename: str
@@ -54,13 +56,14 @@ class SP500History:
 
 
 def _normalise_ticker(symbol: str) -> str:
-    """Yahoo's convention: '-' not '.' for share-class suffixes."""
+    """Convert to Yahoo's convention, which uses '-' rather than '.' for
+    share-class suffixes."""
     return symbol.strip().upper().replace(".", "-")
 
 
 def _resolve_latest_fja_filename(use_cache: bool = True) -> str:
-    """Pick the most recent date-stamped CSV in the repo. Cached 24 h to spare
-    the GitHub API."""
+    """Pick the most recent date-stamped CSV in the repository. I cache the
+    answer for 24 hours to limit calls to the GitHub API."""
     cache = CACHE_DIR / "fja05680_filename.txt"
     if use_cache and cache.exists():
         age = pd.Timestamp.now() - pd.Timestamp(cache.stat().st_mtime, unit="s")
@@ -93,7 +96,7 @@ def _resolve_latest_fja_filename(use_cache: bool = True) -> str:
 
 
 def fetch_fja05680(use_cache: bool = True) -> SP500History:
-    """Download (or load from cache) the fja05680/sp500 historical CSV."""
+    """Download the fja05680/sp500 historical CSV, or load it from the cache."""
     cache = CACHE_DIR / "fja05680_sp500_history.parquet"
     meta = CACHE_DIR / "fja05680_sp500_history.meta.json"
     if use_cache and cache.exists():
@@ -112,7 +115,7 @@ def fetch_fja05680(use_cache: bool = True) -> SP500History:
     import requests
 
     filename = _resolve_latest_fja_filename(use_cache=use_cache)
-    # The raw URL needs spaces and & ( ) URL-encoded.
+    # The raw URL needs spaces and & ( ) to be URL-encoded.
     encoded = (
         filename.replace("&", "%26")
         .replace(" ", "%20")
@@ -125,7 +128,7 @@ def fetch_fja05680(use_cache: bool = True) -> SP500History:
     resp.raise_for_status()
     raw = pd.read_csv(io.StringIO(resp.text))
 
-    # Expected columns: 'date', 'tickers' (comma-separated symbols).
+    # The expected columns are 'date' and 'tickers' (comma-separated symbols).
     cols = {c.lower(): c for c in raw.columns}
     if "date" not in cols or "tickers" not in cols:
         raise RuntimeError(
@@ -171,8 +174,9 @@ def membership_at(
     history: SP500History | None = None,
     use_cache: bool = True,
 ) -> frozenset[str]:
-    """S&P 500 constituents active on date (latest snapshot <= date). Raises
-    ValueError before the start of the table."""
+    """Return the S&P 500 constituents active on date (the latest snapshot on
+    or before date). Raise ValueError for a date before the start of the
+    table."""
     if history is None:
         history = fetch_fja05680(use_cache=use_cache)
     ts = pd.Timestamp(date).normalize()
@@ -192,14 +196,15 @@ def all_tickers_ever(
     history: SP500History | None = None,
     use_cache: bool = True,
 ) -> list[str]:
-    """Every ticker that was a member at any point in [start, end], including
-    since-delisted names. Used to pre-fetch the price universe."""
+    """Return every ticker that was a member at any point in [start, end],
+    including names that have since been delisted. I use this to pre-fetch
+    the price universe."""
     if history is None:
         history = fetch_fja05680(use_cache=use_cache)
     frame = history.frame
     if start is not None:
         s = pd.Timestamp(start).normalize()
-        # Include the snapshot active at start (latest <= start).
+        # Include the snapshot active at start (the latest on or before start).
         first_idx = max(0, int(frame["date"].searchsorted(s, side="right")) - 1)
         frame = frame.iloc[first_idx:]
     if end is not None:
@@ -221,12 +226,13 @@ def top_n_by_mcap_at(
     use_cache: bool = True,
     min_price_lookback_days: int = 5,
 ) -> list[str]:
-    """Top-n S&P 500 constituents by market cap as of date, descending.
+    """Return the top n S&P 500 constituents by market cap as of date, in
+    descending order.
 
-    Uses the most recent close <= date, tolerating up to
-    min_price_lookback_days of staleness. shares_outstanding is one value per
-    ticker (a constant proxy on the non-WRDS path). Members missing price or
-    shares data are skipped and logged.
+    I use the most recent close on or before date and allow up to
+    min_price_lookback_days of staleness. shares_outstanding is 1 value per
+    ticker (a constant proxy on the path without WRDS). Members with missing
+    price or shares data are skipped and logged.
     """
     ts = pd.Timestamp(date).normalize()
     members = membership_at(ts, history=history, use_cache=use_cache)
@@ -238,7 +244,7 @@ def top_n_by_mcap_at(
             ts.date(), len(missing), len(members),
         )
 
-    # Most recent close at or before date, within the lookback window.
+    # Take the most recent close on or before date, within the lookback window.
     window = prices.loc[:ts].tail(min_price_lookback_days)
     if window.empty:
         raise ValueError(f"No prices available at or before {ts.date()}")
@@ -266,7 +272,7 @@ def rolling_top_n_universe(
     history: SP500History | None = None,
     use_cache: bool = True,
 ) -> dict[pd.Timestamp, list[str]]:
-    """Top-N selection per rebalance date in one call."""
+    """Run the top-N selection for every rebalance date in 1 call."""
     if history is None:
         history = fetch_fja05680(use_cache=use_cache)
     return {
@@ -280,8 +286,8 @@ def rolling_top_n_universe(
 def union_of_universes(
     universes: Iterable[Sequence[str]] | dict[pd.Timestamp, Sequence[str]],
 ) -> list[str]:
-    """Sorted union of all tickers appearing in any rebalance's top-N; trims
-    price downloads to the relevant subset."""
+    """Return the sorted union of all tickers that appear in any rebalance's
+    top-N. This limits price downloads to the relevant subset."""
     iterable = universes.values() if isinstance(universes, dict) else universes
     seen: set[str] = set()
     for u in iterable:

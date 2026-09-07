@@ -1,8 +1,9 @@
-"""J5: reduced-scope NTS-NOTEARS probe (non-linear discovery).
+"""J5: a reduced-scope NTS-NOTEARS probe (non-linear discovery).
 
-A full NTS-NOTEARS backtest is compute-prohibitive, so this fits NTS-NOTEARS
-and DYNOTEARS on a few regime windows at a reduced universe and reports
-agreement (Jaccard, Spearman) plus wall-clock per fit.
+A full NTS-NOTEARS backtest is too expensive to compute, so I fit
+NTS-NOTEARS and DYNOTEARS on a few regime windows over a reduced universe
+and report their agreement (Jaccard and Spearman) plus the wall-clock time
+per fit.
 
 Run:  python -m scripts.probe_nts_notears
 Output: results/j5_nts_probe.csv
@@ -27,7 +28,7 @@ from pipeline.factor_selection.prune import stage_a_score
 logging.basicConfig(level=logging.WARNING)
 REPO = pathlib.Path(__file__).resolve().parent.parent
 DROP = {"hyg_lqd_logret", "vvix"}
-N_ASSETS = 25          # reduced universe
+N_ASSETS = 25          # the reduced universe
 WINDOW = 504
 TOPK = 10
 WINDOWS = {"2008-10 GFC": "2008-10-01", "2014-06 calm": "2014-06-02",

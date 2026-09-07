@@ -1,9 +1,10 @@
-"""Legacy asset-only data pipeline: builds the standardised log-return matrix
-shared by DYNOTEARS and VARLiNGAM.
+"""Legacy asset-only data pipeline. It builds the standardised log-return
+matrix that DYNOTEARS and VARLiNGAM share.
 
-Universe approaches: "fixed" (today's constituents; survivorship bias) or
-"intersection" (members for the whole period; reduces but does not eliminate
-it). Cached under thesis/cache/.
+There are 2 universe approaches. "fixed" uses today's constituents, which
+has survivorship bias. "intersection" uses members for the whole period,
+which reduces the bias but does not remove it. Results are cached under
+thesis/cache/.
 """
 
 from __future__ import annotations
@@ -34,8 +35,8 @@ _HTTP_HEADERS = {"User-Agent": "thesis-causal-discovery/1.0 (academic research)"
 # Result container
 @dataclass
 class Dataset:
-    """Output of build_dataset. returns has a sequential RangeIndex (DYNOTEARS
-    requires it); dates holds the real trading days row-for-row."""
+    """Output of build_dataset. returns has a sequential RangeIndex because
+    DYNOTEARS requires it. dates holds the real trading days row for row."""
 
     returns: pd.DataFrame
     dates: pd.DatetimeIndex
@@ -47,12 +48,12 @@ class Dataset:
 
     @property
     def n(self) -> int:
-        """Number of rows (trading days)."""
+        """Return the number of rows (trading days)."""
         return self.returns.shape[0]
 
     @property
     def d(self) -> int:
-        """Number of assets (columns)."""
+        """Return the number of assets (columns)."""
         return self.returns.shape[1]
 
     @property
@@ -69,13 +70,15 @@ class Dataset:
 
 # Ticker symbol hygiene
 def normalise_ticker(symbol: str) -> str:
-    """Yahoo form: '-' instead of '.' for share classes (BRK.B -> BRK-B)."""
+    """Convert to the Yahoo form, which uses '-' instead of '.' for share
+    classes (BRK.B -> BRK-B)."""
     return symbol.strip().upper().replace(".", "-")
 
 
 # S&P 500 constituents (fixed universe)
 def _fetch_wikipedia_tables() -> list[pd.DataFrame]:
-    """Wikipedia S&P 500 page tables: 0 = current constituents, 1 = changes."""
+    """Return the tables on the Wikipedia S&P 500 page. Table 0 is the
+    current constituents and table 1 is the changes."""
     import requests
 
     resp = requests.get(WIKI_SP500_URL, headers=_HTTP_HEADERS, timeout=30)
@@ -84,7 +87,7 @@ def _fetch_wikipedia_tables() -> list[pd.DataFrame]:
 
 
 def get_current_constituents(use_cache: bool = True) -> pd.DataFrame:
-    """Today's S&P 500 constituents, indexed by normalised ticker."""
+    """Return today's S&P 500 constituents, indexed by normalised ticker."""
     cache = CACHE_DIR / "sp500_constituents.parquet"
     if use_cache and cache.exists():
         return pd.read_parquet(cache)
@@ -106,8 +109,9 @@ def get_current_constituents(use_cache: bool = True) -> pd.DataFrame:
 
 # S&P 500 historical changes (intersection universe)
 def get_constituent_changes(use_cache: bool = True) -> pd.DataFrame:
-    """S&P 500 add/remove history from Wikipedia, oldest first. Rows with
-    unparseable dates are dropped (the table has gaps)."""
+    """Return the S&P 500 add and remove history from Wikipedia, oldest
+    first. Rows whose dates cannot be parsed are dropped because the table
+    has gaps."""
     cache = CACHE_DIR / "sp500_changes.parquet"
     if use_cache and cache.exists():
         return pd.read_parquet(cache)
@@ -138,18 +142,18 @@ def get_constituent_changes(use_cache: bool = True) -> pd.DataFrame:
 
 
 def _clean_symbol(raw: str) -> str:
-    """Best-effort ticker extraction from a free-text Wikipedia cell."""
+    """Extract a ticker from a free-text Wikipedia cell as well as possible."""
     text = str(raw).strip()
     if not text or text.lower() == "nan":
         return ""
-    # Cells can be "AAPL[1]" or "AAPL Apple Inc."; take the first token.
+    # Cells can be "AAPL[1]" or "AAPL Apple Inc.", so take the first token.
     token = text.split()[0].split("[")[0]
     return normalise_ticker(token)
 
 
 def membership_at(date: str | pd.Timestamp, use_cache: bool = True) -> set[str]:
-    """Membership as of date: start from today's set and undo every later
-    change."""
+    """Return the membership as of date. I start from today's set and undo
+    every later change."""
     date = pd.Timestamp(date)
     members = set(get_current_constituents(use_cache).index)
     changes = get_constituent_changes(use_cache)
@@ -167,8 +171,9 @@ def intersection_universe(
     end: str | pd.Timestamp,
     use_cache: bool = True,
 ) -> list[str]:
-    """Tickers in the index for the entire [start, end] window. Approximate:
-    ignores renames and remove-then-readd cases."""
+    """Return the tickers in the index for the entire [start, end] window.
+    This is approximate because it ignores renames and names that were
+    removed and then added again."""
     start, end = pd.Timestamp(start), pd.Timestamp(end)
     at_start = membership_at(start, use_cache)
     changes = get_constituent_changes(use_cache)
@@ -191,8 +196,8 @@ def download_prices(
     use_cache: bool = True,
     cache_key: str | None = None,
 ) -> pd.DataFrame:
-    """Download daily auto-adjusted close prices via yfinance. Tickers that
-    fail (delisted, bad symbol) are logged and omitted."""
+    """Download daily auto-adjusted close prices from yfinance. Tickers that
+    fail (delisted or a bad symbol) are logged and left out."""
     import yfinance as yf
 
     tickers = [normalise_ticker(t) for t in tickers]
@@ -228,7 +233,7 @@ def download_prices(
     prices.index = pd.to_datetime(prices.index)
     prices = prices.sort_index()
 
-    # Drop all-NaN columns (unresolvable tickers).
+    # Drop columns that are all NaN, which are tickers that could not be resolved.
     all_nan = [c for c in prices.columns if prices[c].isna().all()]
     if all_nan:
         logger.warning("No data for %d tickers: %s", len(all_nan), sorted(all_nan))
@@ -245,7 +250,7 @@ def handle_missing(
     max_missing: float = 0.05,
     ffill_limit: int = 5,
 ) -> tuple[pd.DataFrame, list[str]]:
-    """Drop sparse assets, forward-fill small gaps, align to common dates."""
+    """Drop sparse assets, forward-fill small gaps and align to common dates."""
     missing_frac = prices.isna().mean()
     too_sparse = missing_frac[missing_frac > max_missing].index.tolist()
     clean = prices.drop(columns=too_sparse)
@@ -253,19 +258,21 @@ def handle_missing(
         logger.info(
             "Dropped %d assets with >%.0f%% missing days", len(too_sparse), 100 * max_missing
         )
-    # Forward-fill short gaps; leaves leading NaNs.
+    # Forward-fill short gaps. This leaves leading NaNs.
     clean = clean.ffill(limit=ffill_limit)
     clean = clean.dropna(axis=0, how="any")
     return clean, too_sparse
 
 
 def compute_log_returns(prices: pd.DataFrame) -> pd.DataFrame:
-    """Log-returns ``log(P_t / P_{t-1})``; first (NaN) row dropped."""
+    """Return the log-returns ``log(P_t / P_{t-1})``. The first row is NaN
+    and is dropped."""
     return np.log(prices / prices.shift(1)).iloc[1:]
 
 
 def adf_pvalues(returns: pd.DataFrame) -> pd.Series:
-    """Augmented Dickey-Fuller p-value per asset (low p => stationary)."""
+    """Return the augmented Dickey-Fuller p-value per asset. A low p means
+    stationary."""
     from statsmodels.tsa.stattools import adfuller
 
     pvals = {}
@@ -275,7 +282,7 @@ def adf_pvalues(returns: pd.DataFrame) -> pd.Series:
             with warnings.catch_warnings():
                 warnings.simplefilter("ignore")
                 pvals[col] = adfuller(series, autolag="AIC")[1]
-        except Exception as exc:  # pragma: no cover - defensive
+        except Exception as exc:  # pragma: no cover - a precaution
             logger.warning("ADF test failed for %s: %s", col, exc)
             pvals[col] = np.nan
     return pd.Series(pvals, name="adf_pvalue")
@@ -284,8 +291,9 @@ def adf_pvalues(returns: pd.DataFrame) -> pd.Series:
 def filter_stationary(
     returns: pd.DataFrame, alpha: float = 0.01
 ) -> tuple[pd.DataFrame, pd.Series, list[str]]:
-    """Drop assets failing the ADF test (kept if p < alpha). Equity log-returns
-    are almost always stationary, so this is a guard that rarely fires."""
+    """Drop assets that fail the ADF test. An asset is kept if p < alpha.
+    Equity log-returns are almost always stationary, so this check rarely
+    drops anything."""
     pvals = adf_pvalues(returns)
     non_stationary = pvals[(pvals >= alpha) | pvals.isna()].index.tolist()
     kept = returns.drop(columns=non_stationary)
@@ -295,7 +303,7 @@ def filter_stationary(
 
 
 def standardise(returns: pd.DataFrame) -> pd.DataFrame:
-    """Zero mean, unit variance per column."""
+    """Scale each column to zero mean and unit variance."""
     return (returns - returns.mean()) / returns.std(ddof=0)
 
 
@@ -311,10 +319,11 @@ def build_dataset(
     max_assets: int | None = None,
     use_cache: bool = True,
 ) -> Dataset:
-    """Build the model-ready log-return Dataset.
+    """Build the log-return Dataset that the models take in.
 
     An explicit tickers list bypasses Wikipedia and the approach setting.
-    max_assets truncates the resolved universe (scaling tests).
+    max_assets truncates the resolved universe, which I use for scaling
+    tests.
     """
     # Universe
     sectors: dict[str, str] = {}
@@ -358,7 +367,7 @@ def build_dataset(
     # Standardise
     model_returns = standardise(returns) if standardise_returns else returns.copy()
 
-    # DYNOTEARS requires a sequential integer index; keep the real dates aside.
+    # DYNOTEARS requires a sequential integer index, so keep the real dates aside.
     dates = pd.DatetimeIndex(model_returns.index)
     model_returns = model_returns.reset_index(drop=True)
 

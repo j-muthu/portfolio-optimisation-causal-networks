@@ -1,6 +1,6 @@
-"""Portfolio construction (HRP, HSP, Causal-HSP variants).
+"""Portfolio construction (HRP, HSP and the Causal-HSP variants).
 
-Also re-exports the reusable legacy helpers from ``_old_v123``.
+I also re-export the reusable legacy helpers from ``_old_v123``.
 """
 
 from __future__ import annotations
@@ -12,12 +12,7 @@ from pipeline.portfolio._old_v123 import (
     symmetrise,
 )
 from pipeline.portfolio.backtest import BacktestResult, RebalanceRecord, run_backtest
-from pipeline.portfolio.benchmarks import (
-    cap_weighted,
-    equal_weight,
-    mean_variance,
-    min_variance,
-)
+from pipeline.portfolio.benchmarks import equal_weight
 from pipeline.portfolio.causal_hsp import (
     v0_vanilla_hsp,
     v0prime_asset_only_causal_hrp,
@@ -60,9 +55,6 @@ __all__ = [
     "v2_causal_hsp_closed_loop",
     # Benchmarks
     "equal_weight",
-    "min_variance",
-    "mean_variance",
-    "cap_weighted",
     # Backtest
     "RebalanceRecord",
     "BacktestResult",

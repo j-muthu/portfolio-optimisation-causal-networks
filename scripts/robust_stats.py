@@ -1,10 +1,11 @@
-"""Robust-stats battery for the final report.
+"""Robust statistics for the final report.
 
-Computes PSR/DSR, White's Reality Check, Hansen's SPA, the Model Confidence
-Set, and the closed-loop reward SNR over every evaluated configuration.
-Reads the gitignored results/<tag>/closed_loop.pkl bundles, so it must run
-locally. Writes results/robust_stats.csv and the _generated/robust_stats.tex
-macros for the report.
+I compute PSR and DSR, White's Reality Check, Hansen's SPA test, the Model
+Confidence Set and the signal-to-noise ratio of the closed-loop reward over
+every evaluated configuration. This reads the gitignored
+results/<tag>/closed_loop.pkl bundles, so it must run locally. It writes
+results/robust_stats.csv and the _generated/robust_stats.tex macros for the
+report.
 
 Run:  python -m scripts.robust_stats
 """
@@ -31,18 +32,18 @@ REPO = pathlib.Path(__file__).resolve().parent.parent
 RESULTS = REPO / "results"
 GEN = REPO / "final_report" / "_generated"
 
-# The trial universe the DSR deflates against. Missing bundles are skipped
-# and logged, so this runs on whatever subset is present. The full counts
-# are asserted (as warnings) at load time; the report quotes both.
-EXPECTED_TRIALS_PHASE_I = 41     # HSP driver route: 12 headline + 20 K-sweep + 9 alpha/gamma
-EXPECTED_TRIALS_PHASE_II = 146   # ... plus the 105 graph-route cells (--phase-ii)
+# The set of trials that the DSR deflates against. Missing bundles are
+# skipped and logged, so this runs on whatever subset is present. The full
+# counts are checked (as warnings) at load time. The report quotes both.
+EXPECTED_TRIALS_PHASE_I = 41     # the HSP driver route: 12 headline, 20 K-sweep and 9 alpha/gamma cells
+EXPECTED_TRIALS_PHASE_II = 146   # the above plus the 105 graph-route cells (--phase-ii)
 WINDOWS = (252, 504)
 KS = (10, 14, 17, 20, 25)
 AG_GRID = ((0.4, 0.1), (0.4, 0.3), (0.4, 0.5),
            (0.6, 0.1), (0.6, 0.3), (0.6, 0.5),
            (0.8, 0.1), (0.8, 0.3), (0.8, 0.5))
 
-# Headline variant tags per window (the universe SPA/RC/MCS choose between).
+# The headline variant tags per window, which SPA, the Reality Check and the MCS choose between.
 HEADLINE = {
     "V0":            "phase_i_v0_w{w}",
     "V0prime":       "phase_i_v0prime_w{w}",
@@ -54,36 +55,38 @@ HEADLINE = {
 
 
 def _all_trial_tags() -> dict[str, str]:
-    """name -> bundle tag, for every distinct configuration evaluated."""
+    """Map each name to its bundle tag, for every distinct configuration
+    evaluated."""
     tags: dict[str, str] = {}
     for w in WINDOWS:
         for name, stem in HEADLINE.items():
             tags[f"{name}_w{w}"] = stem.format(w=w)
-        for k in KS:                       # K-sensitivity sweep (V0, V1)
+        for k in KS:                       # the K sensitivity sweep (V0 and V1)
             tags[f"V0_w{w}_k{k}"] = f"phase_i_v0_w{w}_k{k}"
             tags[f"V1_w{w}_k{k}"] = f"phase_i_v1_w{w}_k{k}"
-    for a, g in AG_GRID:                    # alpha/gamma feedback grid (w252)
+    for a, g in AG_GRID:                    # the alpha and gamma feedback grid (w252)
         tags[f"V2_w252_a{a}_g{g}"] = f"phase_i_v2_w252_a{a}_g{g}"
     return tags
 
 
-# Phase-II direction-aware allocators. D0 duplicates V0prime byte-for-byte
-# under DYNOTEARS; drop_duplicate_configs removes it before SPA/MCS.
+# The Phase II direction-aware allocators. Under DYNOTEARS, D0 is a
+# byte-for-byte duplicate of V0prime, so drop_duplicate_configs removes it
+# before SPA and the MCS.
 PHASE_II_ALLOCS = ("D0", "D0s", "D1", "D2", "D2s", "D3", "D4")
-# The reported family, a restriction chosen AFTER the four-window results were
-# seen, so every family-wise test runs twice: pre-specified (primary) and
-# reported (labelled as narrowed).
+# The reported family. I chose this restriction after seeing the 4-window
+# results, so every test over a family runs twice: once on the family I
+# specified in advance (primary) and once on the reported (narrowed) family.
 REPORTED_ALLOCS = ("D0", "D0s", "D1", "D2", "D2s")
-# Direction-aware members of each family (candidates vs the D0/V0prime anchor).
+# The direction-aware members of each family (the candidates against the D0 or V0prime baseline).
 DIRECTION_FAMILY = ("1", "2", "2s")
 DIRECTION_FAMILY_PRE = ("1", "2", "2s", "3", "4")
-# Post-hoc mechanism controls, DYNOTEARS only. In the deflation universe but
-# in NEITHER family-wise comparison set (introduced after both were fixed).
+# Post-hoc mechanism controls, DYNOTEARS only. They count as trials for the
+# DSR but are in neither family, because I added them after both were fixed.
 CONTROL_ALLOCS = ("D0lw", "D0df", "D0pc")
-# Graph-blind anchors: deflation universe only.
+# Baselines that use no graph. They count as trials for the DSR only.
 ANCHOR_TAGS = {"EW": "phase_ii_ew_w{w}", "IVP": "phase_ii_ivp_w{w}"}
-# HERC cells. No "DYNO-" prefix on purpose: the family filters key on that
-# prefix and the HERC cells belong to neither SPA family.
+# HERC cells. They have no "DYNO-" prefix on purpose, because the family
+# filters key on that prefix and the HERC cells belong to neither SPA family.
 HERC_TAGS = {"HERCC": "phase_ii_herc_corr_w{w}",
              "HERC0": "phase_ii_dynotears_HERC0_w{w}",
              "HERC1": "phase_ii_dynotears_HERC1_w{w}"}
@@ -92,7 +95,8 @@ PHASE_II_WINDOWS = (189, 252, 378, 504)
 
 
 def _phase_ii_tags() -> dict[str, str]:
-    """name -> bundle tag for every Phase-II configuration evaluated."""
+    """Map each name to its bundle tag, for every Phase II configuration
+    evaluated."""
     tags: dict[str, str] = {}
     for w in PHASE_II_WINDOWS:
         tags[f"CORR-HRP_w{w}"] = f"phase_ii_corr_hrp_w{w}"
@@ -105,9 +109,9 @@ def _phase_ii_tags() -> dict[str, str]:
             tags[f"{a}_w{w}"] = stem.format(w=w)
         for a, stem in HERC_TAGS.items():
             tags[f"{a}_w{w}"] = stem.format(w=w)
-    for a in ("D0", "D1", "D2", "D3"):      # E2 GRANGER arm (w252 only)
+    for a in ("D0", "D1", "D2", "D3"):      # the E2 GRANGER cells (w252 only)
         tags[f"GRAN-{a}_w252"] = f"phase_ii_granger_{a}_w252"
-    for tau in ("0.01", "0.05", "0.1"):     # E3 τ sweep (DYNO w252)
+    for tau in ("0.01", "0.05", "0.1"):     # the E3 tau sweep (DYNOTEARS w252)
         for a in ("D0", "D2", "D3"):
             tags[f"DYNO-{a}_w252_tau{tau}"] = f"phase_ii_dynotears_{a}_w252_tau{tau}"
     return tags
@@ -125,7 +129,7 @@ def _load_backtest(tag: str):
 def load_return_matrix(tags: dict[str, str]) -> tuple[pd.DataFrame, list[str]]:
     """Load each tag's daily net returns into an inner-joined matrix.
 
-    Returns (returns_df, loaded_names).
+    Return (returns_df, loaded_names).
     """
     series, loaded = {}, []
     for name, tag in tags.items():
@@ -144,7 +148,8 @@ def load_return_matrix(tags: dict[str, str]) -> tuple[pd.DataFrame, list[str]]:
 
 
 def load_reward_series(tag: str) -> pd.Series | None:
-    """Per-rebalance realised reward R[t] (excess Sharpe vs 1/N)."""
+    """Return the realised reward R[t] at each rebalance (the excess Sharpe
+    over 1/N)."""
     bt = _load_backtest(tag)
     if bt is None:
         return None
@@ -162,10 +167,10 @@ def per_period_sharpe(returns: pd.Series) -> float:
 
 
 def drop_duplicate_configs(returns: pd.DataFrame, names: list[str]) -> list[str]:
-    """Drop names whose daily-return series exactly equals an earlier-kept one.
+    """Drop names whose daily-return series exactly equals one kept earlier.
 
-    V2 equals V1 byte-for-byte (inert loop); duplicates double-count a strategy
-    and give the studentised MCS a zero differential variance.
+    V2 equals V1 byte for byte because the loop is inert. Duplicates count a
+    strategy twice and give the studentised MCS a zero differential variance.
     """
     kept: list[str] = []
     for c in names:
@@ -176,7 +181,8 @@ def drop_duplicate_configs(returns: pd.DataFrame, names: list[str]) -> list[str]
 
 
 def psr_dsr_table(returns: pd.DataFrame, baseline: str) -> pd.DataFrame:
-    """PSR (vs 0 and vs baseline) and DSR for every column of returns.
+    """Return the PSR (against 0 and against the baseline) and the DSR for
+    every column of returns.
 
     The DSR deflates against all per-period trial Sharpes in the matrix.
     """
@@ -187,10 +193,12 @@ def psr_dsr_table(returns: pd.DataFrame, baseline: str) -> pd.DataFrame:
     for c in returns.columns:
         rows.append({
             "config": c,
-            "sharpe_ann": round(annualised_sharpe(returns[c]), 4),
-            "psr_vs_zero": round(probabilistic_sharpe_ratio(returns[c], 0.0), 4),
-            "psr_vs_baseline": round(probabilistic_sharpe_ratio(returns[c], base_pp), 4),
-            "dsr": round(deflated_sharpe_ratio(returns[c], all_pp), 4),
+            # Full precision here; the CSV is rounded to 4 dp at write time so
+            # the 3-dp report macros are rounded once, from the exact value.
+            "sharpe_ann": annualised_sharpe(returns[c]),
+            "psr_vs_zero": probabilistic_sharpe_ratio(returns[c], 0.0),
+            "psr_vs_baseline": probabilistic_sharpe_ratio(returns[c], base_pp),
+            "dsr": deflated_sharpe_ratio(returns[c], all_pp),
             "n_trials": len(all_pp),
         })
     return pd.DataFrame(rows).sort_values("sharpe_ann", ascending=False).reset_index(drop=True)
@@ -198,10 +206,10 @@ def psr_dsr_table(returns: pd.DataFrame, baseline: str) -> pd.DataFrame:
 
 def run_spa(returns: pd.DataFrame, benchmark: str, candidates: list[str],
             block_size: int = 21, reps: int = 10000, seed: int = 42) -> dict:
-    """White's Reality Check + Hansen's SPA: do any candidates beat the
-    benchmark? Loss = negative return, so a low p-value means a candidate
-    significantly out-returns it. Falls back to a hand-rolled Reality Check
-    if arch is absent.
+    """Run White's Reality Check and Hansen's SPA test. The null is that no
+    candidate beats the benchmark. The loss is the negative return, so a low
+    p-value means that a candidate significantly out-returns the benchmark.
+    I fall back to my own Reality Check if arch is not installed.
     """
     bench = -returns[benchmark].to_numpy(dtype=float)
     models = -returns[candidates].to_numpy(dtype=float)
@@ -214,7 +222,7 @@ def run_spa(returns: pd.DataFrame, benchmark: str, candidates: list[str],
                 "spa_consistent": float(pv["consistent"]),
                 "spa_upper": float(pv["upper"]),
                 "engine": "arch"}
-    except Exception as exc:  # pragma: no cover - exercised only without arch
+    except Exception as exc:  # pragma: no cover - only runs without arch
         log.warning("arch SPA unavailable (%s); using hand-rolled Reality Check", exc)
         return {"rc_lower": _handrolled_reality_check(returns, benchmark, candidates,
                                                       block_size, reps, seed),
@@ -225,7 +233,8 @@ def run_spa(returns: pd.DataFrame, benchmark: str, candidates: list[str],
 def _handrolled_reality_check(returns: pd.DataFrame, benchmark: str,
                               candidates: list[str], block_size: int,
                               reps: int, seed: int) -> float:
-    """White (2000) Reality Check p-value via the stationary block bootstrap."""
+    """Return the White (2000) Reality Check p-value from the stationary block
+    bootstrap."""
     diffs = returns[candidates].sub(returns[benchmark], axis=0).to_numpy(dtype=float)
     n = diffs.shape[0]
     obs = float(np.max(diffs.mean(axis=0)))
@@ -242,8 +251,9 @@ def _handrolled_reality_check(returns: pd.DataFrame, benchmark: str,
 
 def run_mcs(returns: pd.DataFrame, configs: list[str], size: float = 0.10,
             block_size: int = 21, reps: int = 10000, seed: int = 42) -> tuple[list[str], pd.DataFrame]:
-    """Model Confidence Set over configs at confidence 1-size (loss =
-    negative return). Returns (included_names, pvalue_frame).
+    """Run the Model Confidence Set over the configurations at confidence
+    1 - size. The loss is the negative return. Return (included_names,
+    pvalue_frame).
     """
     from arch.bootstrap import MCS
     losses = -returns[configs]
@@ -256,8 +266,9 @@ def run_mcs(returns: pd.DataFrame, configs: list[str], size: float = 0.10,
 def measurement_problem(reward: pd.Series, holding_days: int = 21) -> dict:
     """Quantify why a monthly reward is too noisy to learn from.
 
-    Reports the reward's mean, std, SNR, and the theoretical sampling SE of
-    a Sharpe estimated from holding_days observations.
+    Return the reward's mean, standard deviation and signal-to-noise ratio,
+    plus the theoretical sampling standard error of a Sharpe estimated from
+    holding_days observations.
     """
     r = reward.dropna()
     mean = float(r.mean())
@@ -269,14 +280,16 @@ def measurement_problem(reward: pd.Series, holding_days: int = 21) -> dict:
 
 
 def pooled_excess_kurtosis(returns: pd.DataFrame) -> float:
-    """Mean across configurations of the daily-return excess kurtosis."""
+    """Return the mean across configurations of the daily-return excess
+    kurtosis."""
     return float(np.mean([stats.kurtosis(returns[c].dropna(), fisher=True, bias=False)
                           for c in returns.columns]))
 
 
 def full_sample_sharpe_se(returns: pd.Series, periods_per_year: int = 252) -> float:
-    """SE of the full-sample annualised Sharpe (Lo 2002, iid approximation).
-    Distinct from measurement_problem's per-holding-window SE."""
+    """Return the standard error of the full-sample annualised Sharpe (Lo
+    2002, iid approximation). This differs from the per-holding-window
+    standard error in measurement_problem."""
     r = returns.dropna()
     sr_d = per_period_sharpe(r)
     return float(np.sqrt((1.0 + 0.5 * sr_d ** 2) / len(r)) * np.sqrt(periods_per_year))
@@ -285,9 +298,10 @@ def full_sample_sharpe_se(returns: pd.Series, periods_per_year: int = 252) -> fl
 def contrast_se_mde(returns: pd.DataFrame, a: str, b: str,
                     reps: int = 10000, block: float = 21.0,
                     seed: int = 42) -> tuple[float, float]:
-    """Block-bootstrap SE of the annualised ΔSharpe(a - b), plus the one-sided
-    MDE at 5% size / 80% power. The joint panel is resampled so the
-    correlation between the strategies is preserved."""
+    """Return the block-bootstrap standard error of the annualised Sharpe
+    difference (a - b), plus the one-sided minimum detectable effect at 5%
+    size and 80% power. I resample the joint panel so that the correlation
+    between the strategies is preserved."""
     from pipeline.evaluation.metrics import annualised_sharpe as _sh
     arr = returns[[a, b]].dropna().to_numpy(dtype=float)
     n = len(arr)
@@ -341,8 +355,8 @@ def main(argv: list[str] | None = None) -> None:
                   "gitignored closed_loop.pkl bundles live.", RESULTS)
         return
     n_trials = returns.shape[1]
-    # Phase split of the deflation universe: Phase I is the HSP driver route
-    # (incl. the two V0prime skeleton cells), Phase II the graph route.
+    # Split the DSR trials by phase. Phase I is the HSP driver route
+    # (including the 2 V0prime skeleton cells) and Phase II is the graph route.
     phase_i_names = set(_all_trial_tags())
     n_phase_i = sum(c in phase_i_names for c in returns.columns)
     n_phase_ii = n_trials - n_phase_i
@@ -354,18 +368,18 @@ def main(argv: list[str] | None = None) -> None:
                     "the report's \\rsNtrials and every DSR would change",
                     expected, n_trials)
 
-    # PSR / DSR table over every trial (baseline = V0 at w252).
+    # The PSR and DSR table over every trial. The baseline is V0 at w252.
     baseline = "V0_w252" if "V0_w252" in returns.columns else loaded[0]
     table = psr_dsr_table(returns, baseline=baseline)
 
-    # SPA / Reality Check + MCS over the w252 headline universe vs V0.
+    # SPA, the Reality Check and the MCS over the w252 headline set against V0.
     # Identical columns break the studentised MCS, so drop duplicates first.
     headline252 = drop_duplicate_configs(
         returns, [f"{n}_w252" for n in HEADLINE if f"{n}_w252" in returns.columns])
     causal252 = [c for c in headline252 if not c.startswith("V0_")]
     spa = run_spa(returns, benchmark="V0_w252", candidates=causal252)
 
-    # MCS universe: the w252 headline, plus (in --phase-ii mode) every
+    # The MCS set is the w252 headline plus, in --phase-ii mode, every
     # distinct w252 D-variant.
     mcs_universe = list(headline252)
     spa_phase_ii = None
@@ -386,13 +400,13 @@ def main(argv: list[str] | None = None) -> None:
 
     if args.phase_ii:
         def _d252(excluded: tuple[str, ...]) -> list[str]:
-            # Mechanism controls are candidates of neither family.
+            # The mechanism controls are candidates in neither family.
             drop = excluded + CONTROL_ALLOCS
             return [c for c in returns.columns
                     if c.startswith(("DYNO-", "VARL-", "GRAN-", "CORR-"))
                     and c.endswith("_w252") and "_tau" not in c
                     and not any(f"-{a}_" in c for a in drop)]
-        # Pre-registered E1 family first, then the reported (narrowed) family.
+        # The E1 family I specified in advance comes first, then the reported (narrowed) family.
         d252_pre = drop_duplicate_configs(returns, mcs_universe + _d252(()))
         d_only_pre = [c for c in d252_pre if c not in mcs_universe]
         if d_only_pre:
@@ -403,9 +417,9 @@ def main(argv: list[str] | None = None) -> None:
         if d_only:
             spa_phase_ii = run_spa(returns, benchmark="V0_w252", candidates=d_only)
         mcs_universe = d252
-        # Does ANY direction-aware allocator beat its symmetrised control D0,
-        # per window? Where no V0prime bundle exists the benchmark falls back
-        # to DYNO-D0 (byte-identical where both exist).
+        # I test whether any direction-aware allocator beats its symmetrised
+        # control D0, per window. Where no V0prime bundle exists the benchmark
+        # falls back to DYNO-D0, which is byte-identical where both exist.
         for w in PHASE_II_WINDOWS:
             bench = f"V0prime_w{w}"
             if bench not in returns.columns:
@@ -419,7 +433,7 @@ def main(argv: list[str] | None = None) -> None:
                 res = _spa_family(bench, cands)
                 if res is not None:
                     out[w] = res
-        # Does ANY causal-structure strategy beat CORR-HRP, per window?
+        # I test whether any causal-structure strategy beats CORR-HRP, per window.
         for w in PHASE_II_WINDOWS:
             bench = f"CORR-HRP_w{w}"
             for fam, out in ((PHASE_II_ALLOCS, spa_skeleton_pre),
@@ -432,9 +446,9 @@ def main(argv: list[str] | None = None) -> None:
                 res = _spa_family(bench, cands)
                 if res is not None:
                     out[w] = res
-        # Pooled SPA over the union of the four windows, pricing the search
-        # across strategies AND windows jointly. Benchmark = the family's
-        # control at the one-year window.
+        # A pooled SPA test over the union of the 4 windows, which corrects
+        # for the search across strategies and windows jointly. The benchmark
+        # is the family's control at the 1-year window.
         def _pool_skel(fam: tuple[str, ...]) -> list[str]:
             return [c for c in returns.columns
                     if (c.startswith(tuple(f"{s}-{a}_" for s in ("DYNO", "VARL")
@@ -457,14 +471,15 @@ def main(argv: list[str] | None = None) -> None:
         spa_pooled["dir_pre"] = _spa_family(dir_bench, _pool_dir(DIRECTION_FAMILY_PRE))
         spa_pooled["dir"] = _spa_family(dir_bench, _pool_dir(DIRECTION_FAMILY))
     mcs_in, _ = run_mcs(returns, mcs_universe)
-    # MCS membership is only meaningful for the MCS universe.
+    # MCS membership is only meaningful for the MCS set.
     table["in_mcs90"] = [bool(c in mcs_in) if c in mcs_universe else ""
                          for c in table.config]
     RESULTS.mkdir(exist_ok=True)
     out_csv = RESULTS / ("robust_stats_phase_ii.csv" if args.phase_ii else "robust_stats.csv")
-    table.to_csv(out_csv, index=False)
+    CSV_DP = {"sharpe_ann": 4, "psr_vs_zero": 4, "psr_vs_baseline": 4, "dsr": 4}
+    table.round(CSV_DP).to_csv(out_csv, index=False)
     print("\n=== PSR / DSR by configuration ===")
-    print(table.to_string(index=False))
+    print(table.round(CSV_DP).to_string(index=False))
     print(f"\n=== SPA/RC (causal vs V0, w252) ===\n{spa}")
     if spa_phase_ii_pre is not None:
         print(f"\n=== SPA/RC (Phase-II D-variants vs V0, w252, PRE-REGISTERED family) ===\n{spa_phase_ii_pre}")
@@ -486,13 +501,13 @@ def main(argv: list[str] | None = None) -> None:
             print(f"\n=== SPA/RC ({label} family) ===\n{spa_pooled[key]}")
     print(f"\n=== MCS 90% set (w252 universe, n={len(mcs_universe)}) ===\n{mcs_in}")
 
-    # Measurement problem on the closed loop (V2/V1 w252).
+    # The measurement problem on the closed loop (V2 and V1 at w252).
     rtag = "phase_i_v2_w252" if (RESULTS / "phase_i_v2_w252").exists() else "phase_i_v1_w252"
     reward = load_reward_series(rtag)
     mp = measurement_problem(reward) if reward is not None else {}
     print(f"\n=== measurement problem ({rtag}) ===\n{mp}")
 
-    # Full-sample SE and contrast-level precision (power context).
+    # The full-sample standard error and the precision of the contrasts, for the power discussion.
     se_full = (full_sample_sharpe_se(returns["DYNO-D1_w252"])
                if "DYNO-D1_w252" in returns.columns else float("nan"))
     se_total = mde_total = se_orient = mde_orient = float("nan")
@@ -507,14 +522,14 @@ def main(argv: list[str] | None = None) -> None:
               f"ΔSharpe SE (D1−CORR) {se_total:.3f}, MDE80 {mde_total:.3f} | "
               f"ΔSharpe SE (D2s−D0) {se_orient:.3f}, MDE80 {mde_orient:.3f}")
 
-    # Self-check: reproduce the headline Sharpes.
+    # As a self-check, reproduce the headline Sharpes.
     print("\n=== self-check: headline annualised Sharpe ===")
     for n in ("V0_w252", "V1-DYNOTEARS_w252", "V1-VARLiNGAM_w252", "V0prime_w252"):
         if n in returns.columns:
             print(f"  {n:24s} {annualised_sharpe(returns[n]):.4f}")
 
-    # Report macros are owned by the unified --phase-ii battery; the 41-trial
-    # default mode must not overwrite them with a smaller deflation universe.
+    # The --phase-ii run owns the report macros. The default 41-trial mode
+    # must not overwrite them with a smaller set of DSR trials.
     if not args.phase_ii:
         print(f"\nsaved → {out_csv} (report macros unchanged — regenerate with --phase-ii)")
         return
@@ -523,8 +538,8 @@ def main(argv: list[str] | None = None) -> None:
         hit = table.loc[table.config == config, col]
         return float(hit.iloc[0]) if len(hit) else float("nan")
 
-    # The informative quantity is who is EXCLUDED from the MCS. Excluded names
-    # are rendered with the report's display macros (no codenames in prose).
+    # The informative quantity is which names the MCS excludes. I render the
+    # excluded names with the report's display macros, so no codenames appear in prose.
     display = {
         "V0": "HSP as published",
         "V0prime": r"\skelsamp{}",
@@ -546,7 +561,7 @@ def main(argv: list[str] | None = None) -> None:
         display.get(e.replace("_w252", ""), e.replace("_w252", ""))
         for e in excluded) or "none"
 
-    # E7 seed audit (written by scripts/run_seed_audit.py).
+    # The E7 seed audit, written by scripts/run_seed_audit.py.
     seed_macros: dict[str, str] = {}
     seed_csv = RESULTS / "seed_audit.csv"
     if seed_csv.exists():
@@ -566,11 +581,11 @@ def main(argv: list[str] | None = None) -> None:
         "rsNtrialsPhaseI": str(n_phase_i),
         "rsNtrialsPhaseII": str(n_phase_ii),
         "rsKurtosis": _fmt(pooled_excess_kurtosis(returns), 1),
-        # skeleton PSR (vs zero) and DSR, w252. (The other V0-era per-variant
-        # PSR/DSR macros were dropped once no report used them.)
+        # The skeleton PSR (against zero) and DSR at w252. I dropped the other
+        # per-variant PSR and DSR macros from the V0 era once no report used them.
         "rsVprimePSR":   _fmt(cell("V0prime_w252", "psr_vs_zero")),
         "rsVprimeDSR":   _fmt(cell("V0prime_w252", "dsr")),
-        # window suffixes: Wone=189, Wthree=378, Wfive=504; unsuffixed = w252
+        # The window suffixes are Wone=189, Wthree=378 and Wfive=504. No suffix means w252.
         "rsCorrSharpe":       _fmt(cell("CORR-HRP_w252", "sharpe_ann")),
         "rsCorrSharpeWone":   _fmt(cell("CORR-HRP_w189", "sharpe_ann")),
         "rsCorrSharpeWthree": _fmt(cell("CORR-HRP_w378", "sharpe_ann")),
@@ -594,7 +609,7 @@ def main(argv: list[str] | None = None) -> None:
         "rsDzeroSharpeWone":   _fmt(cell("DYNO-D0_w189", "sharpe_ann")),
         "rsDzeroSharpeWthree": _fmt(cell("DYNO-D0_w378", "sharpe_ann")),
         "rsDzeroSharpeWfive":  _fmt(cell("DYNO-D0_w504", "sharpe_ann")),
-        # mechanism controls
+        # The mechanism controls.
         "rsDlwSharpe":       _fmt(cell("DYNO-D0lw_w252", "sharpe_ann")),
         "rsDlwSharpeWone":   _fmt(cell("DYNO-D0lw_w189", "sharpe_ann")),
         "rsDlwSharpeWthree": _fmt(cell("DYNO-D0lw_w378", "sharpe_ann")),
@@ -604,20 +619,20 @@ def main(argv: list[str] | None = None) -> None:
         "rsDdfSharpeWthree": _fmt(cell("DYNO-D0df_w378", "sharpe_ann")),
         "rsDdfSharpeWfive":  _fmt(cell("DYNO-D0df_w504", "sharpe_ann")),
         "rsDdfDSRWthree":    _fmt(cell("DYNO-D0df_w378", "dsr")),
-        # skeleton-channel control
+        # The skeleton control.
         "rsDpcSharpe":       _fmt(cell("DYNO-D0pc_w252", "sharpe_ann")),
         "rsDpcSharpeWone":   _fmt(cell("DYNO-D0pc_w189", "sharpe_ann")),
         "rsDpcSharpeWthree": _fmt(cell("DYNO-D0pc_w378", "sharpe_ann")),
         "rsDpcSharpeWfive":  _fmt(cell("DYNO-D0pc_w504", "sharpe_ann")),
-        # naive anchors (one-year cells)
+        # The naive baselines (1-year cells).
         "rsEwSharpe":        _fmt(cell("EW_w252", "sharpe_ann")),
         "rsIvpSharpe":       _fmt(cell("IVP_w252", "sharpe_ann")),
-        # HERC cells (one-year)
+        # The HERC cells (1-year).
         "rsHercCorrSharpe":  _fmt(cell("HERCC_w252", "sharpe_ann")),
         "rsHercSkelSharpe":  _fmt(cell("HERC0_w252", "sharpe_ann")),
         "rsHercSemSharpe":   _fmt(cell("HERC1_w252", "sharpe_ann")),
-        # data-snooping battery: unsuffixed = reported (narrowed) family,
-        # *Pre = the pre-specified E1 family (quoted first in the report)
+        # The data-snooping tests. No suffix means the reported (narrowed)
+        # family, and *Pre means the E1 family I specified in advance (quoted first in the report).
         "rsSpaRC":         _fmt(spa["rc_lower"]),
         "rsSpaConsistent": _fmt(spa["spa_consistent"]),
         "rsSpaDvar":       _fmt(spa_phase_ii["spa_consistent"]) if spa_phase_ii else "--",
@@ -645,12 +660,12 @@ def main(argv: list[str] | None = None) -> None:
         "rsMcsSize":       str(len(mcs_in)),
         "rsMcsUniverse":   str(len(mcs_universe)),
         "rsMcsExcluded":   pretty_excluded,
-        # closed-loop measurement problem
+        # The closed-loop measurement problem.
         "rsRewardMean": _fmt(mp.get("reward_mean", float("nan"))),
         "rsRewardStd":  _fmt(mp.get("reward_std", float("nan"))),
         "rsRewardSNR":  _fmt(mp.get("reward_snr", float("nan")), 2),
         "rsSharpeSE":   _fmt(mp.get("sharpe_se_window", float("nan")), 2),
-        # full-sample and contrast-level precision
+        # The full-sample and contrast-level precision.
         "rsSharpeSEFull":      _fmt(se_full, 2),
         "rsContrastSETotal":   _fmt(se_total, 3),
         "rsContrastMDETotal":  _fmt(mde_total, 3),

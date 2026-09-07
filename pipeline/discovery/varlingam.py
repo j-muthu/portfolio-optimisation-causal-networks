@@ -1,10 +1,11 @@
 """Rolling-window VARLiNGAM on S&P 500 log-returns.
 
-Two-stage: fit a VAR, then DirectLiNGAM on the residuals for the
-contemporaneous structure. Every matrix exposed here is transposed from
-lingam's raw ``j -> i`` output into the repo-wide ``i -> j`` convention.
-For large d the OLS VAR is underdetermined; :func:`estimate_var_coefs`
-provides a ridge alternative fed in via ``ar_coefs``.
+VARLiNGAM has 2 stages. It fits a VAR, then runs DirectLiNGAM on the
+residuals to get the contemporaneous structure. I transpose every matrix
+exposed here from lingam's raw ``j -> i`` output into the ``i -> j``
+convention used across the repository. For large d the OLS VAR is
+underdetermined, so :func:`estimate_var_coefs` provides a ridge alternative
+that is passed in through ``ar_coefs``.
 """
 
 from __future__ import annotations
@@ -31,10 +32,10 @@ Criterion = Literal["aic", "bic", "hqic", "fpe"]
 # Result containers
 @dataclass
 class VarLingamWindow:
-    """Causal model learned from a single rolling window.
+    """Causal model learned from 1 rolling window.
 
-    Convention: ``B0[i, j]`` / ``B_lags[k][i, j]`` is i -> j (transposed
-    from lingam's raw output).
+    ``B0[i, j]`` and ``B_lags[k][i, j]`` are i -> j (transposed from lingam's
+    raw output).
     """
 
     index: int
@@ -60,7 +61,7 @@ class VarLingamWindow:
 
     @property
     def causal_order_tickers(self) -> list[str]:
-        """The causal order expressed as ticker symbols (upstream first)."""
+        """Return the causal order as ticker symbols, upstream first."""
         return [self.columns[i] for i in self.causal_order]
 
 
@@ -77,15 +78,17 @@ class RollingVarLingamResult:
 
     @property
     def dates(self) -> pd.DatetimeIndex:
-        """End date of each window -- the natural timestamp for its graph."""
+        """Return the end date of each window, which is the timestamp of its
+        graph."""
         return pd.DatetimeIndex([w.end_date for w in self.windows])
 
     def b0_stack(self) -> np.ndarray:
-        """All contemporaneous matrices stacked: shape ``(n_windows, d, d)``."""
+        """Return all contemporaneous matrices stacked, with shape
+        ``(n_windows, d, d)``."""
         return np.stack([w.B0 for w in self.windows])
 
     def to_frame(self) -> pd.DataFrame:
-        """One row per window summarising edge counts and selected lags."""
+        """Return 1 row per window with the edge counts and selected lags."""
         return pd.DataFrame(
             {
                 "start_date": [w.start_date for w in self.windows],
@@ -104,16 +107,17 @@ def estimate_var_coefs(
     method: Literal["ols", "ridge"] = "ridge",
     alpha: float = 1.0,
 ) -> np.ndarray:
-    """Estimate VAR(``lags``) coefficients, optionally ridge-regularised.
+    """Estimate VAR(``lags``) coefficients, with an optional ridge penalty.
 
-    Returns shape ``(lags, d, d)``, the layout VARLiNGAM's ``ar_coefs``
-    expects. No intercept: returns are mean-centred upstream.
+    The result has shape ``(lags, d, d)``, which is the layout that
+    VARLiNGAM's ``ar_coefs`` expects. There is no intercept because the
+    returns are mean-centred upstream.
     """
     from sklearn.linear_model import Ridge
 
     X = np.asarray(X, dtype=float)
     n, d = X.shape
-    # Design: each row t (>= lags) regresses on [X_{t-1} | X_{t-2} | ...].
+    # Each row t (at least lags) regresses on [X_{t-1} | X_{t-2} | ...].
     design = np.concatenate([X[lags - k - 1 : n - k - 1] for k in range(lags)], axis=1)
     target = X[lags:]
 
@@ -122,12 +126,12 @@ def estimate_var_coefs(
     elif method == "ridge":
         model = Ridge(alpha=alpha, fit_intercept=False)
         model.fit(design, target)
-        coef = model.coef_.T  # sklearn gives (d_targets, lags*d) -> transpose
+        coef = model.coef_.T  # sklearn gives (d_targets, lags*d), so transpose
     else:  # pragma: no cover - guarded by typing
         raise ValueError(f"unknown method: {method!r}")
 
-    # coef rows are ordered [lag1 block | lag2 block | ...]; M_tau[i, j] must be
-    # the effect of X_{t-tau}[j] on X_t[i], hence the transpose of each block.
+    # The rows of coef are ordered [lag1 block | lag2 block | ...]. M_tau[i, j]
+    # must be the effect of X_{t-tau}[j] on X_t[i], so I transpose each block.
     return np.stack([coef[k * d : (k + 1) * d].T for k in range(lags)])
 
 
@@ -141,12 +145,12 @@ def run_varlingam_window(
     ar_coefs: np.ndarray | None = None,
     compute_error_independence: bool = False,
 ) -> VarLingamWindow:
-    """Fit VARLiNGAM on one window and return a :class:`VarLingamWindow`.
+    """Fit VARLiNGAM on 1 window and return a :class:`VarLingamWindow`.
 
     ``ar_coefs`` supplies pre-computed VAR coefficients and skips the
     internal VAR step. ``compute_error_independence`` runs the HSIC test,
-    which is O(d^2) and only practical for small d. Row/index fields are
-    placeholders filled by the rolling driver.
+    which is O(d^2) and only practical for small d. The row and index fields
+    are placeholders that the rolling driver fills in.
     """
     columns = list(window_df.columns)
     X = window_df.to_numpy(dtype=float)
@@ -199,19 +203,21 @@ def bootstrap_window(
     """Bootstrap edge probabilities for the contemporaneous matrix ``B0``.
 
     Each entry is the fraction of resamples in which the edge appeared with
-    ``|effect| > min_causal_effect``. Returned in the ``i -> j`` convention.
+    ``|effect| > min_causal_effect``. The result is in the ``i -> j``
+    convention.
     """
     X = window_df.to_numpy(dtype=float)
     d = X.shape[1]
     model = VARLiNGAM(lags=lags, criterion=None, prune=True, random_state=random_state)
-    # lingam's bootstrap resamples via sklearn.utils.resample without a seed, so
-    # it draws from the global NumPy RNG -- seed it for reproducible probabilities.
+    # lingam's bootstrap resamples through sklearn.utils.resample without a seed,
+    # so it draws from the global NumPy RNG. I seed it so that the probabilities
+    # are reproducible.
     np.random.seed(random_state)
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
         result = model.bootstrap(X, n_sampling=n_sampling)
         probs = result.get_probabilities(min_causal_effect=min_causal_effect)
-    # probs is (d, d*(1+lags)) for VAR; block 0 is the B0 probabilities (j -> i).
+    # probs is (d, d*(1+lags)) for a VAR. Block 0 holds the B0 probabilities (j -> i).
     return np.asarray(probs)[:, :d].T.copy()
 
 
@@ -230,7 +236,8 @@ def _fit_one(
     n_bootstrap: int,
     bootstrap_min_effect: float,
 ) -> VarLingamWindow:
-    """Fit VARLiNGAM for a single window (top-level so joblib can pickle it)."""
+    """Fit VARLiNGAM for 1 window. This is a top-level function so that joblib
+    can pickle it."""
     idx, start, end = args
     window_df = returns.iloc[start:end]
 
@@ -284,10 +291,10 @@ def run_rolling_varlingam(
 ) -> RollingVarLingamResult:
     """Slide VARLiNGAM across a :class:`Dataset`.
 
-    ``var_method="ridge"``/``"ols"`` pre-estimates the VAR via
-    :func:`estimate_var_coefs`; use ridge for large d. ``checkpoint_dir``
-    enables resume, keyed by window index only, so use a fresh directory
-    when parameters change.
+    ``var_method="ridge"`` or ``"ols"`` pre-estimates the VAR with
+    :func:`estimate_var_coefs`. Use ridge for large d. ``checkpoint_dir``
+    allows a run to resume. It is keyed by window index only, so use a fresh
+    directory when the parameters change.
     """
     returns = dataset.returns
     dates = dataset.dates
@@ -328,18 +335,19 @@ def run_rolling_varlingam(
     )
 
 
-# Stage 1 joint-matrix path: drivers + assets with asset -> driver mask
-# lingam's prior_knowledge convention: -1 no prior, 0 no edge j -> i,
-# 1 edge j -> i. Forbidding asset -> driver therefore means
-# prior_knowledge[driver_j, asset_i] = 0.
+# Stage 1 joint-matrix path: drivers and assets with the asset -> driver mask.
+# In lingam's prior_knowledge convention, -1 means no prior, 0 means no edge
+# j -> i and 1 means an edge j -> i. Forbidding asset -> driver therefore
+# means prior_knowledge[driver_j, asset_i] = 0.
 def make_prior_knowledge_asset_to_driver(
     driver_idx: np.ndarray,
     asset_idx: np.ndarray,
     n_features: int,
 ) -> np.ndarray:
-    """DirectLiNGAM prior_knowledge matrix forbidding asset -> driver edges.
+    """Return the DirectLiNGAM prior_knowledge matrix that forbids
+    asset -> driver edges.
 
-    All entries -1 (no prior) except ``pk[driver_j, asset_i] = 0``.
+    All entries are -1 (no prior) except ``pk[driver_j, asset_i] = 0``.
     """
     pk = np.full((n_features, n_features), -1, dtype=int)
     for dj in driver_idx:
@@ -355,11 +363,12 @@ def estimate_var_coefs_masked(
     asset_idx: np.ndarray,
     alpha: float = 1.0,
 ) -> np.ndarray:
-    """Ridge VAR with the asset -> driver lag mask enforced row-by-row.
+    """Fit a ridge VAR with the asset -> driver lag mask enforced row by row.
 
-    Driver equations regress only on lagged drivers; asset equations are
-    unconstrained. Returns ``(lags, d, d)`` in the lingam convention
-    (``M[tau, i, j]`` = effect of lagged j on i), masked entries exactly zero.
+    Driver equations regress only on lagged drivers. Asset equations are
+    unconstrained. The result is ``(lags, d, d)`` in the lingam convention
+    (``M[tau, i, j]`` is the effect of lagged j on i), and the masked
+    entries are exactly zero.
     """
     from sklearn.linear_model import Ridge
 
@@ -371,7 +380,7 @@ def estimate_var_coefs_masked(
     target = X[lags:]                                                     # shape (n - lags, d)
 
     driver_set = set(int(i) for i in driver_idx)
-    # Indices in the design matrix corresponding to lagged drivers across all lags:
+    # Indices in the design matrix of the lagged drivers across all lags.
     driver_design_cols = np.array(
         [k * d + j for k in range(lags) for j in range(d) if j in driver_set],
         dtype=int,
@@ -385,16 +394,17 @@ def estimate_var_coefs_masked(
         model.fit(design[:, cols], target[:, i])
         coef_T[i, cols] = model.coef_
 
-    # Reshape: coef_T[i, k*d+j] is the coefficient of x_{t-k-1}[j] in equation i.
-    # M[k, i, j] in the same convention is therefore coef_T[i, k*d+j].
+    # coef_T[i, k*d+j] is the coefficient of x_{t-k-1}[j] in equation i, so
+    # M[k, i, j] in the same convention is coef_T[i, k*d+j].
     return np.stack([coef_T[:, k * d : (k + 1) * d] for k in range(lags)], axis=0)
 
 
 @dataclass
 class JointVarLingamWindow:
-    """VARLiNGAM output for one window of the joint ``[D | A]`` panel.
+    """VARLiNGAM output for 1 window of the joint ``[D | A]`` panel.
 
-    Mirrors :class:`JointDynotearsWindow`; ``B0[i, j]`` is i -> j.
+    It has the same layout as :class:`JointDynotearsWindow`. ``B0[i, j]``
+    is i -> j.
     """
 
     index: int
@@ -426,7 +436,7 @@ class JointVarLingamWindow:
         return mat[np.ix_(self.asset_idx, self.driver_idx)]
 
     def asset_to_asset_block(self, lag: int) -> np.ndarray:
-        """``M[a, a]``: the asset-only causal block."""
+        """Return ``M[a, a]``, the asset-only causal block."""
         mat = self.B0 if lag == 0 else self.B_lags[lag - 1]
         return mat[np.ix_(self.asset_idx, self.asset_idx)]
 
@@ -461,13 +471,14 @@ def run_varlingam_joint_window(
     bootstrap_min_effect: float = 0.01,
     compute_error_independence: bool = False,
 ) -> JointVarLingamWindow:
-    """Fit VARLiNGAM on one joint-matrix window with the asset -> driver mask.
+    """Fit VARLiNGAM on 1 joint-matrix window with the asset -> driver mask.
 
-    Lagged coefficients come from :func:`estimate_var_coefs_masked`; the
-    contemporaneous B0 from DirectLiNGAM with a prior_knowledge mask.
-    ``criterion`` is ignored when the mask is enforced, since the VAR is
-    hand-rolled with fixed ``lags``. ``compute_error_independence`` runs the
-    HSIC misspecification check (O(d^2) tests, so spot-check only).
+    The lagged coefficients come from :func:`estimate_var_coefs_masked` and
+    the contemporaneous B0 comes from DirectLiNGAM with a prior_knowledge
+    mask. ``criterion`` is ignored when the mask is enforced, because I fit
+    the VAR myself with fixed ``lags``. ``compute_error_independence`` runs
+    the HSIC misspecification check, which needs O(d^2) tests, so use it as
+    a spot check only.
     """
     columns = list(joint_window.columns)
     driver_columns = list(driver_columns)
@@ -476,13 +487,13 @@ def run_varlingam_joint_window(
     asset_idx = np.array([columns.index(c) for c in asset_columns], dtype=int)
     d = len(columns)
 
-    # Per-window z-score.
+    # Z-score the window.
     mean = joint_window.mean(axis=0)
     std = joint_window.std(axis=0, ddof=0).where(lambda s: s > 1e-12, 1e-12)
     normalised = (joint_window - mean) / std
     X = normalised.to_numpy(dtype=float)
 
-    # Pre-compute masked VAR coefficients (skips VARLiNGAM's own VAR step).
+    # Pre-compute the masked VAR coefficients. This skips VARLiNGAM's own VAR step.
     if enforce_prior_knowledge:
         ar_coefs = estimate_var_coefs_masked(
             X, lags=lags, driver_idx=driver_idx, asset_idx=asset_idx, alpha=ridge_alpha
@@ -493,7 +504,7 @@ def run_varlingam_joint_window(
 
         pk = make_prior_knowledge_asset_to_driver(driver_idx, asset_idx, d)
         lingam_model = DirectLiNGAM(prior_knowledge=pk)
-        effective_criterion = None  # ar_coefs supplied, so VAR step is skipped
+        effective_criterion = None  # ar_coefs is supplied, so the VAR step is skipped
     else:
         ar_coefs = None
         lingam_model = None
@@ -516,9 +527,9 @@ def run_varlingam_joint_window(
     B_lags = [am[k].T.copy() for k in range(1, len(am))]
     causal_order = [int(i) for i in model.causal_order_]
 
-    # Post-fit projection: VARLiNGAM's pruning refits the lagged blocks
-    # without prior_knowledge, so residual mass leaks into B_tau[asset, driver];
-    # zero it explicitly. B0 is already exactly enforced by DirectLiNGAM.
+    # VARLiNGAM's pruning refits the lagged blocks without prior_knowledge, so
+    # some mass ends up in B_tau[asset, driver]. I zero it explicitly. B0 is
+    # already exactly enforced by DirectLiNGAM.
     if enforce_prior_knowledge:
         for B in (B0, *B_lags):
             B[np.ix_(asset_idx, driver_idx)] = 0.0
@@ -537,7 +548,7 @@ def run_varlingam_joint_window(
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
             error_indep_pvalues = np.asarray(model.get_error_independence_p_values())
-        # Fraction of off-diagonal p < 0.05; ~5% expected under the null.
+        # Fraction of off-diagonal p-values below 0.05. Roughly 5% is expected under the null.
         triu = np.triu_indices_from(error_indep_pvalues, k=1)
         rejection_rate = float(np.mean(error_indep_pvalues[triu] < 0.05))
         log_fn = logger.warning if rejection_rate > 0.20 else logger.info
@@ -588,7 +599,7 @@ def run_rolling_varlingam_joint(
     """Slide VARLiNGAM over the joint ``[D | A]`` matrix with the asset mask.
 
     ``error_independence_every_n_windows > 0`` runs the HSIC test on every
-    n-th window (it is too slow for all of them); 0 disables it.
+    n-th window, because it is too slow to run on all of them. 0 disables it.
     """
     from pipeline.discovery.dynotears import rolling_windows
 

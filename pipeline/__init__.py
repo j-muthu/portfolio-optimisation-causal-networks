@@ -1,6 +1,7 @@
-"""Causal-HSP pipeline for the S&P 100 thesis.
+"""Top-level package for the thesis pipeline.
 
-Re-exports the legacy asset-only DYNOTEARS/VARLiNGAM API for back-compat.
+I re-export the asset-only DYNOTEARS and VARLiNGAM API here so that older
+scripts keep working.
 """
 
 from __future__ import annotations

@@ -1,7 +1,8 @@
-"""Collate the J4 tables: K-sensitivity (J4a) and alpha/gamma sweep (J4b).
+"""Collate the J4 tables: the K sensitivity (J4a) and the alpha and gamma
+sweep (J4b).
 
-Computes net Sharpe per config and bootstrap ΔSharpe vs the matched baseline,
-same methodology as J2/J3.
+I compute the net Sharpe per configuration and the bootstrap Sharpe
+difference against the matched baseline, with the same method as J2 and J3.
 
 Run:  python -m scripts.collate_j4
 Outputs: results/j4a_k_sensitivity.csv, results/j4b_alpha_gamma.csv
@@ -35,8 +36,9 @@ def _rets(tag: str) -> pd.Series | None:
     return bt.nav_net.pct_change().dropna()
 
 
-# J4 configs run fresh with a suffix; committed phase_i_* bundles stay the
-# headline. main() checks fresh K=17 reproduces the committed numbers.
+# The J4 configurations run fresh with a suffix, and the committed phase_i_*
+# bundles stay the headline. main() checks that a fresh K=17 reproduces the
+# committed numbers.
 def _v0_tag(w, k):  return f"phase_i_v0_w{w}_k{k}"
 def _v1_tag(w, k):  return f"phase_i_v1_w{w}_k{k}"
 def _v2_tag(a, g):  return f"phase_i_v2_w252_a{a}_g{g}"
@@ -64,7 +66,7 @@ def collate_j4a() -> pd.DataFrame:
 
 
 def collate_j4b() -> pd.DataFrame:
-    # Baseline is fresh V1 w252 K=17; fall back to committed if absent.
+    # The baseline is the fresh V1 w252 K=17. Fall back to the committed one if it is absent.
     r_v1 = _rets("phase_i_v1_w252_k17")
     if r_v1 is None:
         r_v1 = _rets("phase_i_v1_w252")
@@ -84,7 +86,8 @@ def collate_j4b() -> pd.DataFrame:
 
 
 def _repro_check() -> None:
-    """Confirm fresh K=17 (frozen-EEM) reproduces the committed headline."""
+    """Check that a fresh K=17 run (frozen EEM) reproduces the committed
+    headline."""
     from pipeline.evaluation.metrics import annualised_sharpe as sh
     print("Reproducibility — fresh K=17 (frozen EEM) vs committed headline:")
     for w in WINDOWS:

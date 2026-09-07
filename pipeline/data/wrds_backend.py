@@ -1,12 +1,13 @@
-"""WRDS / CRSP backend for survivorship-bias-free prices and shares.
+"""WRDS/CRSP backend for prices and shares free of survivorship bias.
 
-Talks straight to the WRDS Postgres endpoint via SQLAlchemy + psycopg (the
-official wrds library pins old pandas/numpy). Auth comes from ~/.pgpass
-(host wrds-pgdata.wharton.upenn.edu:9737, db wrds, chmod 600); WRDS_USERNAME
-env var optionally overrides the username. Queries are cached under
-cache/wrds/ and retried on transient drops.
+I connect directly to the WRDS Postgres endpoint with SQLAlchemy and
+psycopg, because the official wrds library pins old versions of pandas and
+numpy. Authentication comes from ~/.pgpass (host
+wrds-pgdata.wharton.upenn.edu:9737, database wrds, chmod 600). The
+WRDS_USERNAME environment variable optionally overrides the username.
+Queries are cached under cache/wrds/ and retried on transient drops.
 
-Tickers are resolved to PERMNOs (stable; tickers get reused, PERMNOs don't).
+I resolve tickers to PERMNOs, because tickers get reused and PERMNOs do not.
 """
 
 from __future__ import annotations
@@ -33,12 +34,12 @@ WRDS_PORT = 9737
 WRDS_DATABASE = "wrds"
 RETRY_BACKOFF_S = (2.0, 5.0, 10.0)
 
-_ENGINE = None  # singleton sqlalchemy.Engine
+_ENGINE = None  # the single shared sqlalchemy.Engine
 
 
 # Connection management
 def _username_from_pgpass() -> str | None:
-    """Username from the matching ~/.pgpass line
+    """Return the username from the matching ~/.pgpass line
     (host:port:database:username:password), or None."""
     path = Path(os.environ.get("PGPASSFILE", Path.home() / ".pgpass"))
     if not path.exists():
@@ -60,8 +61,9 @@ def _username_from_pgpass() -> str | None:
 
 
 def _get_engine():
-    """Lazy-init the singleton WRDS engine. Username: WRDS_USERNAME env var,
-    then ~/.pgpass; password comes from libpq at connect time."""
+    """Create the shared WRDS engine on first use. The username comes from
+    the WRDS_USERNAME environment variable, then from ~/.pgpass. The
+    password comes from libpq at connect time."""
     global _ENGINE
     if _ENGINE is not None:
         return _ENGINE
@@ -86,9 +88,9 @@ def _get_engine():
 
 
 def _retry_query(query, params: dict | None = None) -> pd.DataFrame:
-    """Run a query with retry on transient drops. Terminal failures (missing
-    driver or username) raise immediately so the assets cascade falls through
-    to yfinance."""
+    """Run a query and retry on transient drops. Terminal failures (a missing
+    driver or username) raise immediately so that the assets cascade falls
+    through to yfinance."""
     last_exc: Exception | None = None
     for attempt, wait in enumerate([0.0, *RETRY_BACKOFF_S]):
         if wait:
@@ -97,23 +99,23 @@ def _retry_query(query, params: dict | None = None) -> pd.DataFrame:
             engine = _get_engine()
             return pd.read_sql(query, engine, params=params or {})
         except (ImportError, ModuleNotFoundError):
-            raise  # sqlalchemy/psycopg not installed
+            raise  # sqlalchemy or psycopg is not installed
         except RuntimeError as exc:
-            # Missing username is also terminal.
+            # A missing username is also terminal.
             if "WRDS_USERNAME" in str(exc):
                 raise
             last_exc = exc
         except Exception as exc:
             last_exc = exc
             logger.debug("WRDS query attempt %d failed: %s", attempt + 1, exc)
-            # Rebuild the engine next try; the pool may be in a bad state.
+            # Rebuild the engine on the next try because the pool may be in a bad state.
             global _ENGINE
             _ENGINE = None
     raise RuntimeError(f"WRDS query failed after retries: {last_exc}") from last_exc
 
 
 def verify_connection() -> bool:
-    """Smoke-test the WRDS connection; True on success."""
+    """Smoke-test the WRDS connection. Return True on success."""
     from sqlalchemy import text
 
     try:
@@ -133,8 +135,8 @@ def _cache_key(*parts: str) -> Path:
 
 # Ticker -> PERMNO resolution
 def _resolve_permnos(ticker: str, start: pd.Timestamp, end: pd.Timestamp) -> list[int]:
-    """All PERMNOs the ticker mapped to in [start, end]. One ticker can map
-    to several PERMNOs over time (delisting + reuse)."""
+    """Return all PERMNOs the ticker mapped to in [start, end]. One ticker
+    can map to several PERMNOs over time through delisting and reuse."""
     cache = _cache_key("permnos", ticker.upper(), start.isoformat(), end.isoformat())
     if cache.exists():
         return pd.read_parquet(cache)["permno"].astype(int).tolist()
@@ -162,8 +164,8 @@ def _resolve_permnos(ticker: str, start: pd.Timestamp, end: pd.Timestamp) -> lis
 def _resolve_permnos_batch(
     tickers: Sequence[str], start: pd.Timestamp, end: pd.Timestamp,
 ) -> dict[str, list[int]]:
-    """Batch ticker -> PERMNO mapping in one SQL query. Tickers with no CRSP
-    coverage in the window are absent from the result."""
+    """Map tickers to PERMNOs in 1 SQL query. Tickers with no CRSP coverage in
+    the window are absent from the result."""
     tickers_up = sorted({t.upper() for t in tickers})
     if not tickers_up:
         return {}
@@ -205,10 +207,10 @@ def fetch_crsp_mcap_at_snapshot(
     lookback_days: int = 5,
     use_cache: bool = True,
 ) -> pd.Series:
-    """Market cap (USD) per ticker at as_of in two SQL round-trips.
+    """Return the market cap (USD) per ticker at as_of in 2 SQL round trips.
 
-    mcap = |prc| * shrout * 1000 / cfacshr (shrout is in thousands; cfacshr
-    undoes splits). Takes the latest observation per PERMNO within
+    mcap = |prc| * shrout * 1000 / cfacshr. shrout is in thousands and
+    cfacshr undoes splits. I take the latest observation per PERMNO within
     lookback_days of as_of. Tickers without CRSP coverage are absent from
     the result.
     """
@@ -227,7 +229,7 @@ def fetch_crsp_mcap_at_snapshot(
         return df.iloc[:, 0]
 
     start_window = as_of - pd.Timedelta(days=lookback_days)
-    # Resolve PERMNOs over a 1y window to catch ticker changes near as_of.
+    # Resolve PERMNOs over a 1-year window to catch ticker changes near as_of.
     resolve_start = as_of - pd.Timedelta(days=365)
     permno_map = _resolve_permnos_batch(tickers_up, resolve_start, as_of)
     if not permno_map:
@@ -270,7 +272,7 @@ def fetch_crsp_mcap_at_snapshot(
 
     df["date"] = pd.to_datetime(df["date"])
     df["ticker"] = df["permno"].map(permno_to_ticker)
-    # Latest row per PERMNO, then sum across PERMNOs per ticker (rare).
+    # Take the latest row per PERMNO, then sum across PERMNOs per ticker (rare).
     latest_per_permno = (
         df.sort_values(["permno", "date"])
         .drop_duplicates("permno", keep="last")
@@ -292,8 +294,9 @@ def fetch_crsp_mcap_at_snapshot(
 def fetch_crsp_prices(
     ticker: str, start: pd.Timestamp, end: pd.Timestamp,
 ) -> pd.Series | None:
-    """Daily CRSP split-adjusted close for ticker over [start, end], or None
-    if no PERMNO matched. Cached per (ticker, start, end)."""
+    """Return the daily CRSP split-adjusted close for ticker over
+    [start, end], or None if no PERMNO matched. Cached per (ticker, start,
+    end)."""
     cache = _cache_key("prices", ticker.upper(), start.isoformat(), end.isoformat())
     if cache.exists():
         return pd.read_parquet(cache).iloc[:, 0]
@@ -305,8 +308,8 @@ def fetch_crsp_prices(
 
     from sqlalchemy import bindparam, text
 
-    # prc is negative for bid-ask midpoints (no trade), so take abs();
-    # adjusted_close = abs(prc) / cfacpr.
+    # prc is negative for bid-ask midpoints (no trade), so take the absolute
+    # value. adjusted_close = abs(prc) / cfacpr.
     query = text(
         """
         SELECT date, permno, ABS(prc) / NULLIF(cfacpr, 0) AS adj_close
@@ -324,7 +327,7 @@ def fetch_crsp_prices(
     if df.empty:
         return None
     df["date"] = pd.to_datetime(df["date"])
-    # PERMNOs for one ticker cover disjoint dates, so per-date last is safe.
+    # The PERMNOs for 1 ticker cover disjoint dates, so taking the last per date is safe.
     series = (
         df.sort_values(["date", "permno"])
         .drop_duplicates("date", keep="last")
@@ -345,9 +348,10 @@ def fetch_crsp_prices(
 def fetch_crsp_shares_outstanding(
     tickers: Sequence[str], as_of: pd.Timestamp,
 ) -> pd.Series:
-    """Shares outstanding per ticker at as_of, in units (CRSP shrout is in
-    thousands; we multiply by 1000). Most recent observation <= as_of;
-    tickers without coverage are missing from the result."""
+    """Return shares outstanding per ticker at as_of, in units. CRSP shrout
+    is in thousands, so I multiply by 1000. I take the most recent
+    observation on or before as_of. Tickers without coverage are missing
+    from the result."""
     cache = _cache_key(
         "shrout_panel",
         "|".join(sorted(t.upper() for t in tickers)),

@@ -1,8 +1,8 @@
-"""Corrected (frozen-EEM) versions of the two interim-report figures.
+"""Corrected (frozen EEM) versions of the 2 interim-report figures.
 
-Same style as plot_interim_results.py but driven by the frozen-EEM bundles,
-written to interim_report/figures_corrected/ so the submitted figures stay
-untouched.
+The style is the same as plot_interim_results.py, but the figures come from
+the frozen-EEM bundles. I write them to interim_report/figures_corrected/
+so that the submitted figures stay untouched.
 
 Run:  python -m scripts.plot_interim_corrected
 """
@@ -28,7 +28,7 @@ COLOURS = {"V0": "#999999", "V1": "#0072B2", "V2": "#D55E00"}
 VARIANTS = ["V0", "V1", "V2"]
 LABELS = {"V0": "V0  vanilla HSP (cum-corr)", "V1": "V1  Causal-HSP (open loop)",
           "V2": "V2  Causal-HSP (closed loop)"}
-# CSV variant rows (DYNOTEARS scope, matching the interim report)
+# The CSV variant rows (DYNOTEARS only, matching the interim report)
 CSV_VAR = {"V0": "V0", "V1": "V1-DYNOTEARS", "V2": "V2-DYNOTEARS"}
 REGIME_ORDER = ["GFC 2007-09", "2018Q4 selloff", "COVID 2020", "2022 rate-hike", "Bull 2013-18"]
 REGIME_LBL = ["GFC\n2007-09", "2018Q4\nselloff", "COVID\n2020", "2022\nrate-hike", "Bull\n2013-18"]
@@ -61,7 +61,7 @@ def plot_sharpe_and_regime():
     df = pd.read_csv(RESULTS / "regime_analysis" / "excess_sharpe_named.csv")
     fig, (axL, axR) = plt.subplots(1, 2, figsize=(11.0, 4.3))
 
-    # (a) Sharpe by variant × window, from frozen bundles.
+    # Panel (a) is the Sharpe by variant and window, from the frozen bundles.
     windows = [252, 504]
     x = np.arange(len(VARIANTS)); bw = 0.38
     for j, win in enumerate(windows):
@@ -77,7 +77,7 @@ def plot_sharpe_and_regime():
     axL.legend(frameon=False, fontsize=9, loc="upper right")
     axL.grid(True, axis="y", alpha=0.3)
 
-    # (b) named-regime mean monthly excess-Sharpe vs 1/N (window 252), from CSV.
+    # Panel (b) is the mean monthly excess Sharpe over 1/N in the named regimes (window 252), from the CSV.
     xr = np.arange(len(REGIME_ORDER)); bw2 = 0.26
     for k, v in enumerate(VARIANTS):
         sub = df[df.variant == CSV_VAR[v]].set_index("named_regime")["mean_excess_sharpe"]
